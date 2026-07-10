@@ -2,12 +2,16 @@
 
 This changelog summarizes public, non-personal milestones. Early development used many private prototype snapshots; those files are intentionally not reproduced in the public repository.
 
-## Unreleased
+## 1.00 - 2026-07-10
 
 - Consolidated the project into one canonical public repository.
 - Replaced duplicated version snapshots with stable entry-point filenames.
 - Added public contribution, testing, methodology, privacy and security guidance.
 - Retained the deterministic simulator as the primary tool and labelled Monte Carlo analysis experimental.
+- Replaced the high-balance generic defaults with a fictional Australian couple approaching retirement.
+- Renamed the two household planning anchors to **Preferred Retirement Income** and **Essential Annual Budget**.
+- Clarified that accumulation and retirement-phase inputs are estimated net returns after fees and tax.
+- Moved model assumptions, sources and the step-by-step calculation method beneath the projection table.
 
 ## Deterministic simulator 0.99
 

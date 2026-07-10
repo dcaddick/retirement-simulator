@@ -40,6 +40,23 @@ check('sample has otherIncomes/otherAssets arrays',
   Array.isArray(sample.otherIncomes) && Array.isArray(sample.otherAssets));
 check('sample people have no ukPrivate fields',
   sample.people.every(p => !('ukPrivateAmountGbp' in p)));
+check('v1.00 fictional couple sample is installed',
+  sample.people[0].name === 'John' && sample.people[0].age === 63 && sample.people[0].super === 220000 &&
+  sample.people[1].name === 'Jane' && sample.people[1].age === 61 && sample.people[1].super === 165000);
+check('sample uses lower accumulation and higher retirement-phase net returns',
+  sample.people.every(p => p.accumulationReturnPct === 5.5 && p.retirementReturnPct === 6.5));
+check('sample has UK pensions cleared and disabled',
+  sample.people.every(p => p.ukStateAnnualGbp === 0) && sample.assumptions.ukPensionsEnabled === false);
+check('sample distinguishes preferred income from essential budget',
+  sample.household.targetAfterTax === 80000 && sample.household.annualBudget === 70000);
+check('v1.00 terminology is rendered',
+  html.includes('Preferred Retirement Income') && html.includes('Essential Annual Budget'));
+check('return assumptions are explained below the table',
+  html.indexOf('Return assumptions.') > html.indexOf('<div class="tblwrap">') &&
+  html.includes('estimated net returns after fees and tax'));
+check('assumptions and methodology moved out of the controls panel',
+  html.indexOf('<summary>Model assumptions and sources</summary>') > html.indexOf('<div class="tblwrap">') &&
+  html.indexOf('id="methodologySection"') > html.indexOf('<div class="tblwrap">'));
 
 console.log('\nbaseline projection');
 const base = core.projectScenario(sample);
@@ -65,12 +82,16 @@ const r0 = projIncome.rows[0];
 check('year-0 otherIncomeNet between 2000 and 12000',
   r0.components.otherIncomeNet > 2000 && r0.components.otherIncomeNet <= 12000,
   String(r0.components.otherIncomeNet));
-// Total income is capped at the requested target while tiers can fill the gap,
-// so extra income shows up as a smaller drawdown, i.e. higher end assets.
-check('income reduces year-0 drawdown vs baseline',
-  (r0.components.potDraw + r0.components.person0Super + r0.components.person1Super) <
-  (base.rows[0].components.potDraw + base.rows[0].components.person0Super + base.rows[0].components.person1Super),
-  `draws ${r0.components.potDraw} vs ${base.rows[0].components.potDraw}`);
+// Working-year salary can cover the target in year 0. Compare the first year in
+// which the baseline actually draws from assets.
+const drawTotal = row =>
+  row.components.potDraw + row.components.person0Super + row.components.person1Super;
+const firstDrawIndex = base.rows.findIndex(row => drawTotal(row) > 0);
+check('income reduces drawdown once the baseline draws from assets',
+  firstDrawIndex >= 0 && drawTotal(projIncome.rows[firstDrawIndex]) < drawTotal(base.rows[firstDrawIndex]),
+  firstDrawIndex < 0
+    ? 'baseline never draws from assets'
+    : `year ${base.rows[firstDrawIndex].year}: ${drawTotal(projIncome.rows[firstDrawIndex])} vs ${drawTotal(base.rows[firstDrawIndex])}`);
 check('income raises end-of-model assets vs baseline',
   projIncome.rows.at(-1).totalAssets > base.rows.at(-1).totalAssets,
   `${projIncome.rows.at(-1).totalAssets} vs ${base.rows.at(-1).totalAssets}`);

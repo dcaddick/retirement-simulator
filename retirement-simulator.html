@@ -4,7 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src https://api.frankfurter.app https://stooq.com; base-uri 'none'; form-action 'none'" />
-<title>Family Retirement Income Simulator v0.99</title>
+<title>Family Retirement Income Simulator v1.00</title>
 <style>
   :root{
     --bg:#0f1720; --panel:#18232f; --panel2:#1e2c3a; --line:#2b3d4f;
@@ -63,6 +63,9 @@
   .validation-summary:empty{display:none}
   .assumptions{margin:12px 0;color:var(--muted);font-size:11.5px}
   .assumptions summary{cursor:pointer;color:var(--text)}
+  .supporting-notes{margin-top:12px;border-top:1px solid var(--line);padding-top:2px}
+  .stage .assumptions{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+  .stage .assumptions summary{font-weight:600}
   .tabs{display:flex;gap:6px;margin-bottom:10px}
   .tabs button{background:var(--panel);color:var(--muted);border:1px solid var(--line);border-radius:8px;padding:6px 14px;font-size:13px;cursor:pointer}
   .tabs button.on{background:var(--accent);color:#08131c;border-color:var(--accent);font-weight:600}
@@ -130,7 +133,7 @@
 <body>
 <div class="disclaimer-banner top" role="note">Local, reproducible retirement-risk analysis. Estimate only; not financial or tax advice.</div>
 <header>
-  <h1>Family Retirement Income Simulator <span class="version">v0.99</span></h1>
+  <h1>Family Retirement Income Simulator <span class="version">v1.00</span></h1>
   <div class="sub">A transparent two-person household projection. Working estimate, not financial advice.</div>
   <nav class="scenario-actions" aria-label="Scenario actions">
     <button type="button" id="newScenario">New</button>
@@ -214,65 +217,6 @@
       </p>
     </section>
     <ul id="validationSummary" class="validation-summary" aria-live="polite"></ul>
-    <details class="assumptions">
-      <summary>Model assumptions and sources</summary>
-      <div id="assumptionsContent">
-        <p>Estimates only. Not financial or tax advice.</p>
-        <h4>Key rates in this scenario</h4>
-        <ul id="keyRatesList"></ul>
-        <h4>Sources</h4>
-        <ul id="sourceList"></ul>
-        <ul id="limitationsList">
-          <li>Annual projection rows; retirement and pension starts use whole ages.</li>
-          <li>Age Pension estimate assumes a homeowner couple and excludes the principal residence.</li>
-          <li>Share values remain flat until sale.</li>
-          <li>Capital-loss carry-forward is not modelled.</li>
-          <li>Survival is illustrative and Person 1-specific.</li>
-          <li>Other income is CPI-indexed and split 50/50 for tax when marked taxable. Other assets count in the Age Pension assets test but are not deemed, and no CGT is modelled on their disposal.</li>
-          <li>Early super access is simplified, not full Transition-to-Retirement (TTR). There is no 10%-of-balance annual payment cap, no commutation restriction, and no automatic cessation rule. Tax treatment assumes the member is over 60, where TTR and full retirement-phase withdrawals are both tax-free; the model will misstate results for anyone under 60 drawing super while still working.</li>
-        </ul>
-      </div>
-    </details>
-    <details class="assumptions" id="methodologySection">
-      <summary>How each year is calculated (step by step)</summary>
-      <div>
-        <p>Every projection year runs this exact sequence, in nominal (future) dollars.
-        The table and chart then divide by the cumulative inflation factor to show
-        today&rsquo;s dollars, unless the table display is switched to Nominal.</p>
-        <ol id="methodologySteps">
-          <li><b>Super access.</b> If a person reaches their super access age this year,
-            the selected percentage of their whole balance moves to the ABP
-            (retirement/drawdown) phase. This happens before growth.</li>
-          <li><b>Salary.</b> If still working: salary &times; inflation factor, plus
-            SG contributions (salary &times; SG% &times; 0.85 after contributions tax)
-            into accumulation super.</li>
-          <li><b>Investment growth.</b> The full year&rsquo;s return is applied:
-            accumulation balance &times; (1 + accumulation return), ABP balance
-            &times; (1 + retirement return). Returns are nominal. A 6% nominal return
-            with 2.5% inflation is about a 3.4% real return, which is why balances
-            shown in today&rsquo;s dollars grow more slowly than the headline rate.</li>
-          <li><b>ABP minimum drawdown.</b> If enabled, the legislated minimum is taken
-            from the post-growth ABP balance: 4% under 65, 5% at 65&ndash;74, 6% at
-            75&ndash;79, 7% at 80&ndash;84, 9% at 85&ndash;89, 11% at 90&ndash;94,
-            14% at 95+.</li>
-          <li><b>Top-up draws.</b> If guaranteed income (work, UK/DB pensions,
-            other income, Age Pension) plus the ABP minimums fall short of the requested after-tax
-            income, the gap is drawn from the drawdown priority tiers. Spending is
-            capped at the general budget; income above it is banked to savings.</li>
-          <li><b>Display conversion.</b> Each row divides nominal values by the
-            cumulative inflation factor for that year (today&rsquo;s dollars).</li>
-        </ol>
-        <p><b>Table columns.</b> Super balance columns are end-of-year balances after
-        growth and draws. &ldquo;UK State Pension (gross)&rdquo; is the gross pension
-        (frozen pensions stay fixed in nominal GBP, so their today&rsquo;s-dollars
-        value falls each year). &ldquo;ABP min draw&rdquo; shows the mandatory minimum
-        with the applied rate; &ldquo;Top-up draw&rdquo; is the extra super drawn to
-        reach the requested income. &ldquo;Tax&rdquo; is total household income tax
-        including Medicare, LITO/SAPTO and the UPP deduction on UK pensions.
-        &ldquo;After tax&rdquo; is total household after-tax income;
-        &ldquo;Banked&rdquo; is the part of it above the budget, added to savings.</p>
-      </div>
-    </details>
   </div>
   <div id="splitter" role="separator" aria-orientation="vertical" aria-label="Resize panels"></div>
   <div class="stage">
@@ -301,8 +245,70 @@
       </label>
     </div>
     <div class="tblwrap"><table id="tbl"></table></div>
+    <div class="supporting-notes">
+      <p class="note"><b>Return assumptions.</b> Accumulation and retirement-phase returns are estimated net returns after fees and tax. A higher retirement-phase return may represent the tax advantage of pension-phase earnings; it does not imply a different underlying investment portfolio.</p>
+      <details class="assumptions">
+        <summary>Model assumptions and sources</summary>
+        <div id="assumptionsContent">
+          <p>Estimates only. Not financial or tax advice.</p>
+          <h4>Key rates in this scenario</h4>
+          <ul id="keyRatesList"></ul>
+          <h4>Sources</h4>
+          <ul id="sourceList"></ul>
+          <ul id="limitationsList">
+            <li>Annual projection rows; retirement and pension starts use whole ages.</li>
+            <li>Age Pension estimate assumes a homeowner couple and excludes the principal residence.</li>
+            <li>Share values remain flat until sale.</li>
+            <li>Capital-loss carry-forward is not modelled.</li>
+            <li>Survival is illustrative and Person 1-specific.</li>
+            <li>Other income is CPI-indexed and split 50/50 for tax when marked taxable. Other assets count in the Age Pension assets test but are not deemed, and no CGT is modelled on their disposal.</li>
+            <li>Early super access is simplified, not full Transition-to-Retirement (TTR). There is no 10%-of-balance annual payment cap, no commutation restriction, and no automatic cessation rule. Tax treatment assumes the member is over 60, where TTR and full retirement-phase withdrawals are both tax-free; the model will misstate results for anyone under 60 drawing super while still working.</li>
+          </ul>
+        </div>
+      </details>
+      <details class="assumptions" id="methodologySection">
+        <summary>How each year is calculated (step by step)</summary>
+        <div>
+          <p>Every projection year runs this exact sequence, in nominal (future) dollars.
+          The table and chart then divide by the cumulative inflation factor to show
+          today&rsquo;s dollars, unless the table display is switched to Nominal.</p>
+          <ol id="methodologySteps">
+            <li><b>Super access.</b> If a person reaches their super access age this year,
+              the selected percentage of their whole balance moves to the ABP
+              (retirement/drawdown) phase. This happens before growth.</li>
+            <li><b>Salary.</b> If still working: salary &times; inflation factor, plus
+              SG contributions (salary &times; SG% &times; 0.85 after contributions tax)
+              into accumulation super.</li>
+            <li><b>Investment growth.</b> The full year&rsquo;s estimated net return after fees and tax is applied:
+              accumulation balance &times; (1 + accumulation return), ABP balance
+              &times; (1 + retirement return). A 6% nominal return with 2.5% inflation
+              is about a 3.4% real return, which is why balances shown in today&rsquo;s
+              dollars grow more slowly than the headline rate.</li>
+            <li><b>ABP minimum drawdown.</b> If enabled, the legislated minimum is taken
+              from the post-growth ABP balance: 4% under 65, 5% at 65&ndash;74, 6% at
+              75&ndash;79, 7% at 80&ndash;84, 9% at 85&ndash;89, 11% at 90&ndash;94,
+              14% at 95+.</li>
+            <li><b>Top-up draws.</b> If guaranteed income (work, UK/DB pensions,
+              other income, Age Pension) plus the ABP minimums fall short of the Preferred
+              Retirement Income, the gap is drawn from the drawdown priority tiers. Spending is
+              capped at the Essential Annual Budget; income above it is banked to savings.</li>
+            <li><b>Display conversion.</b> Each row divides nominal values by the
+              cumulative inflation factor for that year (today&rsquo;s dollars).</li>
+          </ol>
+          <p><b>Table columns.</b> Super balance columns are end-of-year balances after
+          growth and draws. &ldquo;UK State Pension (gross)&rdquo; is the gross pension
+          (frozen pensions stay fixed in nominal GBP, so their today&rsquo;s-dollars
+          value falls each year). &ldquo;ABP min draw&rdquo; shows the mandatory minimum
+          with the applied rate; &ldquo;Top-up draw&rdquo; is the extra super drawn to
+          reach the Preferred Retirement Income. &ldquo;Tax&rdquo; is total household income tax
+          including Medicare, LITO/SAPTO and the UPP deduction on UK pensions.
+          &ldquo;After tax&rdquo; is total household after-tax income;
+          &ldquo;Banked&rdquo; is the part of it above the Essential Annual Budget, added to savings.</p>
+        </div>
+      </details>
+    </div>
     <div class="note">
-      <b>v0.99.</b> Generic two-person sample data is stored locally on this device and can be imported or exported as JSON. Calculations are transparent estimates and are not financial or tax advice. The Display toggle switches the whole dashboard &mdash; table, chart and headline figures &mdash; between today&rsquo;s dollars and nominal (future) dollars, except the CSHC estimate which stays in today&rsquo;s dollars against its fixed threshold. Numeric inputs recalculate live as you type; the &ldquo;Recalculated&rdquo; stamp above the table confirms each run. See &ldquo;How each year is calculated&rdquo; in the left panel for the exact maths.
+      <b>v1.00.</b> Fictional Australian couple sample data is stored locally on this device and can be imported or exported as JSON. Calculations are transparent estimates and are not financial or tax advice. The Display toggle switches the whole dashboard &mdash; table, chart and headline figures &mdash; between today&rsquo;s dollars and nominal (future) dollars, except the CSHC estimate which stays in today&rsquo;s dollars against its fixed threshold. Numeric inputs recalculate live as you type; the &ldquo;Recalculated&rdquo; stamp above the table confirms each run. See &ldquo;How each year is calculated&rdquo; below the projection table for the exact maths.
     </div>
   </div>
 </div>
@@ -529,57 +535,63 @@
       people: [
         {
           id: 'p0',
-          name: 'Alex',
-          age: 62,
-          super: 600000,
-          retireAge: 67,
-          superAccessAge: 67,
+          name: 'John',
+          age: 63,
+          super: 220000,
+          retireAge: 65,
+          superAccessAge: 65,
           superAccessPct: 100,
-          salary: 55000,
+          salary: 85000,
           sgPct: 12,
-          accumulationReturnPct: 7,
-          retirementReturnPct: 6,
-          ukStateAnnualGbp: 10000,
+          accumulationReturnPct: 5.5,
+          retirementReturnPct: 6.5,
+          ukStateAnnualGbp: 0,
           ukStateStartAge: 67,
           ukStateIndexation: 'frozen'
         },
         {
           id: 'p1',
-          name: 'Jordan',
-          age: 60,
-          super: 350000,
-          retireAge: 67,
-          superAccessAge: 67,
+          name: 'Jane',
+          age: 61,
+          super: 165000,
+          retireAge: 65,
+          superAccessAge: 65,
           superAccessPct: 100,
-          salary: 30000,
+          salary: 45000,
           sgPct: 12,
-          accumulationReturnPct: 7,
-          retirementReturnPct: 6,
+          accumulationReturnPct: 5.5,
+          retirementReturnPct: 6.5,
           ukStateAnnualGbp: 0,
           ukStateStartAge: 67,
           ukStateIndexation: 'frozen'
         }
       ],
-      cash: { amount: 50000, interestPct: 0, owner: 'joint' },
-      savings: { amount: 150000, interestPct: 4, owner: 'p1' },
+      cash: { amount: 25000, interestPct: 0, owner: 'joint' },
+      savings: { amount: 60000, interestPct: 4.5, owner: 'p1' },
       shareholdings: [],
       otherIncomes: [],
       otherAssets: [],
       household: {
-        targetAfterTax: 90000,
-        annualBudget: 60000,
-        modelEndAge: 100,
-        drawdownPriority: defaultDrawdownPriority(true),
+        targetAfterTax: 80000,
+        annualBudget: 70000,
+        modelEndAge: 95,
+        drawdownPriority: [
+          [
+            { source: 'p0Super', weight: 0.5 },
+            { source: 'p1Super', weight: 0.5 }
+          ],
+          [{ source: 'savings', weight: 0.5 }]
+        ],
         applyMinimumDrawdown: true,
         includeAgePension: true,
         showSurvival: true
       },
       assumptions: {
-        inflationMode: 'treasury',
-        manualInflationPct: 2.5,
+        inflationMode: 'manual',
+        manualInflationPct: 3,
         gbpAud: 1.95,
         uppPct: 8,
-        ukPensionsEnabled: true
+        ukPensionsEnabled: false
       }
     };
   }
@@ -1155,11 +1167,11 @@
     const budgetNominal =
       (scenario.household.annualBudget ?? scenario.household.targetAfterTax) *
       inflationFactor;
-    // v0.96: top-ups anchor to the REQUESTED INCOME in both modes. With minimum
+    // v0.96: top-ups anchor to Preferred Retirement Income in both modes. With minimum
     // drawdown enforced, mandatory minimums are Priority 1 and the tiers fill any
-    // remaining gap to the requested income; spending stays capped at the general
-    // budget and the excess is banked. This lets the requested income act as the
-    // modelling lever while the budget reflects actual spending.
+    // remaining gap to Preferred Retirement Income; spending stays capped at the
+    // Essential Annual Budget and the excess is banked. This lets preferred income
+    // act as the modelling lever while the essential budget reflects actual spending.
     const gap = Math.max(0, targetNominal - guaranteedNet - mandatoryTotal);
 
     const waterfall = drawFromTiers(state, scenario.household.drawdownPriority, gap);
@@ -1173,7 +1185,7 @@
       guaranteedNet +
       superIncome.reduce((sum, value) => sum + value, 0) +
       potDraw;
-    // v0.96: spending equals the general budget; income above it is banked to savings.
+    // v0.96: spending equals the Essential Annual Budget; income above it is banked to savings.
     const surplusBanked = Math.max(0, totalIncomeNominal - budgetNominal);
     state.savings += surplusBanked;
     const shortfallNominal = Math.max(0, budgetNominal - totalIncomeNominal);
@@ -1382,7 +1394,7 @@
       add('household.targetAfterTax', 'Target income must be zero or greater.');
     }
     if (!(scenario.household?.annualBudget >= 0)) {
-      add('household.annualBudget', 'General budget must be zero or greater.');
+      add('household.annualBudget', 'Essential Annual Budget must be zero or greater.');
     }
     if (!(scenario.household?.modelEndAge >= scenario.people?.[0]?.age)) {
       add('household.modelEndAge', 'Model end age cannot be below Person 1 current age.');
@@ -1474,10 +1486,11 @@
   'use strict';
 
   const core = globalThis.RetirementSimulatorCore;
-  const STORAGE_KEY = 'family-retirement-simulator:v0.99:scenario';
+  const STORAGE_KEY = 'family-retirement-simulator:v1.00:scenario';
   // Read-only fallbacks so scenarios saved under earlier versions carry over
   // on first load (they migrate to schema v6 automatically).
   const LEGACY_STORAGE_KEYS = [
+    'family-retirement-simulator:v0.99:scenario',
     'family-retirement-simulator:v0.98:scenario',
     'family-retirement-simulator:v0.97:scenario'
   ];
@@ -1865,17 +1878,17 @@
     <ul class="sub sub-list">
       <li><strong>Guaranteed income first:</strong> salary, UK pensions and the Aust. Aged Pension are counted before anything is drawn.</li>
       <li><strong>Priority 1, ABP minimum drawdown (when enforced):</strong> the legislated minimum comes out of each account-based pension regardless of need.</li>
-      <li><strong>Priority 2+, the tiers below, in order:</strong> any remaining gap up to the <em>requested income</em> is filled tier by tier (e.g. Savings) until the target is met or every tier is exhausted. Requested income is the modelling lever: raise or lower it to see the effect on later-year assets.</li>
-      <li><strong>Surplus is banked:</strong> income above the general budget moves to the savings pot, where it earns taxable interest in later years.</li>
-      <li><strong>Shortfall:</strong> flagged only when every tier is exhausted and income still sits below the budget.</li>
+      <li><strong>Priority 2+, the tiers below, in order:</strong> any remaining gap up to the <em>Preferred Retirement Income</em> is filled tier by tier (e.g. Savings) until the target is met or every tier is exhausted. Preferred Retirement Income is the modelling lever: raise or lower it to see the effect on later-year assets.</li>
+      <li><strong>Surplus is banked:</strong> income above the Essential Annual Budget moves to the savings pot, where it earns taxable interest in later years.</li>
+      <li><strong>Shortfall:</strong> flagged only when every tier is exhausted and income still sits below the Essential Annual Budget.</li>
       <li>A two-source tier splits its draw by the chosen %% while both sources remain available.</li>
     </ul>`;
   }
 
   function renderHousehold(household, assumptions, people) {
     $('#householdFields').innerHTML = `
-      ${moneyField('Requested income after tax', 'household.targetAfterTax', household.targetAfterTax)}
-      ${moneyField('General budget p.a. (spend)', 'household.annualBudget', household.annualBudget)}
+      ${moneyField('Preferred Retirement Income', 'household.targetAfterTax', household.targetAfterTax)}
+      ${moneyField('Essential Annual Budget', 'household.annualBudget', household.annualBudget)}
       ${numberField('Model to Person 1 age', 'household.modelEndAge', household.modelEndAge, 'min="65" max="120"')}
       <label><span class="k">Apply ABP minimum drawdown</span>
         <input type="checkbox" data-path="household.applyMinimumDrawdown"${household.applyMinimumDrawdown ? ' checked' : ''}>
@@ -2129,7 +2142,7 @@
       }
     });
 
-    // In nominal mode the requested/budget lines rise with inflation, so both
+    // In nominal mode the preferred-income and essential-budget lines rise with inflation, so both
     // are drawn as per-year paths (flat in today's-dollars mode).
     const drawReferenceLine = (value, colour, dash) => {
       ctx.strokeStyle = colour;
@@ -2154,7 +2167,7 @@
     ctx.font = '10px Segoe UI, sans-serif';
     ctx.textAlign = 'right';
     ctx.textBaseline = 'bottom';
-    ctx.fillText('Requested', width - pads.right, targetEndY - 3);
+    ctx.fillText('Preferred', width - pads.right, targetEndY - 3);
 
     const budgetValue = scenario.household.annualBudget ?? scenario.household.targetAfterTax;
     drawReferenceLine(budgetValue, BUDGET_COLOUR, [2, 3]);
@@ -2162,13 +2175,13 @@
     ctx.fillStyle = BUDGET_COLOUR;
     ctx.textAlign = 'left';
     ctx.textBaseline = 'bottom';
-    ctx.fillText('Budget', pads.left + 4, budgetStartY - 3);
+    ctx.fillText('Essential budget', pads.left + 4, budgetStartY - 3);
 
     $('#legend').innerHTML = incomeSegments.map(([, colour, label]) =>
       `<span><i style="background:${colour}"></i>${escapeHtml(label)}</span>`
     ).join('') +
-      `<span><i style="background:${TARGET_COLOUR}"></i>Requested income</span>` +
-      `<span><i style="background:${BUDGET_COLOUR}"></i>General budget</span>`;
+      `<span><i style="background:${TARGET_COLOUR}"></i>Preferred Retirement Income</span>` +
+      `<span><i style="background:${BUDGET_COLOUR}"></i>Essential Annual Budget</span>`;
     chart.setAttribute(
       'aria-label',
       'Income funding sources chart. Salary and UK pensions form the base, then the chosen drawdown order. Use arrow keys to inspect chart segments.'
@@ -2511,7 +2524,7 @@
       ? `Manual ${assumptions.manualInflationPct}% every year`
       : 'Treasury forecast: 5% for calendar 2026, 2.5% from 2027 onward (Budget 2026-27, published 12 May 2026)';
     const items = [
-      `Inflation: ${inflationText}. All returns below are nominal; today's-dollars figures are deflated by this path.`,
+      `Inflation: ${inflationText}. Returns below are estimated net nominal returns after fees and tax; today's-dollars figures are deflated by this path.`,
       ...scenario.people.map(person =>
         `${escapeHtml(person.name)}: accumulation return ${person.accumulationReturnPct}%/yr, ` +
         `ABP (drawdown) return ${person.retirementReturnPct}%/yr, ` +
@@ -2519,9 +2532,9 @@
       `ABP minimum drawdown ${scenario.household.applyMinimumDrawdown ? 'enforced' : 'off'}: ` +
         '4% under 65, 5% at 65-74, 6% at 75-79, 7% at 80-84, 9% at 85-89, 11% at 90-94, 14% at 95+, ' +
         'applied to the post-growth balance each year',
-      `Requested after-tax income $${Math.round(scenario.household.targetAfterTax).toLocaleString()} ` +
-        `(draw target), general budget $${Math.round(scenario.household.annualBudget ?? scenario.household.targetAfterTax).toLocaleString()} ` +
-        '(spending cap); income above budget is banked to savings',
+      `Preferred Retirement Income $${Math.round(scenario.household.targetAfterTax).toLocaleString()} ` +
+        `(draw target), Essential Annual Budget $${Math.round(scenario.household.annualBudget ?? scenario.household.targetAfterTax).toLocaleString()} ` +
+        '(spending cap); income above the Essential Annual Budget is banked to savings',
       assumptions.ukPensionsEnabled !== false
         ? `GBP to AUD ${assumptions.gbpAud} fixed for all years; UK State Pension indexation per person ` +
           `(frozen = fixed nominal GBP, so real value falls with inflation); UPP deduction ${assumptions.uppPct}% for tax`

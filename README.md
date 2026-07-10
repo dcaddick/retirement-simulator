@@ -37,7 +37,7 @@ The deterministic simulator models a reusable two-person household and includes:
 - Australian income-tax estimates, Medicare, LITO/SAPTO, Age Pension and CSHC estimates;
 - UK State Pension support and currency conversion;
 - account-based pension minimum drawdowns;
-- requested income, household spending and surplus banking;
+- Preferred Retirement Income, Essential Annual Budget and surplus banking;
 - today's-dollar and nominal-dollar views;
 - year-by-year projection tables and inspectable charts;
 - local autosave plus JSON import and export.

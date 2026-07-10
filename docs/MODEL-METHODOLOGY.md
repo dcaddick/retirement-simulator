@@ -12,13 +12,13 @@ Each projection row represents one year. At a high level the simulator:
 
 1. Applies any scheduled transition from accumulation super to retirement/drawdown phase.
 2. Adds employment income and after-contributions-tax superannuation contributions for people still working.
-3. Applies the user-entered nominal investment-return assumptions.
+3. Applies the user-entered estimated net nominal investment returns after fees and tax.
 4. Applies account-based pension minimum drawdowns when enabled.
 5. Adds pensions and other configured income.
 6. Estimates household income tax and relevant offsets.
 7. Uses the configured drawdown priorities to fill any remaining income target.
-8. Banks income above household spending into savings.
-9. Flags a shortfall when available income and configured drawdown sources cannot cover household spending.
+8. Banks income above the Essential Annual Budget into savings.
+9. Flags a shortfall when available income and configured drawdown sources cannot cover the Essential Annual Budget.
 10. Converts nominal results to today's dollars when that display mode is selected.
 
 The application contains a more detailed step-by-step explanation and shows the dated rates used by the active scenario.
@@ -27,7 +27,7 @@ The application contains a more detailed step-by-step explanation and shows the 
 
 ### Superannuation
 
-The model separates accumulation and retirement-phase balances, accepts separate return assumptions and supports configurable transition timing. Early access is simplified and is not a complete Transition-to-Retirement compliance model.
+The model separates accumulation and retirement-phase balances, accepts separate estimated net return assumptions after fees and tax, and supports configurable transition timing. A higher retirement-phase assumption can represent pension-phase tax treatment; it does not imply a different underlying investment portfolio. Early access is simplified and is not a complete Transition-to-Retirement compliance model.
 
 ### Drawdown
 
