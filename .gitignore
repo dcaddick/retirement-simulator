@@ -1,0 +1,11 @@
+node_modules/
+scratch/
+private/
+scenarios/
+exports/
+*.log
+*.local.json
+.env
+.env.*
+.DS_Store
+desktop.ini

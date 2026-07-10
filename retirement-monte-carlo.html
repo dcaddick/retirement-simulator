@@ -1,0 +1,4377 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Family Retirement Monte Carlo Report v0.5</title>
+<style>
+  :root{
+    --bg:#0f1720; --panel:#18232f; --panel2:#1e2c3a; --line:#2b3d4f;
+    --text:#e6edf3; --muted:#9fb0c0; --accent:#4fc3f7; --accent2:#8bd450;
+    --warn:#ffb454; --bad:#ff6b6b; --uk:#c77dff; --share:#ffd166; --pot:#5dcaa5;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font:14px/1.5 -apple-system,Segoe UI,Roboto,sans-serif}
+  header{padding:16px 22px;border-bottom:1px solid var(--line)}
+  h1{margin:0;font-size:19px}
+  .sub{color:var(--muted);font-size:12.5px;margin-top:3px}
+  .advice-warning{margin:6px 0 0;color:var(--bad);font-size:13px;font-weight:750;letter-spacing:.01em}
+  .page-footer{border-top:1px solid rgba(255,107,107,.38);padding:12px 22px 16px;color:var(--bad);font-size:13px;font-weight:750}
+  .wrap{display:grid;grid-template-columns:400px 1fr;min-height:calc(100vh - 62px)}
+  .controls{padding:14px 16px;border-right:1px solid var(--line);overflow-y:auto;max-height:calc(100vh - 62px)}
+  .stage{padding:14px 18px;overflow-x:hidden}
+  .group{margin-bottom:13px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+  .group h3{margin:0 0 8px;font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--accent)}
+  .group.uk h3{color:var(--uk)} .group.share h3{color:var(--share)} .group.pot h3{color:var(--pot)}
+  .two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .people-split{display:grid;grid-template-columns:1fr 1fr;gap:0}
+  .people-split>fieldset{border:0;margin:0;padding:0 10px;min-width:0}
+  .people-split>fieldset+fieldset{border-left:1px solid var(--line)}
+  .people-split>fieldset input:not([type=checkbox]):not([type=file]),.people-split>fieldset select{width:min(96px,48%)}
+  .col h4{margin:0 0 5px;font-size:12px;color:var(--text)}
+  label{display:flex;justify-content:space-between;align-items:center;gap:6px;margin:5px 0;font-size:12.5px}
+  label span.k{color:var(--muted);flex:1}
+  input:not([type=checkbox]):not([type=file]),select{width:112px;background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:6px;padding:5px 7px;font:inherit;text-align:right}
+  select{width:142px;text-align:left}
+  input[data-path$=".name"],#scenarioName,input[data-path$=".symbol"]{text-align:left}
+  input[type=checkbox]{width:15px;height:15px}
+  input[aria-invalid=true],select[aria-invalid=true]{border-color:var(--bad);outline:1px solid color-mix(in srgb,var(--bad) 45%,transparent)}
+  fieldset legend{font-size:12px;font-weight:650;color:var(--text);padding:0;margin-bottom:6px}
+  button{background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:7px;padding:6px 10px;font:inherit;cursor:pointer}
+  button:hover{border-color:var(--muted)}
+  #runMonteCarlo{background:linear-gradient(180deg,#53c8f5,#2fa7dc);border-color:#69d7ff;color:#07151f;font-weight:750;box-shadow:0 7px 20px rgba(79,195,247,.18)}
+  #runMonteCarlo:hover:not(:disabled){border-color:#b6edff;filter:brightness(1.04)}
+  #runMonteCarlo:disabled{background:var(--panel2);border-color:var(--line);color:var(--muted);box-shadow:none;cursor:not-allowed;filter:none}
+  .scenario-actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:10px}
+  .scenario-message,.privacy-note{margin:6px 0 0;color:var(--muted);font-size:11.5px}
+  .scenario-message.error{color:var(--bad)} .scenario-message.success{color:var(--accent2)}
+  .scenario-callout{margin:0;padding:9px 11px;border:1px solid rgba(79,195,247,.32);border-radius:8px;background:rgba(79,195,247,.07);color:var(--text);font-size:12px}
+  .section-heading{display:flex;align-items:center;justify-content:space-between;gap:10px}
+  .section-heading h3{margin-bottom:0}
+  .shareholding{border-top:1px solid var(--line);padding:7px 0}
+  .shareholding summary{display:grid;grid-template-columns:1fr auto auto auto;gap:8px;cursor:pointer;color:var(--muted);font-size:11.5px}
+  .shareholding-fields{padding:8px 0 2px}
+  .validation-summary{color:var(--bad);font-size:11.5px;padding-left:20px}
+  .validation-summary:empty{display:none}
+  .assumptions{margin:12px 0;color:var(--muted);font-size:11.5px}
+  .assumptions summary{cursor:pointer;color:var(--text)}
+  .tabs{display:flex;gap:6px;margin-bottom:10px}
+  .tabs button{background:var(--panel);color:var(--muted);border:1px solid var(--line);border-radius:8px;padding:6px 14px;font-size:13px;cursor:pointer}
+  .tabs button.on{background:var(--accent);color:#08131c;border-color:var(--accent);font-weight:600}
+  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(148px,1fr));gap:10px;margin-bottom:12px}
+  .kpi{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+  .kpi .lab{color:var(--muted);font-size:10.5px;text-transform:uppercase;letter-spacing:.05em}
+  .kpi .num{font-size:20px;font-weight:600;margin-top:3px;font-variant-numeric:tabular-nums}
+  .kpi.good{border-color:rgba(139,212,80,.72);box-shadow:0 0 0 1px rgba(139,212,80,.18) inset}
+  .kpi.warn{border-color:rgba(255,180,84,.72);box-shadow:0 0 0 1px rgba(255,180,84,.15) inset}
+  .kpi.bad{border-color:rgba(255,107,107,.78);box-shadow:0 0 0 1px rgba(255,107,107,.16) inset}
+  .kpi.good .num{color:var(--accent2)} .kpi.warn .num{color:var(--warn)} .kpi.bad .num{color:var(--bad)}
+  .flag{border-radius:8px;padding:7px 10px;font-size:12px;margin-bottom:7px;border:1px solid}
+  .flag.ok{background:rgba(139,212,80,.08);border-color:rgba(139,212,80,.4)}
+  .flag.warn{background:rgba(255,180,84,.08);border-color:rgba(255,180,84,.4)}
+  .flag.bad{background:rgba(255,107,107,.08);border-color:rgba(255,107,107,.4)}
+  .chart-shell{position:relative}
+  canvas{width:100%;background:var(--panel);border:1px solid var(--line);border-radius:10px;margin-top:4px}
+  .chart-tooltip{position:absolute;z-index:5;display:grid;gap:2px;max-width:250px;padding:9px 11px;border:1px solid var(--line);border-radius:8px;background:#101923;color:var(--text);box-shadow:0 8px 24px rgba(0,0,0,.28);pointer-events:none;font-size:12px}
+  .chart-tooltip[hidden]{display:none}
+  .legend{display:flex;gap:14px;flex-wrap:wrap;font-size:11.5px;color:var(--muted);margin:8px 2px}
+  .legend i{display:inline-block;width:11px;height:11px;border-radius:2px;margin-right:5px;vertical-align:-1px}
+  .tblwrap{margin-top:14px;border:1px solid var(--line);border-radius:10px;overflow:auto;max-height:280px}
+  table{border-collapse:collapse;width:100%;font-size:11px;font-variant-numeric:tabular-nums}
+  th,td{padding:4px 7px;text-align:right;white-space:nowrap;border-bottom:1px solid var(--line)}
+  th{position:sticky;top:0;background:var(--panel2);color:var(--muted);font-weight:500;z-index:1}
+  td:first-child,th:first-child{text-align:left}
+  tr.retire td{background:rgba(79,195,247,.06)} tr.event td{background:rgba(255,209,102,.08)}
+  tr.short td{color:var(--bad)}
+  .note{color:var(--muted);font-size:11.5px;margin-top:12px;border-top:1px solid var(--line);padding-top:9px}
+  .note b{color:var(--warn)}
+  button:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visible,canvas:focus-visible{outline:2px solid #F0C571;outline-offset:2px}
+  [aria-invalid="true"]{border-color:var(--bad)!important;box-shadow:0 0 0 1px var(--bad)}
+  .field-error{color:var(--bad);font-size:11px}
+  @media (max-width:1000px){
+    .wrap{grid-template-columns:340px minmax(0,1fr)}
+    .controls,.stage{padding:12px}
+  }
+  @media (max-width:800px){
+    .wrap{display:block}
+    .controls{max-height:none;overflow:visible;border-right:0;border-bottom:1px solid var(--line)}
+    .stage{overflow:visible}
+    .people-split,.two{grid-template-columns:1fr}
+    .people-split>fieldset+fieldset{border-left:0;border-top:1px solid var(--line);margin-top:12px;padding-top:12px}
+    .kpis{grid-template-columns:repeat(2,minmax(0,1fr))}
+    .tblwrap{max-width:100%;overflow-x:auto}
+  }
+  @media (max-width:480px){
+    .kpis{grid-template-columns:1fr}
+    header{padding:14px}
+    .group{border-radius:8px}
+    .shareholding summary{grid-template-columns:1fr auto}
+  }
+  @media (prefers-reduced-motion:reduce){
+    *,*::before,*::after{scroll-behavior:auto!important;transition-duration:.01ms!important;animation-duration:.01ms!important}
+  }
+  main.wrap{display:block;min-height:auto;padding:14px 18px}
+  body>div.wrap{display:none}
+  .toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:end}
+  #glidePath{width:188px}
+  #stressEvent{width:188px}
+  #glideChangeYear{width:92px}
+  #runProgress{display:block;width:100%;height:16px;margin-top:12px;accent-color:var(--accent2)}
+  #runProgress[hidden]{display:none}
+  #runProgressText{margin:6px 0 0;color:var(--muted);font-size:11.5px}
+  #runProgressText[hidden]{display:none}
+  .summary-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin:10px 0}
+  .stress-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px}
+  .stress-card{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px}
+  .table-scroll{overflow-x:auto}
+  .mc-chart-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;align-items:start}
+  .mc-chart-panel{min-width:0;position:relative}
+  .mc-chart{display:block;width:100%;height:240px;max-height:240px}
+  .stress-preview{display:grid;grid-template-columns:minmax(260px,40%) minmax(0,60%);gap:12px;align-items:stretch;margin-top:12px;padding-top:10px;border-top:1px solid rgba(79,195,247,.18)}
+  .stress-preview-copy{display:grid;gap:8px;align-content:start}
+  .stress-preview h3{margin:0 0 4px;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--warn)}
+  .stress-preview p{margin:4px 0;color:var(--muted);font-size:11.5px}
+  .stress-chart-panel{min-width:0}
+  #stressPreviewChart{height:180px;max-height:180px}
+  #stressPreviewSummary{color:var(--text)}
+  .mc-chart-summary{margin:6px 0 14px;color:var(--muted);font-size:11.5px}
+  .mc-assumptions summary{font-size:16px;font-weight:800;color:var(--text);cursor:pointer}
+  .mc-assumptions{margin-top:16px;border-top:1px solid var(--line);padding-top:12px}
+  @media (max-width:900px){.mc-chart-grid,.stress-preview{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<header>
+  <h1>Family Retirement Monte Carlo Report <span class="version">v0.5</span></h1>
+  <div class="sub">Local, reproducible retirement-risk analysis.</div>
+  <div class="advice-warning">Estimate only; not financial or tax advice.</div>
+  <nav class="scenario-actions" aria-label="Scenario actions">
+    <button type="button" id="newScenario">New</button>
+    <button type="button" id="resetSample">Reset sample</button>
+    <button type="button" id="importScenario">Import JSON</button>
+    <button type="button" id="exportScenario">Export JSON</button>
+    <input type="file" id="scenarioFile" accept=".json,application/json" hidden>
+  </nav>
+  <p id="scenarioMessage" class="scenario-message" aria-live="polite"></p>
+  <p class="privacy-note">Saved locally on this device. Local data is not encrypted or uploaded.</p>
+</header>
+<main class="wrap">
+  <section class="group" aria-labelledby="mcInputHeading">
+    <h3 id="mcInputHeading">Scenario and run assumptions</h3>
+    <div class="toolbar">
+      <label><span class="k">Paths</span>
+        <select id="pathCount">
+          <option value="1000">1,000</option>
+          <option value="5000">5,000</option>
+        </select>
+      </label>
+      <label><span class="k">Seed</span>
+        <input id="seed" type="number" min="0" max="4294967295" value="95095">
+      </label>
+      <label><span class="k">Risk mode</span>
+        <select id="riskMode">
+          <option value="aggressive-spending" selected>Aggressive spending</option>
+          <option value="middle-ground">Middle ground</option>
+          <option value="capital-preservation">Capital preservation</option>
+        </select>
+      </label>
+      <label><span class="k">Return scenario</span>
+        <select id="returnScenario">
+          <option value="base" selected>Base returns</option>
+          <option value="cautious">Cautious returns</option>
+          <option value="poor-decade">Poor decade</option>
+          <option value="severe-early-crash">Severe return environment</option>
+        </select>
+      </label>
+      <label><span class="k">Stress event</span>
+        <select id="stressEvent">
+          <option value="none">None</option>
+          <option value="severe-early-downturn" selected>Severe early downturn</option>
+          <option value="prolonged-low-returns">Prolonged low returns</option>
+          <option value="delayed-recovery">Delayed recovery</option>
+        </select>
+      </label>
+      <label><span class="k">Glide path</span>
+        <select id="glidePath">
+          <option value="stay-current" selected>Keep imported baseline</option>
+          <option value="balanced">Balanced after change year</option>
+          <option value="aggressive-growth">Aggressive growth after change year</option>
+          <option value="conservative">Conservative after change year</option>
+          <option value="cpiplus">CPIplus after change year</option>
+        </select>
+      </label>
+      <label><span class="k">Glide change year</span>
+        <input id="glideChangeYear" type="number" min="2026" max="2100" step="1" value="2038">
+      </label>
+      <label><span class="k">Budget from</span>
+        <input id="budgetStart" type="number" min="0" step="10000" value="50000">
+      </label>
+      <label><span class="k">Budget to</span>
+        <input id="budgetEnd" type="number" min="0" step="10000" value="140000">
+      </label>
+      <label><span class="k">Budget step</span>
+        <input id="budgetStep" type="number" min="1000" step="1000" value="10000">
+      </label>
+      <button id="runMonteCarlo" type="button" disabled>Find break point</button>
+      <button id="cancelRun" type="button" disabled>Cancel</button>
+    </div>
+    <div class="stress-preview" aria-labelledby="stressPreviewHeading">
+      <div class="stress-preview-copy">
+        <p id="scenarioCallout" class="scenario-callout"></p>
+        <h3 id="stressPreviewHeading">Stress event preview</h3>
+        <p id="stressPreviewSummary"></p>
+        <p>Indexed to 100 at the start. Illustrative only; not a forecast or historical reconstruction.</p>
+      </div>
+      <div class="stress-chart-panel">
+        <canvas id="stressPreviewChart" width="900" height="180" aria-label="Five-year stress event preview chart"></canvas>
+      </div>
+    </div>
+    <progress id="runProgress" max="100" value="0" hidden></progress>
+    <p id="runProgressText" hidden></p>
+  </section>
+  <section id="mcDashboard" class="group" hidden>
+    <div id="headlineKpis" class="summary-cards"></div>
+    <section aria-labelledby="breakPointHeading">
+      <h3 id="breakPointHeading">Break-point budget sweep</h3>
+      <div id="breakPointKpis" class="summary-cards"></div>
+    </section>
+    <div class="mc-chart-grid">
+      <section class="mc-chart-panel"><h3>Asset range</h3><canvas id="fanChart" class="mc-chart" width="1200" height="240"></canvas><p id="fanChartSummary" class="mc-chart-summary"></p></section>
+      <section class="mc-chart-panel"><h3>Budget reliability</h3><canvas id="budgetChart" class="mc-chart" width="1200" height="240"></canvas><div id="budgetChartTooltip" class="chart-tooltip" role="status" aria-live="polite" hidden></div><p id="budgetChartSummary" class="mc-chart-summary"></p></section>
+    </div>
+    <section><h3>Modelled middle ground strategies</h3><div class="table-scroll"><table id="strategyTable"></table></div></section>
+    <section><h3>Explicit stress tests</h3><div id="stressResults"></div></section>
+    <details class="mc-assumptions"><summary>Assumptions and limitations</summary><div id="assumptionsPanel"></div></details>
+  </section>
+</main>
+<div class="wrap">
+  <div class="controls" id="controls">
+    <section class="group">
+      <h3>Scenario</h3>
+      <label><span class="k">Scenario name</span>
+        <input id="scenarioName" data-path="scenarioName">
+      </label>
+    </section>
+    <section class="group">
+      <h3>People</h3>
+      <div id="peopleFields" class="people-split"></div>
+    </section>
+    <section class="group pot">
+      <h3>Cash and savings</h3>
+      <div id="cashSavingsFields" class="people-split"></div>
+    </section>
+    <section class="group share" aria-labelledby="shareholdingsHeading">
+      <div class="section-heading">
+        <h3 id="shareholdingsHeading">Shareholdings</h3>
+        <button type="button" id="addShareholding">Add shareholding</button>
+      </div>
+      <div id="shareholdingList"></div>
+    </section>
+    <section class="group uk" aria-labelledby="ukPensionsHeading">
+      <h3 id="ukPensionsHeading">UK pensions</h3>
+      <label><span class="k">GBP&rarr;AUD rate</span>
+        <input type="number" id="gbpAud" min="0" step="0.0001"
+          data-value-type="number" data-path="assumptions.gbpAud">
+      </label>
+      <div class="people-split pensions-split">
+        <fieldset id="ukPerson0"></fieldset>
+        <fieldset id="ukPerson1"></fieldset>
+      </div>
+      <p class="sub">State Pension is annual lifetime income from the selected age. A private lump sum is paid into the household savings pot.</p>
+    </section>
+    <section class="group">
+      <h3>Household</h3>
+      <div id="householdFields"></div>
+      <label>
+        <span class="k">Inflation assumption</span>
+        <select id="inflationMode" data-path="assumptions.inflationMode">
+          <option value="treasury">Treasury forecast</option>
+          <option value="manual">Manual rate</option>
+        </select>
+      </label>
+      <label id="manualInflationRow" hidden>
+        <span class="k">Manual inflation %</span>
+        <input type="number" id="manualInflationPct" min="0" max="20" step="0.1"
+          data-value-type="number" data-path="assumptions.manualInflationPct">
+      </label>
+      <p class="sub" id="treasurySource">Treasury Budget 2026–27 forecast, published 12 May 2026:
+        5% for 2025–26, then 2.5% from 2026–27.
+        <a href="https://budget.gov.au/content/bp1/index.htm" target="_blank" rel="noreferrer">Official source</a>.
+      </p>
+    </section>
+    <ul id="validationSummary" class="validation-summary" aria-live="polite"></ul>
+    <details class="assumptions">
+      <summary>Model assumptions and sources</summary>
+      <div id="assumptionsContent">
+        <p>Estimates only. Not financial or tax advice.</p>
+        <ul id="sourceList"></ul>
+        <ul id="limitationsList">
+          <li>Annual projection rows; retirement and pension starts use whole ages.</li>
+          <li>Age Pension estimate assumes a homeowner couple and excludes the principal residence.</li>
+          <li>Share values remain flat until sale.</li>
+          <li>Capital-loss carry-forward is not modelled.</li>
+          <li>Survival is illustrative and Person 1-specific.</li>
+          <li>Early super access is simplified, not full Transition-to-Retirement (TTR). There is no 10%-of-balance annual payment cap, no commutation restriction, and no automatic cessation rule. Tax treatment assumes the member is over 60, where TTR and full retirement-phase withdrawals are both tax-free; the model will misstate results for anyone under 60 drawing super while still working.</li>
+        </ul>
+      </div>
+    </details>
+  </div>
+  <div class="stage">
+    <div class="tabs" id="tabs">
+      <button data-v="income" class="on">Your income</button>
+      <button data-v="balance">Your balance</button>
+    </div>
+    <div id="projectionError" class="flag bad" role="alert" hidden></div>
+    <div class="kpis" id="kpis"></div>
+    <div id="flags"></div>
+    <div class="chart-shell">
+      <canvas id="chart" width="900" height="330" tabindex="0"
+        aria-label="Income funding sources chart. Use arrow keys to inspect chart segments."></canvas>
+      <div id="chartTooltip" class="chart-tooltip" role="status" aria-live="polite" hidden></div>
+    </div>
+    <div class="legend" id="legend"></div>
+    <div class="tblwrap"><table id="tbl"></table></div>
+    <div class="note">
+      <b>v0.95.</b> Generic two-person sample data is stored locally on this device and can be imported or exported as JSON. Calculations are transparent estimates in today&rsquo;s AUD and are not financial or tax advice.
+    </div>
+  </div>
+</div>
+<script id="compat-shim">
+/* v0.95 — compatibility shim + visible error reporting (iPad/older Safari) */
+(function () {
+  if (typeof window.structuredClone !== 'function') {
+    window.structuredClone = function (obj) { return JSON.parse(JSON.stringify(obj)); };
+  }
+  if (!Array.prototype.at) {
+    Object.defineProperty(Array.prototype, 'at', {
+      value: function (n) {
+        n = Math.trunc(n) || 0;
+        if (n < 0) n += this.length;
+        return (n < 0 || n >= this.length) ? undefined : this[n];
+      }
+    });
+  }
+  if (!String.prototype.replaceAll) {
+    Object.defineProperty(String.prototype, 'replaceAll', {
+      value: function (s, r) { return this.split(s).join(r); }
+    });
+  }
+  // Safe localStorage wrapper — private browsing / restricted contexts throw on access
+  var mem = {};
+  var store;
+  try {
+    localStorage.setItem('__probe__', '1');
+    localStorage.removeItem('__probe__');
+    store = localStorage;
+  } catch (e) {
+    store = {
+      getItem: function (k) { return (k in mem) ? mem[k] : null; },
+      setItem: function (k, v) { mem[k] = String(v); },
+      removeItem: function (k) { delete mem[k]; }
+    };
+  }
+  window.__safeStorage = store;
+  // Surface fatal JS errors on-page instead of failing silently with a blank chart
+  window.addEventListener('error', function (e) {
+    var el = document.getElementById('jsErrorBanner');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'jsErrorBanner';
+      el.style.cssText = 'position:fixed;bottom:0;left:0;right:0;z-index:99;background:#5a1f1f;color:#ffd7d7;font:12px/1.4 -apple-system,sans-serif;padding:8px 14px;border-top:1px solid #ff6b6b';
+      document.body.appendChild(el);
+    }
+    el.textContent = 'Script error: ' + (e.message || 'unknown') + ' (line ' + (e.lineno || '?') + '). Chart may not render — check browser version or open in Safari rather than the Files preview.';
+  });
+})();
+</script>
+<script id="simulator-core">
+(function () {
+  'use strict';
+  const SCHEMA_VERSION = 3;
+  const VALID_OWNERS = new Set(['p0', 'p1', 'joint']);
+  const DRAWDOWN_SOURCES = new Set(['p0Super', 'p1Super', 'cash', 'savings']);
+  const TREASURY_INFLATION = Object.freeze({
+    sourceDate: '2026-05-12',
+    sourceUrl: 'https://budget.gov.au/content/bp1/download/bp1_2026-27.pdf',
+    rates: Object.freeze({
+      2026: 0.05,
+      2027: 0.025,
+      2028: 0.025,
+      2029: 0.025,
+      2030: 0.025
+    }),
+    longRunRate: 0.025
+  });
+  const TAX_SCHEDULES = Object.freeze({
+    2026: [[18200, 0], [45000, 0.15], [135000, 0.30], [190000, 0.37], [Infinity, 0.45]],
+    2027: [[18200, 0], [45000, 0.14], [135000, 0.30], [190000, 0.37], [Infinity, 0.45]]
+  });
+  const TAX_SOURCE = Object.freeze({
+    checkedDate: '2026-07-06',
+    url: 'https://www.ato.gov.au/tax-rates-and-codes/tax-rates-australian-residents'
+  });
+  const MEDICARE_BASE = Object.freeze({
+    effectiveYear: 2024,
+    checkedDate: '2026-07-06',
+    sourceUrl: 'https://www.ato.gov.au/myTax25MedicareLevy',
+    ordinary: { lower: 27222, upper: 34027 },
+    sapto: { lower: 43020, upper: 53775 }
+  });
+  const SERVICES_AUSTRALIA_2026 = Object.freeze({
+    effectiveDate: '2026-07-01',
+    checkedDate: '2026-07-06',
+    assetsTestUrl: 'https://www.servicesaustralia.gov.au/assets-test-for-age-pension?context=22526',
+    incomeTestUrl: 'https://www.servicesaustralia.gov.au/income-test-for-age-pension?context=22526',
+    cshcUrl: 'https://www.servicesaustralia.gov.au/income-test-for-commonwealth-seniors-health-card?context=21966',
+    deemingUrl: 'https://www.servicesaustralia.gov.au/deeming',
+    agePensionMaxCoupleAnnual: 1810.40 * 26,
+    homeownerAssetFreeArea: 499000,
+    assetTaperAnnualPerThousand: 78,
+    incomeFreeAreaCoupleAnnual: 396 * 26,
+    incomeTaperCouple: 0.40,
+    deemingThresholdCouple: 110600,
+    deemingLowerRate: 0.0125,
+    deemingUpperRate: 0.0325,
+    cshcCoupleThreshold: 161768
+  });
+
+  function inflationRateForYear(year, assumptions) {
+    if (assumptions.inflationMode === 'stress-path') {
+      const path = assumptions.stressInflationPctByYear ?? [];
+      const startYear = assumptions.stressInflationStartYear ?? year;
+      const index = Math.max(0, year - startYear);
+      const pct = path[Math.min(index, Math.max(0, path.length - 1))];
+      return (pct ?? TREASURY_INFLATION.longRunRate * 100) / 100;
+    }
+    if (assumptions.inflationMode === 'manual') {
+      return assumptions.manualInflationPct / 100;
+    }
+    return TREASURY_INFLATION.rates[year] ?? TREASURY_INFLATION.longRunRate;
+  }
+
+  function taxScheduleForYear(year) {
+    return year >= 2027 ? TAX_SCHEDULES[2027] : TAX_SCHEDULES[2026];
+  }
+
+  function incomeTaxResident(taxableIncome, year) {
+    let tax = 0;
+    let previous = 0;
+    for (const [cap, rate] of taxScheduleForYear(year)) {
+      if (taxableIncome <= previous) break;
+      tax += (Math.min(taxableIncome, cap) - previous) * rate;
+      previous = cap;
+    }
+    return Math.round(tax * 100) / 100;
+  }
+
+  function medicareLevy(taxableIncome, seniorEligible) {
+    const { lower, upper } = seniorEligible ? MEDICARE_BASE.sapto : MEDICARE_BASE.ordinary;
+    if (taxableIncome <= lower) return 0;
+    if (taxableIncome <= upper) return (taxableIncome - lower) * 0.10;
+    return taxableIncome * 0.02;
+  }
+
+  function litoOffset(taxableIncome) {
+    if (taxableIncome <= 37500) return 700;
+    if (taxableIncome <= 45000) return 700 - (taxableIncome - 37500) * 0.05;
+    if (taxableIncome <= 66667) return 325 - (taxableIncome - 45000) * 0.015;
+    return 0;
+  }
+
+  function saptoOffset(rebateIncome) {
+    if (rebateIncome <= 30994) return 1602;
+    if (rebateIncome >= 43810) return 0;
+    return Math.max(0, 1602 - (rebateIncome - 30994) * 0.125);
+  }
+
+  function netTax({ taxableIncome, rebateIncome, year, seniorEligible }) {
+    const gross = incomeTaxResident(taxableIncome, year) +
+      medicareLevy(taxableIncome, seniorEligible);
+    const offsets = litoOffset(taxableIncome) +
+      (seniorEligible ? saptoOffset(rebateIncome) : 0);
+    return Math.max(0, gross - offsets);
+  }
+
+  function deemedIncome(financialAssets) {
+    const rules = SERVICES_AUSTRALIA_2026;
+    const lowerBand = Math.min(financialAssets, rules.deemingThresholdCouple);
+    const upperBand = Math.max(0, financialAssets - rules.deemingThresholdCouple);
+    return lowerBand * rules.deemingLowerRate + upperBand * rules.deemingUpperRate;
+  }
+
+  function agePensionAssetsRate(assets) {
+    const rules = SERVICES_AUSTRALIA_2026;
+    const reduction = Math.max(0, assets - rules.homeownerAssetFreeArea) /
+      1000 * rules.assetTaperAnnualPerThousand;
+    return Math.max(0, rules.agePensionMaxCoupleAnnual - reduction);
+  }
+
+  function agePensionIncomeRate(assessableIncome) {
+    const rules = SERVICES_AUSTRALIA_2026;
+    const reduction = Math.max(0, assessableIncome - rules.incomeFreeAreaCoupleAnnual) *
+      rules.incomeTaperCouple;
+    return Math.max(0, rules.agePensionMaxCoupleAnnual - reduction);
+  }
+
+  function agePensionCouple({ assets, assessableIncome }) {
+    return Math.min(
+      agePensionAssetsRate(assets),
+      agePensionIncomeRate(assessableIncome)
+    );
+  }
+
+  function cshcEstimate({ adjustedTaxableIncome, accountBasedPensionBalance }) {
+    const deemedAbpIncome = deemedIncome(accountBasedPensionBalance);
+    const assessedIncome = adjustedTaxableIncome + deemedAbpIncome;
+    return {
+      assessedIncome,
+      deemedAbpIncome,
+      threshold: SERVICES_AUSTRALIA_2026.cshcCoupleThreshold,
+      eligible: assessedIncome < SERVICES_AUSTRALIA_2026.cshcCoupleThreshold
+    };
+  }
+
+  function assessableFinancialAssets({
+    cash,
+    savings,
+    shareholdings,
+    superBalances,
+    ages,
+    ukPrivateBalances
+  }) {
+    const shares = shareholdings.reduce((sum, holding) =>
+      sum + (holding.sold ? 0 : shareValueAud(holding)), 0);
+    const superAssessable = superBalances.reduce((sum, balance, index) =>
+      sum + (ages[index] >= 67 ? balance : 0), 0);
+    return cash + savings + shares + superAssessable +
+      ukPrivateBalances.reduce((sum, balance) => sum + balance, 0);
+  }
+
+  function defaultDrawdownPriority(superFirst) {
+    const superTier = [
+      { source: 'p0Super', weight: 0.5 },
+      { source: 'p1Super', weight: 0.5 }
+    ];
+    const potTier = [
+      { source: 'savings', weight: 0.6 },
+      { source: 'cash', weight: 0.4 }
+    ];
+    return superFirst ? [superTier, potTier] : [potTier, superTier];
+  }
+
+  function makeSampleScenario() {
+    return {
+      schemaVersion: SCHEMA_VERSION,
+      scenarioName: 'Sample household',
+      startYear: new Date().getFullYear(),
+      people: [
+        {
+          id: 'p0',
+          name: 'Alex',
+          age: 62,
+          super: 600000,
+          retireAge: 67,
+          superAccessAge: 67,
+          superAccessPct: 100,
+          salary: 55000,
+          sgPct: 12,
+          accumulationReturnPct: 7,
+          retirementReturnPct: 6,
+          ukStateAnnualGbp: 10000,
+          ukStateStartAge: 67,
+          ukPrivateAmountGbp: 0,
+          ukPrivateTakeAge: 67,
+          ukPrivateType: 'lump'
+        },
+        {
+          id: 'p1',
+          name: 'Jordan',
+          age: 60,
+          super: 350000,
+          retireAge: 67,
+          superAccessAge: 67,
+          superAccessPct: 100,
+          salary: 30000,
+          sgPct: 12,
+          accumulationReturnPct: 7,
+          retirementReturnPct: 6,
+          ukStateAnnualGbp: 0,
+          ukStateStartAge: 67,
+          ukPrivateAmountGbp: 0,
+          ukPrivateTakeAge: 67,
+          ukPrivateType: 'lump'
+        }
+      ],
+      cash: { amount: 50000, interestPct: 0, owner: 'joint' },
+      savings: { amount: 150000, interestPct: 4, owner: 'p1' },
+      shareholdings: [],
+      household: {
+        targetAfterTax: 90000,
+        annualBudget: 60000,
+        modelEndAge: 100,
+        drawdownPriority: defaultDrawdownPriority(true),
+        applyMinimumDrawdown: true,
+        includeAgePension: true,
+        showSurvival: true
+      },
+      assumptions: {
+        inflationMode: 'treasury',
+        manualInflationPct: 2.5,
+        gbpAud: 1.95,
+        uppPct: 8
+      }
+    };
+  }
+
+  function parseMoney(value) {
+    if (typeof value === 'number') return value;
+    const parsed = Number(String(value).replace(/[^0-9.-]/g, ''));
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+
+  function formatMoney(value, currency = 'AUD') {
+    const options = {
+      maximumFractionDigits: currency === 'USD' ? 2 : 0,
+      minimumFractionDigits: currency === 'USD' ? 2 : 0
+    };
+    const number = Number(value).toLocaleString('en-AU', options);
+    if (currency === 'GBP') return `£${number}`;
+    if (currency === 'USD') return `US$${number}`;
+    return `$${number}`;
+  }
+
+  function ownerWeights(owner) {
+    if (owner === 'p0') return [1, 0];
+    if (owner === 'p1') return [0, 1];
+    if (owner === 'joint') return [0.5, 0.5];
+    throw new Error(`Invalid owner: ${owner}`);
+  }
+
+  function hitTestSegments(segments, x, y) {
+    return segments.find(segment =>
+      x >= segment.x &&
+      x <= segment.x + segment.width &&
+      y >= segment.y &&
+      y <= segment.y + segment.height
+    ) ?? null;
+  }
+
+  function migrateScenario(raw) {
+    let current = raw;
+    if (current.schemaVersion === 1) {
+      const migrated = structuredClone(current);
+      migrated.schemaVersion = 2;
+      migrated.people = migrated.people.map(person => ({
+        ...person,
+        superAccessAge: person.superAccessAge ?? person.retireAge,
+        superAccessPct: person.superAccessPct ?? 100
+      }));
+      const superFirst = migrated.household?.superFirst ?? false;
+      migrated.household = { ...migrated.household };
+      if (!Array.isArray(migrated.household.drawdownPriority)) {
+        migrated.household.drawdownPriority = defaultDrawdownPriority(superFirst);
+      }
+      delete migrated.household.superFirst;
+      current = migrated;
+    }
+    if (current.schemaVersion === 2) {
+      // v0.95: general budget added; default to old target so legacy saves behave identically.
+      const migrated = structuredClone(current);
+      migrated.schemaVersion = 3;
+      migrated.household = { ...migrated.household };
+      if (!(migrated.household.annualBudget >= 0)) {
+        migrated.household.annualBudget = migrated.household.targetAfterTax;
+      }
+      current = migrated;
+    }
+    if (current.schemaVersion !== SCHEMA_VERSION) {
+      throw new Error(`Unsupported schema version: ${raw.schemaVersion}.`);
+    }
+    return current;
+  }
+
+  function exportScenario(scenario) {
+    const errors = validateScenario(scenario);
+    if (errors.length) throw new Error(errors[0].message);
+    return JSON.stringify(scenario, null, 2);
+  }
+
+  function importScenario(text) {
+    let parsed;
+    try {
+      parsed = JSON.parse(text);
+    } catch {
+      throw new Error('Scenario file is not valid JSON.');
+    }
+    const scenario = migrateScenario(parsed);
+    const errors = validateScenario(scenario);
+    if (errors.length) {
+      throw new Error(`${errors[0].path}: ${errors[0].message}`);
+    }
+    return scenario;
+  }
+
+  function shareValueAud(holding) {
+    const fx = holding.quoteCurrency === 'AUD' ? 1 : holding.fxToAud;
+    return holding.quantity * holding.price * fx;
+  }
+
+  function allocateOwnedAmount(amount, owner) {
+    return ownerWeights(owner).map(weight => amount * weight);
+  }
+
+  function discountedCapitalGainByPerson(holding) {
+    const gain = Math.max(0, shareValueAud(holding) - holding.costBaseAud);
+    const taxableGain = gain * (holding.cgtDiscountEligible ? 0.5 : 1);
+    return allocateOwnedAmount(taxableGain, holding.owner);
+  }
+
+  function makeShareholding(index) {
+    return {
+      id: `share-${Date.now()}-${index}`,
+      symbol: '',
+      quantity: 0,
+      quoteCurrency: 'AUD',
+      price: 0,
+      fxToAud: 1,
+      owner: 'joint',
+      costBaseAud: 0,
+      cgtDiscountEligible: true,
+      saleYear: new Date().getFullYear() + 1,
+      saleMonth: 1
+    };
+  }
+
+  function ukPensionFlows(person, age, gbpAud, inflationFactor) {
+    const stateAnnuity = age >= person.ukStateStartAge
+      ? person.ukStateAnnualGbp * gbpAud * inflationFactor
+      : 0;
+    const privateAnnuity = person.ukPrivateType === 'annuity' &&
+      age >= person.ukPrivateTakeAge
+      ? person.ukPrivateAmountGbp * gbpAud * inflationFactor
+      : 0;
+    const privateLump = person.ukPrivateType === 'lump' &&
+      age === person.ukPrivateTakeAge
+      ? person.ukPrivateAmountGbp * gbpAud * inflationFactor
+      : 0;
+    return { stateAnnuity, privateAnnuity, privateLump };
+  }
+
+  function superAccessSplit(person) {
+    const pct = Math.max(0, Math.min(100, person.superAccessPct)) / 100;
+    const alreadyAccessed = person.age >= person.superAccessAge;
+    return {
+      accum: alreadyAccessed ? person.super * (1 - pct) : person.super,
+      retire: alreadyAccessed ? person.super * pct : 0,
+      transitioned: alreadyAccessed
+    };
+  }
+
+  function makeProjectionState(scenario) {
+    const splits = scenario.people.map(superAccessSplit);
+    return {
+      superAccum: splits.map(split => split.accum),
+      superRetire: splits.map(split => split.retire),
+      superTransitioned: splits.map(split => split.transitioned),
+      cash: scenario.cash.amount,
+      savings: scenario.savings.amount,
+      holdings: scenario.shareholdings.map(holding => ({ ...holding, sold: false })),
+      ukPrivateBalances: scenario.people.map(person =>
+        person.ukPrivateType === 'lump'
+          ? person.ukPrivateAmountGbp * scenario.assumptions.gbpAud
+          : 0
+      )
+    };
+  }
+
+  function totalSuper(state, index) {
+    return state.superAccum[index] + state.superRetire[index];
+  }
+
+  function sourceBalance(state, source) {
+    if (source === 'p0Super') return state.superRetire[0];
+    if (source === 'p1Super') return state.superRetire[1];
+    if (source === 'cash') return state.cash;
+    if (source === 'savings') return state.savings;
+    throw new Error(`Invalid drawdown source: ${source}`);
+  }
+
+  function setSourceBalance(state, source, value) {
+    if (source === 'p0Super') { state.superRetire[0] = value; return; }
+    if (source === 'p1Super') { state.superRetire[1] = value; return; }
+    if (source === 'cash') { state.cash = value; return; }
+    if (source === 'savings') { state.savings = value; return; }
+    throw new Error(`Invalid drawdown source: ${source}`);
+  }
+
+  function drawFromTiers(state, tiers, amount) {
+    let remaining = Math.max(0, amount);
+    const drawsBySource = { p0Super: 0, p1Super: 0, cash: 0, savings: 0 };
+    for (const tier of tiers) {
+      if (remaining <= 0) break;
+      const weightSum = tier.reduce((sum, entry) => sum + entry.weight, 0) || 1;
+      const balances = tier.map(entry => sourceBalance(state, entry.source));
+      const tierAvailable = balances.reduce((sum, value) => sum + value, 0);
+      if (!(tierAvailable > 0)) continue;
+      const tierDraw = Math.min(remaining, tierAvailable);
+      const shares = tier.map(entry => tierDraw * (entry.weight / weightSum));
+      for (let i = 0; i < tier.length; i += 1) {
+        if (shares[i] > balances[i]) {
+          const overflow = shares[i] - balances[i];
+          shares[i] = balances[i];
+          const other = i === 0 ? 1 : 0;
+          if (tier[other]) shares[other] += overflow;
+        }
+      }
+      tier.forEach((entry, i) => {
+        setSourceBalance(state, entry.source, Math.max(0, balances[i] - shares[i]));
+        drawsBySource[entry.source] += shares[i];
+      });
+      remaining -= tierDraw;
+    }
+    return { drawsBySource, drawn: amount - remaining, remaining };
+  }
+
+  function inflationFactors(scenario, rowCount) {
+    const factors = [1];
+    for (let index = 1; index < rowCount; index += 1) {
+      const year = scenario.startYear + index - 1;
+      factors.push(
+        factors[index - 1] *
+        (1 + inflationRateForYear(year, scenario.assumptions))
+      );
+    }
+    return factors;
+  }
+
+  function applyShareSales(state, scenario, year, inflationFactor) {
+    const events = [];
+    const discountedGainByPerson = [0, 0];
+    let saleYearInterest = 0;
+    for (const holding of state.holdings) {
+      if (holding.sold || holding.saleYear !== year) continue;
+      const proceeds = shareValueAud(holding);
+      const gain = proceeds - holding.costBaseAud;
+      const discounted = Math.max(0, gain) *
+        (holding.cgtDiscountEligible ? 0.5 : 1);
+      const allocations = allocateOwnedAmount(discounted, holding.owner);
+      discountedGainByPerson[0] += allocations[0];
+      discountedGainByPerson[1] += allocations[1];
+      state.savings += proceeds;
+      holding.sold = true;
+      const monthsInSavings = Math.max(0, 12 - holding.saleMonth);
+      saleYearInterest += proceeds * (scenario.savings.interestPct / 100) *
+        (monthsInSavings / 12);
+      events.push({
+        type: 'share-sale',
+        label: `${holding.symbol} sold`,
+        amount: proceeds / inflationFactor,
+        gain: gain / inflationFactor
+      });
+    }
+    return { events, discountedGainByPerson, saleYearInterest };
+  }
+
+  function minDrawRate(age) {
+    if (age < 65) return 0.04;
+    if (age < 75) return 0.05;
+    if (age < 80) return 0.06;
+    if (age < 85) return 0.07;
+    if (age < 90) return 0.09;
+    if (age < 95) return 0.11;
+    return 0.14;
+  }
+
+  function validateAnnualPath(scenario, annualPath) {
+    if (annualPath == null) return [];
+    const errors = [];
+    const add = (path, message) => errors.push({ path, message });
+    const expectedCount =
+      scenario.household.modelEndAge - scenario.people[0].age + 1;
+
+    if (annualPath.schemaVersion !== 1) {
+      add(
+        'annualPath.schemaVersion',
+        'Expected annual path schema version 1.'
+      );
+    }
+    if (
+      !Array.isArray(annualPath.years) ||
+      annualPath.years.length !== expectedCount
+    ) {
+      add(
+        'annualPath.years',
+        'Annual path must contain exactly one entry per projection year.'
+      );
+      return errors;
+    }
+
+    annualPath.years.forEach((entry, index) => {
+      const expectedYear = scenario.startYear + index;
+      if (entry.year !== expectedYear) {
+        add(
+          `annualPath.years.${index}.year`,
+          `Expected projection year ${expectedYear}.`
+        );
+      }
+      [
+        'superAccumulationReturnPct',
+        'superRetirementReturnPct'
+      ].forEach(key => {
+        if (!Array.isArray(entry[key]) || entry[key].length !== 2) {
+          add(
+            `annualPath.years.${index}.${key}`,
+            `${key} must contain exactly two returns.`
+          );
+          return;
+        }
+        entry[key].forEach((value, personIndex) => {
+          if (!Number.isFinite(value) || value <= -100) {
+            add(
+              `annualPath.years.${index}.${key}.${personIndex}`,
+              'Annual super return must be finite and greater than -100.'
+            );
+          }
+        });
+      });
+    });
+    return errors;
+  }
+
+  function annualReturnsForYear(scenario, annualPath, year) {
+    if (annualPath == null) {
+      return {
+        superAccumulationReturnPct: scenario.people.map(
+          person => person.accumulationReturnPct
+        ),
+        superRetirementReturnPct: scenario.people.map(
+          person => person.retirementReturnPct
+        )
+      };
+    }
+    return annualPath.years[year - scenario.startYear];
+  }
+
+  function projectScenario(scenario, annualPath = null) {
+    const errors = validateScenario(scenario);
+    if (errors.length) throw new Error(`${errors[0].path}: ${errors[0].message}`);
+    const pathErrors = validateAnnualPath(scenario, annualPath);
+    if (pathErrors.length) {
+      throw new Error(`${pathErrors[0].path}: ${pathErrors[0].message}`);
+    }
+
+    const rowCount = scenario.household.modelEndAge - scenario.people[0].age + 1;
+    const factors = inflationFactors(scenario, rowCount);
+    const state = makeProjectionState(scenario);
+    const rows = [];
+
+    for (let index = 0; index < rowCount; index += 1) {
+      const year = scenario.startYear + index;
+      const inflationFactor = factors[index];
+      const ages = scenario.people.map(person => person.age + index);
+      const events = [];
+      const openingSavings = state.savings;
+      const annualReturns = annualReturnsForYear(
+        scenario,
+        annualPath,
+        year
+      );
+
+      const shareResult = applyShareSales(state, scenario, year, inflationFactor);
+      events.push(...shareResult.events);
+
+      const row = projectYear({
+        scenario,
+        state,
+        year,
+        ages,
+        inflationFactor,
+        discountedGainByPerson: shareResult.discountedGainByPerson,
+        openingSavings,
+        saleYearInterest: shareResult.saleYearInterest,
+        events,
+        annualReturns
+      });
+      rows.push(row);
+    }
+
+    const firstShortfall = rows.find(row => row.shortfall > 1) ?? null;
+    return { rows, firstShortfall };
+  }
+
+  function projectYear({
+    scenario,
+    state,
+    year,
+    ages,
+    inflationFactor,
+    discountedGainByPerson,
+    openingSavings,
+    saleYearInterest,
+    events,
+    annualReturns
+  }) {
+    const salaries = [0, 0];
+    const ukState = [0, 0];
+    const ukPrivateAnnuity = [0, 0];
+    const ukPrivateLump = [0, 0];
+
+    scenario.people.forEach((person, index) => {
+      if (!state.superTransitioned[index] && ages[index] >= person.superAccessAge) {
+        const pct = Math.max(0, Math.min(100, person.superAccessPct)) / 100;
+        const total = totalSuper(state, index);
+        const moved = total * pct;
+        state.superRetire[index] = moved;
+        state.superAccum[index] = total - moved;
+        state.superTransitioned[index] = true;
+        if (pct > 0) {
+          events.push({
+            type: 'super-access',
+            label: `${person.name} moves ${Math.round(pct * 100)}% of super to drawdown phase`,
+            amount: moved / inflationFactor
+          });
+        }
+      }
+
+      const working = ages[index] < person.retireAge;
+      const salary = working ? person.salary * inflationFactor : 0;
+      salaries[index] = salary;
+
+      state.superRetire[index] *=
+        1 + annualReturns.superRetirementReturnPct[index] / 100;
+      state.superAccum[index] = working
+        ? state.superAccum[index] *
+            (1 + annualReturns.superAccumulationReturnPct[index] / 100) +
+          salary * person.sgPct / 100 * 0.85
+        : state.superAccum[index] *
+            (1 + annualReturns.superAccumulationReturnPct[index] / 100);
+
+      if (person.ukPrivateType === 'lump' && ages[index] < person.ukPrivateTakeAge) {
+        state.ukPrivateBalances[index] =
+          person.ukPrivateAmountGbp *
+          scenario.assumptions.gbpAud *
+          inflationFactor;
+      }
+
+      const uk = ukPensionFlows(
+        person,
+        ages[index],
+        scenario.assumptions.gbpAud,
+        inflationFactor
+      );
+      ukState[index] = uk.stateAnnuity;
+      ukPrivateAnnuity[index] = uk.privateAnnuity;
+      ukPrivateLump[index] = uk.privateLump;
+
+      if (uk.privateLump > 0 && state.ukPrivateBalances[index] > 0) {
+        state.savings += uk.privateLump;
+        state.ukPrivateBalances[index] = 0;
+        events.push({
+          type: 'uk-private-lump',
+          label: `${person.name} UK private pension lump sum`,
+          amount: uk.privateLump / inflationFactor
+        });
+      }
+    });
+
+    const cashInterest = state.cash * scenario.cash.interestPct / 100;
+    const savingsInterest =
+      openingSavings * scenario.savings.interestPct / 100 +
+      saleYearInterest;
+    state.cash += cashInterest;
+    state.savings += savingsInterest;
+    const interestByPerson = [0, 0];
+    const cashWeights = ownerWeights(scenario.cash.owner);
+    const savingsWeights = ownerWeights(scenario.savings.owner);
+    for (let index = 0; index < 2; index += 1) {
+      interestByPerson[index] =
+        cashInterest * cashWeights[index] +
+        savingsInterest * savingsWeights[index];
+    }
+
+    const assessableAssetsReal = assessableFinancialAssets({
+      cash: state.cash / inflationFactor,
+      savings: state.savings / inflationFactor,
+      shareholdings: state.holdings.map(holding => ({
+        ...holding,
+        price: holding.price / inflationFactor
+      })),
+      superBalances: [0, 1].map(index => totalSuper(state, index) / inflationFactor),
+      ages,
+      ukPrivateBalances: state.ukPrivateBalances.map(value => value / inflationFactor)
+    });
+    const agePensionIncomeReal =
+      salaries.reduce((sum, value) => sum + value, 0) / inflationFactor +
+      ukState.reduce((sum, value) => sum + value, 0) / inflationFactor +
+      ukPrivateAnnuity.reduce((sum, value) => sum + value, 0) / inflationFactor +
+      deemedIncome(assessableAssetsReal);
+    const bothAgePensionAge = ages.every(age => age >= 67);
+    const agePensionReal = scenario.household.includeAgePension && bothAgePensionAge
+      ? agePensionCouple({
+          assets: assessableAssetsReal,
+          assessableIncome: agePensionIncomeReal
+        })
+      : 0;
+    const agePensionNominal = agePensionReal * inflationFactor;
+
+    const mandatoryDraws = [0, 0];
+    if (scenario.household.applyMinimumDrawdown) {
+      scenario.people.forEach((person, index) => {
+        if (!(state.superRetire[index] > 0)) return;
+        mandatoryDraws[index] =
+          state.superRetire[index] * minDrawRate(ages[index]);
+        state.superRetire[index] = Math.max(
+          0,
+          state.superRetire[index] - mandatoryDraws[index]
+        );
+      });
+    }
+
+    const uppRate = scenario.assumptions.uppPct / 100;
+    const taxableNominal = [0, 1].map(index =>
+      salaries[index] +
+      (ukState[index] + ukPrivateAnnuity[index]) * (1 - uppRate) +
+      agePensionNominal / 2 +
+      interestByPerson[index] +
+      discountedGainByPerson[index]
+    );
+    const taxReal = taxableNominal.map((value, index) =>
+      netTax({
+        taxableIncome: value / inflationFactor,
+        rebateIncome: value / inflationFactor,
+        year,
+        seniorEligible: ages[index] >= 67
+      })
+    );
+    const totalTaxNominal =
+      taxReal.reduce((sum, value) => sum + value, 0) * inflationFactor;
+    const cgtTaxNominal = [0, 1].reduce((sum, index) => {
+      if (!(discountedGainByPerson[index] > 0)) return sum;
+      const withGain = taxReal[index];
+      const withoutGain = netTax({
+        taxableIncome:
+          (taxableNominal[index] - discountedGainByPerson[index]) / inflationFactor,
+        rebateIncome:
+          (taxableNominal[index] - discountedGainByPerson[index]) / inflationFactor,
+        year,
+        seniorEligible: ages[index] >= 67
+      });
+      return sum + Math.max(0, withGain - withoutGain) * inflationFactor;
+    }, 0);
+
+    const grossTaxableSources =
+      salaries.reduce((sum, value) => sum + value, 0) +
+      ukState.reduce((sum, value) => sum + value, 0) +
+      ukPrivateAnnuity.reduce((sum, value) => sum + value, 0) +
+      agePensionNominal;
+    const taxableNetRatio = grossTaxableSources > 0
+      ? Math.max(0, (grossTaxableSources - totalTaxNominal) / grossTaxableSources)
+      : 1;
+
+    const guaranteedNet =
+      grossTaxableSources - totalTaxNominal;
+    const mandatoryTotal =
+      mandatoryDraws.reduce((sum, value) => sum + value, 0);
+    const targetNominal = scenario.household.targetAfterTax * inflationFactor;
+    const budgetNominal =
+      (scenario.household.annualBudget ?? scenario.household.targetAfterTax) *
+      inflationFactor;
+    const availableBeforeDiscretionary = guaranteedNet + mandatoryTotal;
+    let gap = Math.max(0, budgetNominal - availableBeforeDiscretionary);
+    const surplusBanked = Math.max(
+      0,
+      availableBeforeDiscretionary - budgetNominal
+    );
+    state.savings += surplusBanked;
+
+    const waterfall = drawFromTiers(
+      state,
+      scenario.household.drawdownPriority,
+      gap
+    );
+    gap = waterfall.remaining;
+    const extraSuperDraws = [waterfall.drawsBySource.p0Super, waterfall.drawsBySource.p1Super];
+    const potDraw = waterfall.drawsBySource.cash + waterfall.drawsBySource.savings;
+
+    const superIncome = mandatoryDraws.map(
+      (value, index) => value + extraSuperDraws[index]
+    );
+    const totalIncomeNominal =
+      guaranteedNet +
+      superIncome.reduce((sum, value) => sum + value, 0) +
+      potDraw;
+    const shortfallNominal = Math.max(0, budgetNominal - totalIncomeNominal);
+
+    const unsoldShares = state.holdings.reduce(
+      (sum, holding) => sum + (holding.sold ? 0 : shareValueAud(holding)),
+      0
+    );
+    const totalAssetsNominal =
+      state.superAccum.reduce((sum, value) => sum + value, 0) +
+      state.superRetire.reduce((sum, value) => sum + value, 0) +
+      state.cash +
+      state.savings +
+      unsoldShares +
+      state.ukPrivateBalances.reduce((sum, value) => sum + value, 0);
+
+    const adjustedTaxableIncomeReal =
+      taxableNominal.reduce((sum, value) => sum + value, 0) / inflationFactor;
+    const abpBalanceReal =
+      state.superRetire.reduce((sum, value) => sum + value, 0) / inflationFactor;
+    const cshc = cshcEstimate({
+      adjustedTaxableIncome: adjustedTaxableIncomeReal,
+      accountBasedPensionBalance: abpBalanceReal
+    });
+
+    return {
+      year,
+      ages,
+      components: {
+        workNet:
+          salaries.reduce((sum, value) => sum + value, 0) *
+          taxableNetRatio / inflationFactor,
+        ukStateNet:
+          ukState.reduce((sum, value) => sum + value, 0) *
+          taxableNetRatio / inflationFactor,
+        ukPrivateAnnuityNet:
+          ukPrivateAnnuity.reduce((sum, value) => sum + value, 0) *
+          taxableNetRatio / inflationFactor,
+        agePensionNet:
+          agePensionNominal * taxableNetRatio / inflationFactor,
+        person0Super: superIncome[0] / inflationFactor,
+        person1Super: superIncome[1] / inflationFactor,
+        potDraw: potDraw / inflationFactor,
+        cashDraw: waterfall.drawsBySource.cash / inflationFactor,
+        savingsDraw: waterfall.drawsBySource.savings / inflationFactor
+      },
+      tax: totalTaxNominal / inflationFactor,
+      cgtTax: cgtTaxNominal / inflationFactor,
+      cshc,
+      totalIncome: totalIncomeNominal / inflationFactor,
+      target: scenario.household.targetAfterTax,
+      budget: budgetNominal / inflationFactor,
+      banked: surplusBanked / inflationFactor,
+      shortfall: shortfallNominal / inflationFactor,
+      totalAssets: totalAssetsNominal / inflationFactor,
+      superBalances: [0, 1].map(index => totalSuper(state, index) / inflationFactor),
+      cash: state.cash / inflationFactor,
+      savings: state.savings / inflationFactor,
+      shares: unsoldShares / inflationFactor,
+      events: [...events]
+    };
+  }
+
+  function validateScenario(scenario) {
+    const errors = [];
+    const add = (path, message) => errors.push({ path, message });
+    const finiteNonNegative = value => Number.isFinite(value) && value >= 0;
+
+    if (!scenario || typeof scenario !== 'object') {
+      return [{ path: 'scenario', message: 'Scenario must be an object.' }];
+    }
+    if (scenario.schemaVersion !== SCHEMA_VERSION) {
+      add('schemaVersion', `Expected schema version ${SCHEMA_VERSION}.`);
+    }
+    if (!Array.isArray(scenario.people) || scenario.people.length !== 2) {
+      add('people', 'Exactly two people are required.');
+    } else {
+      scenario.people.forEach((person, index) => {
+        if (!person.name || typeof person.name !== 'string') {
+          add(`people.${index}.name`, 'Name is required.');
+        }
+        if (!finiteNonNegative(person.age) || person.age > 120) {
+          add(`people.${index}.age`, 'Age must be between 0 and 120.');
+        }
+        if (!finiteNonNegative(person.super)) {
+          add(`people.${index}.super`, 'Super must be zero or greater.');
+        }
+        if (!finiteNonNegative(person.retireAge) || person.retireAge < person.age) {
+          add(`people.${index}.retireAge`, 'Retirement age cannot be below current age.');
+        }
+        if (!finiteNonNegative(person.superAccessAge) || person.superAccessAge > 120) {
+          add(`people.${index}.superAccessAge`, 'Super access age must be between 0 and 120.');
+        }
+        if (!Number.isFinite(person.superAccessPct) ||
+            person.superAccessPct < 0 || person.superAccessPct > 100) {
+          add(`people.${index}.superAccessPct`, 'Super access % must be between 0 and 100.');
+        }
+      });
+    }
+    ['cash', 'savings'].forEach(key => {
+      if (!scenario[key] || !finiteNonNegative(scenario[key].amount)) {
+        add(`${key}.amount`, 'Amount must be zero or greater.');
+      }
+      if (!scenario[key] || !VALID_OWNERS.has(scenario[key].owner)) {
+        add(`${key}.owner`, 'Owner must be Person 1, Person 2, or Joint 50/50.');
+      }
+    });
+    if (!Array.isArray(scenario.shareholdings)) {
+      add('shareholdings', 'Shareholdings must be an array.');
+    } else {
+      scenario.shareholdings.forEach((holding, index) => {
+        const path = `shareholdings.${index}`;
+        if (!holding.symbol || typeof holding.symbol !== 'string') {
+          add(`${path}.symbol`, 'Symbol is required.');
+        }
+        if (!finiteNonNegative(holding.quantity)) {
+          add(`${path}.quantity`, 'Quantity must be zero or greater.');
+        }
+        if (!['AUD', 'USD'].includes(holding.quoteCurrency)) {
+          add(`${path}.quoteCurrency`, 'Quote currency must be AUD or USD.');
+        }
+        if (!(Number.isFinite(holding.price) && holding.price > 0)) {
+          add(`${path}.price`, 'Price must be greater than zero.');
+        }
+        if (!(Number.isFinite(holding.fxToAud) && holding.fxToAud > 0)) {
+          add(`${path}.fxToAud`, 'FX rate must be greater than zero.');
+        }
+        if (!VALID_OWNERS.has(holding.owner)) {
+          add(`${path}.owner`, 'Owner must be Person 1, Person 2, or Joint 50/50.');
+        }
+        if (!finiteNonNegative(holding.costBaseAud)) {
+          add(`${path}.costBaseAud`, 'Cost base must be zero or greater.');
+        }
+        if (typeof holding.cgtDiscountEligible !== 'boolean') {
+          add(`${path}.cgtDiscountEligible`, 'CGT discount eligibility must be true or false.');
+        }
+        if (!Number.isInteger(holding.saleYear) || holding.saleYear < scenario.startYear) {
+          add(`${path}.saleYear`, 'Sale year cannot be before the scenario start year.');
+        }
+        if (!Number.isInteger(holding.saleMonth) ||
+            holding.saleMonth < 1 || holding.saleMonth > 12) {
+          add(`${path}.saleMonth`, 'Sale month must be between 1 and 12.');
+        }
+      });
+    }
+    if (!(scenario.household?.targetAfterTax >= 0)) {
+      add('household.targetAfterTax', 'Target income must be zero or greater.');
+    }
+    if (!(scenario.household?.annualBudget >= 0)) {
+      add('household.annualBudget', 'General budget must be zero or greater.');
+    }
+    if (!(scenario.household?.modelEndAge >= scenario.people?.[0]?.age)) {
+      add('household.modelEndAge', 'Model end age cannot be below Person 1 current age.');
+    }
+    if (!Array.isArray(scenario.household?.drawdownPriority) ||
+        scenario.household.drawdownPriority.length === 0) {
+      add('household.drawdownPriority', 'At least one drawdown tier is required.');
+    } else {
+      const seenAcrossTiers = new Set();
+      scenario.household.drawdownPriority.forEach((tier, tierIndex) => {
+        const path = `household.drawdownPriority.${tierIndex}`;
+        if (!Array.isArray(tier) || tier.length < 1 || tier.length > 2) {
+          add(path, 'Each tier must have one or two sources.');
+          return;
+        }
+        tier.forEach((entry, entryIndex) => {
+          const entryPath = `${path}.${entryIndex}`;
+          if (!DRAWDOWN_SOURCES.has(entry?.source)) {
+            add(`${entryPath}.source`, 'Source must be a valid drawdown source.');
+          } else if (seenAcrossTiers.has(entry.source)) {
+            add(`${entryPath}.source`, 'A source cannot appear in more than one tier.');
+          } else {
+            seenAcrossTiers.add(entry.source);
+          }
+          if (!(Number.isFinite(entry?.weight) && entry.weight > 0)) {
+            add(`${entryPath}.weight`, 'Weight must be greater than zero.');
+          }
+        });
+      });
+    }
+    if (!['treasury', 'manual', 'stress-path'].includes(scenario.assumptions?.inflationMode)) {
+      add('assumptions.inflationMode', 'Inflation mode must be Treasury, manual, or stress path.');
+    }
+    return errors;
+  }
+
+  globalThis.RetirementSimulatorCore = { SCHEMA_VERSION };
+  Object.assign(globalThis.RetirementSimulatorCore, {
+    makeSampleScenario,
+    validateScenario,
+    parseMoney,
+    formatMoney,
+    ownerWeights,
+    hitTestSegments,
+    exportScenario,
+    importScenario,
+    shareValueAud,
+    allocateOwnedAmount,
+    discountedCapitalGainByPerson,
+    makeShareholding,
+    ukPensionFlows,
+    TREASURY_INFLATION,
+    TAX_SCHEDULES,
+    TAX_SOURCE,
+    MEDICARE_BASE,
+    SERVICES_AUSTRALIA_2026,
+    inflationRateForYear,
+    incomeTaxResident,
+    medicareLevy,
+    litoOffset,
+    saptoOffset,
+    netTax,
+    deemedIncome,
+    agePensionAssetsRate,
+    agePensionIncomeRate,
+    agePensionCouple,
+    cshcEstimate,
+    assessableFinancialAssets,
+    makeProjectionState,
+    superAccessSplit,
+    totalSuper,
+    sourceBalance,
+    setSourceBalance,
+    drawFromTiers,
+    defaultDrawdownPriority,
+    migrateScenario,
+    inflationFactors,
+    applyShareSales,
+    minDrawRate,
+    validateAnnualPath,
+    annualReturnsForYear,
+    projectScenario
+  });
+})();
+</script>
+<script id="simulator-ui">
+(() => {
+  'use strict';
+
+  const core = globalThis.RetirementSimulatorCore;
+  const STORAGE_KEY = 'family-retirement-simulator:v0.95:scenario';
+  let currentScenario = null;
+  let currentProjection = null;
+  let saveTimer = null;
+  let view = 'income';
+  const $ = selector => document.querySelector(selector);
+  const chart = $('#chart');
+  function buildIncomeSegments(scenario) {
+    const people = scenario.people;
+    const base = [
+      ['workNet', '#C8C8C8', 'Work income'],
+      ['ukStateNet', '#C99A45', 'UK State Pension'],
+      ['ukPrivateAnnuityNet', '#F0C571', 'UK private annuity'],
+      ['agePensionNet', '#7E4794', 'Aust. Aged Pension']
+    ];
+    const sourceMeta = {
+      p0Super: ['person0Super', '#0B81A2', `${people[0].name} super drawdown`],
+      p1Super: ['person1Super', '#59A89C', `${people[1].name} super drawdown`],
+      savings: ['savingsDraw', '#7F8F98', 'Savings drawdown'],
+      cash: ['cashDraw', '#9FB0C0', 'Cash drawdown']
+    };
+    const discretionary = [];
+    scenario.household.drawdownPriority.forEach(tier => {
+      tier.forEach(entry => {
+        if (sourceMeta[entry.source]) discretionary.push(sourceMeta[entry.source]);
+      });
+    });
+    return [...base, ...discretionary];
+  }
+  const TARGET_COLOUR = '#E6A15A';
+  const BUDGET_COLOUR = '#8bd450';
+  let chartState = { segments: [] };
+  let keyboardSegmentIndex = 0;
+
+  function escapeHtml(value) {
+    return String(value)
+      .replaceAll('&', '&amp;')
+      .replaceAll('<', '&lt;')
+      .replaceAll('>', '&gt;')
+      .replaceAll('"', '&quot;')
+      .replaceAll("'", '&#039;');
+  }
+
+  function slugify(value) {
+    return String(value)
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '') || 'retirement-scenario';
+  }
+
+  function ownerOptions(selected, people) {
+    return [
+      ['p0', people[0].name],
+      ['p1', people[1].name],
+      ['joint', 'Joint 50/50']
+    ].map(([value, label]) =>
+      `<option value="${value}"${value === selected ? ' selected' : ''}>${escapeHtml(label)}</option>`
+    ).join('');
+  }
+
+  function ownerLabel(owner, people) {
+    if (owner === 'p0') return people[0].name;
+    if (owner === 'p1') return people[1].name;
+    return 'Joint 50/50';
+  }
+
+  function privatePensionAmountLabel(type) {
+    return type === 'annuity'
+      ? 'Private annuity (£/year)'
+      : 'Private pension lump sum (£)';
+  }
+
+  function setPathImmutable(source, dottedPath, value) {
+    const result = structuredClone(source);
+    const parts = dottedPath.split('.');
+    let cursor = result;
+    for (const part of parts.slice(0, -1)) {
+      cursor = cursor[Number.isInteger(Number(part)) ? Number(part) : part];
+    }
+    const last = parts.at(-1);
+    cursor[Number.isInteger(Number(last)) ? Number(last) : last] = value;
+    return result;
+  }
+
+  function readControlValue(control) {
+    if (control.type === 'checkbox') return control.checked;
+    if (control.dataset.valueType === 'money') return core.parseMoney(control.value);
+    if (control.dataset.valueType === 'number') return Number(control.value);
+    return control.value;
+  }
+
+  function moneyField(label, path, value, currency = 'AUD') {
+    return `<label><span class="k">${escapeHtml(label)} (${currency})</span>
+      <input class="money-input" inputmode="decimal" data-value-type="money"
+        data-currency="${currency}" data-path="${path}"
+        value="${core.formatMoney(value, currency)}">
+    </label>`;
+  }
+
+  function numberField(label, path, value, attributes = '') {
+    return `<label><span class="k">${escapeHtml(label)}</span>
+      <input type="number" data-value-type="number" data-path="${path}"
+        value="${value}" ${attributes}>
+    </label>`;
+  }
+
+  function ownerField(label, path, selected, people) {
+    return `<label><span class="k">${escapeHtml(label)}</span>
+      <select data-path="${path}">${ownerOptions(selected, people)}</select>
+    </label>`;
+  }
+
+  function personFields(person, index) {
+    const path = `people.${index}`;
+    return `<fieldset>
+      <legend>${escapeHtml(person.name)}</legend>
+      <label><span class="k">Name</span>
+        <input data-path="${path}.name" value="${escapeHtml(person.name)}">
+      </label>
+      ${numberField('Age now', `${path}.age`, person.age, 'min="0" max="120"')}
+      ${moneyField('Super now', `${path}.super`, person.super)}
+      ${numberField('Retire age', `${path}.retireAge`, person.retireAge, 'min="0" max="120"')}
+      ${moneyField('Salary', `${path}.salary`, person.salary)}
+      ${numberField('SG %', `${path}.sgPct`, person.sgPct, 'min="0" max="30" step="0.1"')}
+      ${numberField('Accumulation return %', `${path}.accumulationReturnPct`, person.accumulationReturnPct, 'min="-20" max="30" step="0.1"')}
+      ${numberField('Retirement return %', `${path}.retirementReturnPct`, person.retirementReturnPct, 'min="-20" max="30" step="0.1"')}
+      ${numberField('Super access age', `${path}.superAccessAge`, person.superAccessAge, 'min="0" max="120"')}
+      ${numberField('Super access %', `${path}.superAccessPct`, person.superAccessPct, 'min="0" max="100" step="1"')}
+      <p class="sub">Age and % of super balance moved into drawdown phase. Independent of retire age &mdash; simplified early-access modelling, not full TTR (see Model assumptions).</p>
+    </fieldset>`;
+  }
+
+  function renderPeople(people) {
+    $('#peopleFields').innerHTML = people.map(personFields).join('');
+  }
+
+  function renderCashAndSavings(scenario) {
+    $('#cashSavingsFields').innerHTML = `
+      <fieldset>
+        <legend>Cash on hand</legend>
+        ${moneyField('Amount', 'cash.amount', scenario.cash.amount)}
+        ${numberField('Interest rate %', 'cash.interestPct', scenario.cash.interestPct, 'min="0" max="30" step="0.1"')}
+        ${ownerField('Owner', 'cash.owner', scenario.cash.owner, scenario.people)}
+      </fieldset>
+      <fieldset>
+        <legend>Savings pot</legend>
+        ${moneyField('Amount', 'savings.amount', scenario.savings.amount)}
+        ${numberField('Interest rate %', 'savings.interestPct', scenario.savings.interestPct, 'min="0" max="30" step="0.1"')}
+        ${ownerField('Owner', 'savings.owner', scenario.savings.owner, scenario.people)}
+      </fieldset>`;
+  }
+
+  function shareholdingFields(holding, index, people) {
+    const path = `shareholdings.${index}`;
+    return `
+      <label><span class="k">Symbol</span>
+        <input data-path="${path}.symbol" value="${escapeHtml(holding.symbol)}">
+      </label>
+      ${numberField('Quantity', `${path}.quantity`, holding.quantity, 'min="0" step="0.0001"')}
+      <label><span class="k">Quote currency</span>
+        <select data-path="${path}.quoteCurrency">
+          <option value="AUD"${holding.quoteCurrency === 'AUD' ? ' selected' : ''}>AUD</option>
+          <option value="USD"${holding.quoteCurrency === 'USD' ? ' selected' : ''}>USD</option>
+        </select>
+      </label>
+      ${moneyField('Current price', `${path}.price`, holding.price, holding.quoteCurrency)}
+      <label${holding.quoteCurrency === 'AUD' ? ' hidden' : ''}><span class="k">FX to AUD</span>
+        <input type="number" min="0" step="0.0001" data-value-type="number"
+          data-path="${path}.fxToAud" value="${holding.fxToAud}">
+      </label>
+      ${ownerField('Owner', `${path}.owner`, holding.owner, people)}
+      ${moneyField('Cost base', `${path}.costBaseAud`, holding.costBaseAud)}
+      <label><span class="k">Eligible for 50% CGT discount</span>
+        <input type="checkbox" data-path="${path}.cgtDiscountEligible"
+          ${holding.cgtDiscountEligible ? 'checked' : ''}>
+      </label>
+      <label><span class="k">Sale month</span>
+        <input type="month" data-sale-index="${index}"
+          value="${holding.saleYear}-${String(holding.saleMonth).padStart(2, '0')}">
+      </label>
+      <label><span class="k">Cost-base CSV</span>
+        <input type="file" class="holding-csv" data-index="${index}" accept=".csv,text/csv">
+      </label>
+      <button type="button" class="fetch-holding" data-index="${index}">
+        Fetch latest available close and FX
+      </button>`;
+  }
+
+  function renderShareholding(holding, index, people) {
+    return `<details class="shareholding" data-share-id="${escapeHtml(holding.id)}">
+      <summary>
+        <span>${escapeHtml(holding.symbol || 'New holding')}</span>
+        <span>${holding.quantity.toLocaleString('en-AU')} shares</span>
+        <span>${escapeHtml(ownerLabel(holding.owner, people))}</span>
+        <span>${core.formatMoney(core.shareValueAud(holding), 'AUD')}</span>
+      </summary>
+      <div class="shareholding-fields">
+        ${shareholdingFields(holding, index, people)}
+        <button type="button" class="remove-share" data-index="${index}">Remove holding</button>
+      </div>
+    </details>`;
+  }
+
+  function renderShareholdings(holdings, people) {
+    $('#shareholdingList').innerHTML = holdings.length
+      ? holdings.map((holding, index) =>
+          renderShareholding(holding, index, people)).join('')
+      : '<p class="empty-state">No shareholdings added.</p>';
+  }
+
+  function ukPersonFields(person, index) {
+    const path = `people.${index}`;
+    return `<legend>${escapeHtml(person.name)}</legend>
+      ${moneyField('State Pension annual', `${path}.ukStateAnnualGbp`, person.ukStateAnnualGbp, 'GBP')}
+      ${numberField('State Pension start age', `${path}.ukStateStartAge`, person.ukStateStartAge, 'min="55" max="80"')}
+      ${moneyField(
+        privatePensionAmountLabel(person.ukPrivateType),
+        `${path}.ukPrivateAmountGbp`,
+        person.ukPrivateAmountGbp,
+        'GBP'
+      )}
+      ${numberField('Private pension take age', `${path}.ukPrivateTakeAge`, person.ukPrivateTakeAge, 'min="55" max="100"')}
+      <label><span class="k">Private pension treatment</span>
+        <select data-path="${path}.ukPrivateType">
+          <option value="lump"${person.ukPrivateType === 'lump' ? ' selected' : ''}>Lump sum into savings pot</option>
+          <option value="annuity"${person.ukPrivateType === 'annuity' ? ' selected' : ''}>Annual lifetime annuity</option>
+        </select>
+      </label>`;
+  }
+
+  function renderUkPensions(people, assumptions) {
+    $('#gbpAud').value = assumptions.gbpAud;
+    $('#ukPerson0').innerHTML = ukPersonFields(people[0], 0);
+    $('#ukPerson1').innerHTML = ukPersonFields(people[1], 1);
+  }
+
+  function drawdownSourceOptions(selected, people) {
+    const options = [
+      ['p0Super', `${people[0].name} super`],
+      ['p1Super', `${people[1].name} super`],
+      ['savings', 'Savings'],
+      ['cash', 'Cash']
+    ];
+    return options.map(([value, label]) =>
+      `<option value="${value}"${value === selected ? ' selected' : ''}>${escapeHtml(label)}</option>`
+    ).join('');
+  }
+
+  function tierFields(tier, tierIndex, people, tierCount) {
+    const path = `household.drawdownPriority.${tierIndex}`;
+    const [a, b] = tier;
+    const weightAPct = b
+      ? Math.round((a.weight / (a.weight + b.weight)) * 100)
+      : 100;
+    return `<div class="tier" data-tier-index="${tierIndex}">
+      <div class="tier-head">
+        <strong>Priority ${tierIndex + 1}</strong>
+        <button type="button" class="tier-up" data-index="${tierIndex}"${tierIndex === 0 ? ' disabled' : ''}>Up</button>
+        <button type="button" class="tier-down" data-index="${tierIndex}"${tierIndex === tierCount - 1 ? ' disabled' : ''}>Down</button>
+        <button type="button" class="tier-remove" data-index="${tierIndex}"${tierCount <= 1 ? ' disabled' : ''}>Remove</button>
+      </div>
+      <label><span class="k">Source${b ? ' A' : ''}</span>
+        <select data-path="${path}.0.source">${drawdownSourceOptions(a.source, people)}</select>
+      </label>
+      <label><span class="k">Split this tier with a second source</span>
+        <input type="checkbox" class="tier-split-toggle" data-index="${tierIndex}"${b ? ' checked' : ''}>
+      </label>
+      ${b ? `
+      <label><span class="k">Source B</span>
+        <select data-path="${path}.1.source">${drawdownSourceOptions(b.source, people)}</select>
+      </label>
+      <label><span class="k">Source A share %</span>
+        <input type="number" min="0" max="100" step="5" class="tier-weight" data-index="${tierIndex}" value="${weightAPct}">
+      </label>` : ''}
+    </div>`;
+  }
+
+  function drawdownPriorityFields(drawdownPriority, people) {
+    return `<div id="drawdownPriorityList">
+      ${drawdownPriority.map((tier, index) =>
+        tierFields(tier, index, people, drawdownPriority.length)).join('')}
+    </div>
+    <button type="button" id="addDrawdownTier">Add drawdown tier</button>
+    <p class="sub">Once base income (salary, UK State Pension) and Aust. Aged Pension are accounted for, the model tops up toward the requested income from these tiers, in order. With ABP minimum drawdown enforced, no top-ups are taken — income is guaranteed sources plus mandatory minimums, spending is capped at the general budget, surplus is banked to savings, and any gap below budget shows as a shortfall. A two-source tier splits the draw by the chosen %% while both sources remain available.</p>`;
+  }
+
+  function renderHousehold(household, assumptions, people) {
+    $('#householdFields').innerHTML = `
+      ${moneyField('Requested income after tax', 'household.targetAfterTax', household.targetAfterTax)}
+      ${moneyField('General budget p.a. (spend)', 'household.annualBudget', household.annualBudget)}
+      ${numberField('Model to Person 1 age', 'household.modelEndAge', household.modelEndAge, 'min="65" max="120"')}
+      <label><span class="k">Apply ABP minimum drawdown</span>
+        <input type="checkbox" data-path="household.applyMinimumDrawdown"${household.applyMinimumDrawdown ? ' checked' : ''}>
+      </label>
+      <label><span class="k">Include Age Pension estimate</span>
+        <input type="checkbox" data-path="household.includeAgePension"${household.includeAgePension ? ' checked' : ''}>
+      </label>
+      <label><span class="k">Show illustrative survival band</span>
+        <input type="checkbox" data-path="household.showSurvival"${household.showSurvival ? ' checked' : ''}>
+      </label>
+      ${numberField('UK pension UPP deduction %', 'assumptions.uppPct', assumptions.uppPct, 'min="0" max="100" step="0.1"')}
+      <h4>Drawdown order</h4>
+      ${drawdownPriorityFields(household.drawdownPriority, people)}`;
+    $('#inflationMode').value = assumptions.inflationMode;
+    $('#manualInflationPct').value = assumptions.manualInflationPct;
+    $('#manualInflationRow').hidden = assumptions.inflationMode !== 'manual';
+    $('#treasurySource').hidden = assumptions.inflationMode === 'manual';
+  }
+
+  function bindMoneyInputs() {
+    document.querySelectorAll('.money-input').forEach(input => {
+      input.addEventListener('focus', () => {
+        const value = core.parseMoney(input.value);
+        input.value = Number.isFinite(value) ? String(value) : '';
+      });
+      input.addEventListener('blur', () => {
+        const value = core.parseMoney(input.value);
+        if (!Number.isFinite(value) || value < 0) {
+          input.setAttribute('aria-invalid', 'true');
+          return;
+        }
+        input.removeAttribute('aria-invalid');
+        input.value = core.formatMoney(value, input.dataset.currency);
+      });
+    });
+  }
+
+  function showScenarioMessage(message, kind = 'info') {
+    $('#scenarioMessage').textContent = message;
+    $('#scenarioMessage').className = `scenario-message ${kind}`;
+  }
+
+  function showValidation(errors) {
+    document.querySelectorAll('[aria-invalid="true"]').forEach(element =>
+      element.removeAttribute('aria-invalid'));
+    $('#validationSummary').innerHTML = errors
+      .map(error => `<li>${escapeHtml(error.path)}: ${escapeHtml(error.message)}</li>`)
+      .join('');
+    errors.forEach(error => {
+      const control = document.querySelector(`[data-path="${CSS.escape(error.path)}"]`);
+      if (control) control.setAttribute('aria-invalid', 'true');
+    });
+  }
+
+  function showProjectionError(message) {
+    const element = $('#projectionError');
+    element.textContent = message;
+    element.hidden = false;
+  }
+
+  function saveScenario(scenario) {
+    const errors = core.validateScenario(scenario);
+    if (errors.length) return false;
+    window.__safeStorage.setItem(STORAGE_KEY, core.exportScenario(scenario));
+    return true;
+  }
+
+  function scheduleSave(scenario) {
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(() => {
+      if (saveScenario(scenario)) showScenarioMessage('Saved locally.', 'success');
+    }, 250);
+  }
+
+  function loadScenario() {
+    const text = window.__safeStorage.getItem(STORAGE_KEY);
+    if (!text) return core.makeSampleScenario();
+    try {
+      return core.importScenario(text);
+    } catch {
+      return core.makeSampleScenario();
+    }
+  }
+
+  function downloadScenarioFallback(scenario) {
+    const blob = new Blob([core.exportScenario(scenario)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = `${slugify(scenario.scenarioName || 'retirement-scenario')}.json`;
+    anchor.click();
+    URL.revokeObjectURL(url);
+  }
+
+  async function downloadScenario(scenario) {
+    const text = core.exportScenario(scenario);
+    if (typeof window.showSaveFilePicker !== 'function') {
+      downloadScenarioFallback(scenario);
+      return 'downloaded';
+    }
+    try {
+      const handle = await window.showSaveFilePicker({
+        suggestedName: `${slugify(scenario.scenarioName || 'retirement-scenario')}.json`,
+        types: [{
+          description: 'Retirement scenario JSON',
+          accept: { 'application/json': ['.json'] }
+        }]
+      });
+      const writable = await handle.createWritable();
+      await writable.write(text);
+      await writable.close();
+      return 'saved';
+    } catch (error) {
+      if (error?.name === 'AbortError') return 'cancelled';
+      downloadScenarioFallback(scenario);
+      return 'downloaded';
+    }
+  }
+
+  async function readScenarioFile(file) {
+    return core.importScenario(await file.text());
+  }
+
+  async function fetchHoldingQuote(holding) {
+    const results = { ...holding };
+    const messages = [];
+    if (holding.quoteCurrency === 'USD') {
+      try {
+        const fxResponse = await fetch('https://api.frankfurter.app/latest?from=USD&to=AUD');
+        if (!fxResponse.ok) throw new Error(`FX HTTP ${fxResponse.status}`);
+        const fx = await fxResponse.json();
+        results.fxToAud = fx.rates.AUD;
+        messages.push(`USD/AUD ${fx.rates.AUD.toFixed(4)}`);
+      } catch {
+        messages.push('FX unavailable; retained manual rate');
+      }
+      try {
+        const symbol = encodeURIComponent(holding.symbol.toLowerCase());
+        const response = await fetch(
+          `https://stooq.com/q/l/?s=${symbol}.us&f=sd2t2ohlcv&h&e=csv`
+        );
+        if (!response.ok) throw new Error(`Quote HTTP ${response.status}`);
+        const rows = (await response.text()).trim().split(/\r?\n/);
+        const close = Number(rows[1]?.split(',')[6]);
+        if (!(close > 0)) throw new Error('No close price');
+        results.price = close;
+        messages.push(`${holding.symbol.toUpperCase()} close ${close.toFixed(2)}`);
+      } catch {
+        messages.push('Quote unavailable; retained manual price');
+      }
+    } else {
+      messages.push('AUD holding: retained manual price');
+    }
+    return { holding: results, messages };
+  }
+
+  function statusCard(className, label, value) {
+    return `<div class="flag ${className}">
+      <strong>${escapeHtml(label)}</strong>
+      <span>${escapeHtml(value)}</span>
+    </div>`;
+  }
+
+  function prepareChart() {
+    const width = Math.max(320, chart.clientWidth || 900);
+    const height = 330;
+    const dpr = Math.max(1, window.devicePixelRatio || 1);
+    chart.width = Math.round(width * dpr);
+    chart.height = Math.round(height * dpr);
+    const ctx = chart.getContext('2d');
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, width, height);
+    return { ctx, width, height };
+  }
+
+  function drawAxes(ctx, width, height, maximum, pads) {
+    const { left, right, top, bottom } = pads;
+    ctx.font = '11px Segoe UI, sans-serif';
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'middle';
+    for (let tick = 0; tick <= 4; tick += 1) {
+      const value = maximum * tick / 4;
+      const y = height - bottom - (height - top - bottom) * tick / 4;
+      ctx.strokeStyle = '#2B3D4F';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(left, y);
+      ctx.lineTo(width - right, y);
+      ctx.stroke();
+      ctx.fillStyle = '#9FB0C0';
+      ctx.fillText(value >= 1000 ? `$${Math.round(value / 1000)}k` : `$${Math.round(value)}`, left - 8, y);
+    }
+  }
+
+  function drawIncomeChart(rows, scenario) {
+    const { ctx, width, height } = prepareChart();
+    const pads = { left: 54, right: 18, top: 18, bottom: 34 };
+    const plotWidth = width - pads.left - pads.right;
+    const plotHeight = height - pads.top - pads.bottom;
+    const maximum = Math.max(
+      scenario.household.targetAfterTax,
+      scenario.household.annualBudget ?? 0,
+      ...rows.map(row => row.totalIncome)
+    ) * 1.12 || 1;
+    const step = plotWidth / Math.max(1, rows.length);
+    const barWidth = Math.max(3, Math.min(24, step * 0.72));
+    const y = value => height - pads.bottom - value / maximum * plotHeight;
+    chartState.segments = [];
+    hideChartTooltip();
+    drawAxes(ctx, width, height, maximum, pads);
+    const incomeSegments = buildIncomeSegments(scenario);
+
+    rows.forEach((row, rowIndex) => {
+      const barX = pads.left + rowIndex * step + (step - barWidth) / 2;
+      let cumulative = 0;
+      incomeSegments.forEach(([key, colour, label]) => {
+        const value = Math.max(0, row.components[key] || 0);
+        if (!(value > 0)) return;
+        const segmentBottom = y(cumulative);
+        cumulative += value;
+        const segmentTop = y(cumulative);
+        const segmentHeight = Math.max(0, segmentBottom - segmentTop);
+        ctx.fillStyle = colour;
+        ctx.fillRect(barX, segmentTop, barWidth, segmentHeight);
+        chartState.segments.push({
+          x: barX,
+          y: segmentTop,
+          width: barWidth,
+          height: segmentHeight,
+          rowIndex,
+          year: row.year,
+          ages: row.ages,
+          key,
+          label,
+          value
+        });
+      });
+      if (rowIndex % 5 === 0 || rowIndex === rows.length - 1) {
+        ctx.fillStyle = '#9FB0C0';
+        ctx.font = '10px Segoe UI, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'top';
+        ctx.fillText(String(row.ages[0]), barX + barWidth / 2, height - pads.bottom + 7);
+      }
+    });
+
+    const targetY = y(scenario.household.targetAfterTax);
+    ctx.strokeStyle = TARGET_COLOUR;
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([5, 4]);
+    ctx.beginPath();
+    ctx.moveTo(pads.left, targetY);
+    ctx.lineTo(width - pads.right, targetY);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = TARGET_COLOUR;
+    ctx.font = '10px Segoe UI, sans-serif';
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'bottom';
+    ctx.fillText('Requested', width - pads.right, targetY - 3);
+
+    const budgetValue = scenario.household.annualBudget ?? scenario.household.targetAfterTax;
+    const budgetY = y(budgetValue);
+    ctx.strokeStyle = BUDGET_COLOUR;
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([2, 3]);
+    ctx.beginPath();
+    ctx.moveTo(pads.left, budgetY);
+    ctx.lineTo(width - pads.right, budgetY);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = BUDGET_COLOUR;
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'bottom';
+    ctx.fillText('Budget', pads.left + 4, budgetY - 3);
+
+    $('#legend').innerHTML = incomeSegments.map(([, colour, label]) =>
+      `<span><i style="background:${colour}"></i>${escapeHtml(label)}</span>`
+    ).join('') +
+      `<span><i style="background:${TARGET_COLOUR}"></i>Requested income</span>` +
+      `<span><i style="background:${BUDGET_COLOUR}"></i>General budget</span>`;
+    chart.setAttribute(
+      'aria-label',
+      'Income funding sources chart. Salary and UK pensions form the base, then the chosen drawdown order. Use arrow keys to inspect chart segments.'
+    );
+  }
+
+  function drawBalanceEventMarkers(ctx, rows, xScale, chartBottom) {
+    rows.forEach(row => {
+      if (!row.events.length) return;
+      const x = xScale(row.year);
+      ctx.strokeStyle = '#F0C571';
+      ctx.setLineDash([3, 3]);
+      ctx.beginPath();
+      ctx.moveTo(x, 12);
+      ctx.lineTo(x, chartBottom);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    });
+  }
+
+  function drawBalanceChart(rows, scenario) {
+    const { ctx, width, height } = prepareChart();
+    const pads = { left: 54, right: 18, top: 18, bottom: 42 };
+    const plotWidth = width - pads.left - pads.right;
+    const plotHeight = height - pads.top - pads.bottom;
+    const maximum = Math.max(1, ...rows.map(row => row.totalAssets)) * 1.08;
+    const x = index => pads.left + index / Math.max(1, rows.length - 1) * plotWidth;
+    const y = value => height - pads.bottom - value / maximum * plotHeight;
+    chartState.segments = [];
+    hideChartTooltip();
+    drawAxes(ctx, width, height, maximum, pads);
+
+    const series = [
+      ['superBalances', 0, '#0B81A2', `${scenario.people[0].name} super`],
+      ['superBalances', 1, '#59A89C', `${scenario.people[1].name} super`],
+      ['savings', null, '#7F8F98', 'Savings'],
+      ['cash', null, '#9FB0C0', 'Cash'],
+      ['shares', null, '#F0C571', 'Unsold shares'],
+      ['totalAssets', null, '#C8C8C8', 'Total assets']
+    ];
+    series.forEach(([key, index, colour]) => {
+      ctx.strokeStyle = colour;
+      ctx.lineWidth = key === 'totalAssets' ? 2.4 : 1.7;
+      ctx.beginPath();
+      rows.forEach((row, rowIndex) => {
+        const value = index === null ? row[key] : row[key][index];
+        if (rowIndex === 0) ctx.moveTo(x(rowIndex), y(value));
+        else ctx.lineTo(x(rowIndex), y(value));
+      });
+      ctx.stroke();
+    });
+
+    if (scenario.household.showSurvival) {
+      const bandTop = height - 18;
+      const gradient = ctx.createLinearGradient(pads.left, 0, width - pads.right, 0);
+      gradient.addColorStop(0, 'rgba(200,200,200,.42)');
+      gradient.addColorStop(1, 'rgba(200,200,200,.04)');
+      ctx.fillStyle = gradient;
+      ctx.fillRect(pads.left, bandTop, plotWidth, 7);
+      ctx.fillStyle = '#9FB0C0';
+      ctx.font = '9px Segoe UI, sans-serif';
+      ctx.textAlign = 'left';
+      ctx.fillText('Illustrative chance Person 1 is alive', pads.left, height - 4);
+    }
+
+    drawBalanceEventMarkers(
+      ctx,
+      rows,
+      year => x(year - scenario.startYear),
+      height - pads.bottom
+    );
+    $('#legend').innerHTML = series.map(([, , colour, label]) =>
+      `<span><i style="background:${colour}"></i>${escapeHtml(label)}</span>`
+    ).join('') +
+      '<span><i style="background:#F0C571"></i>Asset event</span>';
+    chart.setAttribute('aria-label', 'Asset balance chart with share and pension event markers.');
+  }
+
+  function showChartTooltip(segment, row, point) {
+    const tooltip = $('#chartTooltip');
+    tooltip.innerHTML = `
+      <strong>${escapeHtml(segment.label)}</strong>
+      <span>${row.year} · ages ${row.ages[0]} and ${row.ages[1]}</span>
+      <span>${core.formatMoney(segment.value, 'AUD')} per year</span>
+      <span>Total: ${core.formatMoney(row.totalIncome, 'AUD')}</span>
+      <span>Target: ${core.formatMoney(row.target, 'AUD')}</span>
+      <span>${row.shortfall > 1
+        ? `Shortfall: ${core.formatMoney(row.shortfall, 'AUD')}`
+        : 'Target met'}</span>`;
+    tooltip.style.left = `${Math.min(point.x + 12, Math.max(8, chart.clientWidth - 260))}px`;
+    tooltip.style.top = `${Math.max(8, point.y + 12)}px`;
+    tooltip.hidden = false;
+  }
+
+  function hideChartTooltip() {
+    const tooltip = $('#chartTooltip');
+    tooltip.hidden = true;
+    tooltip.textContent = '';
+  }
+
+  function inspectChartAt(clientX, clientY) {
+    const rect = chart.getBoundingClientRect();
+    const x = clientX - rect.left;
+    const y = clientY - rect.top;
+    const segment = core.hitTestSegments(chartState.segments, x, y);
+    if (!segment) return hideChartTooltip();
+    showChartTooltip(segment, currentProjection.rows[segment.rowIndex], { x, y });
+  }
+
+  function renderKpis(result, scenario) {
+    const end = result.rows.at(-1);
+    const averageTax = result.rows.reduce((sum, row) => sum + row.tax, 0) /
+      result.rows.length;
+    const lifetimeTax = result.rows.reduce((sum, row) => sum + row.tax, 0);
+    const lifetimeCgtTax = result.rows.reduce((sum, row) => sum + row.cgtTax, 0);
+    const peakCshcIncome = Math.max(
+      0,
+      ...result.rows.map(row => row.cshc?.assessedIncome ?? 0)
+    );
+    const kpis = [
+      {
+        label: 'First projected shortfall',
+        value: result.firstShortfall
+          ? `${result.firstShortfall.year} · age ${result.firstShortfall.ages[0]}`
+          : 'None in model period'
+      },
+      { label: `Assets at age ${scenario.household.modelEndAge}`, value: core.formatMoney(end.totalAssets) },
+      { label: 'Average annual estimated tax', value: core.formatMoney(averageTax) },
+      { label: 'Lifetime estimated tax', value: core.formatMoney(lifetimeTax) },
+      { label: 'Estimated CGT', value: core.formatMoney(lifetimeCgtTax) },
+      {
+        label: 'Lifetime banked to savings',
+        value: core.formatMoney(
+          result.rows.reduce((sum, row) => sum + (row.banked || 0), 0)
+        )
+      },
+      { label: 'Peak estimated CSHC income', value: core.formatMoney(peakCshcIncome) }
+    ];
+    $('#kpis').innerHTML = kpis.map(kpi =>
+      `<div class="kpi"><div class="lab">${escapeHtml(kpi.label)}</div>
+        <div class="num">${escapeHtml(kpi.value)}</div></div>`
+    ).join('');
+  }
+
+  function renderProjectionTable(rows, people) {
+    const headings = [
+      'Year',
+      people[0].name,
+      people[1].name,
+      'Total Assets',
+      `${people[0].name} super`,
+      `${people[1].name} super`,
+      'Cash',
+      'Savings',
+      'UK State Pension',
+      'Aust. Aged Pension',
+      'Draw super',
+      'Draw pot',
+      'Tax',
+      'After tax',
+      'Banked',
+      'Event',
+      '+/-'
+    ];
+    const body = rows.map(row => {
+      const eventText = row.events.map(event => event.label).join('; ');
+      const superDraw =
+        row.components.person0Super + row.components.person1Super;
+      return `<tr class="${row.shortfall > 1 ? 'short' : ''}">
+        <td>${row.year}</td>
+        <td>${row.ages[0]}</td>
+        <td>${row.ages[1]}</td>
+        <td>${core.formatMoney(row.totalAssets)}</td>
+        <td>${core.formatMoney(row.superBalances[0])}</td>
+        <td>${core.formatMoney(row.superBalances[1])}</td>
+        <td>${core.formatMoney(row.cash)}</td>
+        <td>${core.formatMoney(row.savings)}</td>
+        <td>${core.formatMoney(row.components.ukStateNet)}</td>
+        <td>${core.formatMoney(row.components.agePensionNet)}</td>
+        <td>${core.formatMoney(superDraw)}</td>
+        <td>${core.formatMoney(row.components.potDraw)}</td>
+        <td>${core.formatMoney(row.tax)}</td>
+        <td>${core.formatMoney(row.totalIncome)}</td>
+        <td>${row.banked > 1 ? core.formatMoney(row.banked) : '—'}</td>
+        <td class="event-cell">${escapeHtml(eventText || '—')}</td>
+        <td>${row.shortfall > 1
+          ? `-${core.formatMoney(row.shortfall)}`
+          : 'ok'}</td>
+      </tr>`;
+    }).join('');
+    $('#tbl').innerHTML =
+      `<thead><tr>${headings.map(heading =>
+        `<th>${escapeHtml(heading)}</th>`).join('')}</tr></thead><tbody>${body}</tbody>`;
+  }
+
+  function renderDashboard(result, scenario) {
+    currentProjection = result;
+    renderKpis(result, scenario);
+    renderProjectionTable(result.rows, scenario.people);
+    const peakCshcRow = result.rows.reduce((peak, row) =>
+      (row.cshc?.assessedIncome ?? 0) > (peak.cshc?.assessedIncome ?? 0)
+        ? row
+        : peak
+    , result.rows[0]);
+    const thresholdState = peakCshcRow.cshc.eligible
+      ? 'Below estimated threshold'
+      : 'Above estimated threshold';
+    $('#flags').innerHTML = [
+      statusCard(
+        peakCshcRow.cshc.eligible ? 'warn' : 'bad',
+        'CSHC estimate',
+        `${thresholdState}: ${core.formatMoney(peakCshcRow.cshc.assessedIncome)} assessed`
+      ),
+      result.firstShortfall
+        ? statusCard(
+            'bad',
+            'Projected shortfall',
+            `${result.firstShortfall.year}: ${core.formatMoney(result.firstShortfall.shortfall)}`
+          )
+        : statusCard(
+            'ok',
+            'Model period',
+            'No projected shortfall in the selected period.'
+          )
+    ].join('');
+    if (view === 'income') drawIncomeChart(result.rows, scenario);
+    else drawBalanceChart(result.rows, scenario);
+  }
+
+  function recalculateAndRender() {
+    const errors = core.validateScenario(currentScenario);
+    showValidation(errors);
+    if (errors.length) {
+      showProjectionError('Correct the highlighted inputs to update the projection.');
+      return;
+    }
+    try {
+      const projection = core.projectScenario(currentScenario);
+      $('#projectionError').hidden = true;
+      renderDashboard(projection, currentScenario);
+    } catch (error) {
+      showProjectionError(`Projection unavailable: ${error.message}`);
+    }
+  }
+
+  function renderSources() {
+    const sources = [
+      ['Treasury inflation forecast', core.TREASURY_INFLATION.sourceUrl],
+      ['ATO resident tax rates', core.TAX_SOURCE.url],
+      ['ATO Medicare levy thresholds', core.MEDICARE_BASE.sourceUrl],
+      ['Services Australia Age Pension assets test', core.SERVICES_AUSTRALIA_2026.assetsTestUrl],
+      ['Services Australia Age Pension income test', core.SERVICES_AUSTRALIA_2026.incomeTestUrl],
+      ['Services Australia CSHC income test', core.SERVICES_AUSTRALIA_2026.cshcUrl]
+    ];
+    $('#sourceList').innerHTML = sources.map(([label, url]) =>
+      `<li><a href="${escapeHtml(url)}" target="_blank" rel="noreferrer">${escapeHtml(label)}</a></li>`
+    ).join('');
+  }
+
+  function renderScenario(scenario) {
+    currentScenario = structuredClone(scenario);
+    $('#scenarioName').value = currentScenario.scenarioName;
+    renderPeople(currentScenario.people);
+    renderCashAndSavings(currentScenario);
+    renderShareholdings(currentScenario.shareholdings, currentScenario.people);
+    renderUkPensions(currentScenario.people, currentScenario.assumptions);
+    renderHousehold(currentScenario.household, currentScenario.assumptions, currentScenario.people);
+    bindMoneyInputs();
+    recalculateAndRender();
+  }
+
+  function addShareholding(scenario) {
+    return {
+      ...scenario,
+      shareholdings: [
+        ...scenario.shareholdings,
+        core.makeShareholding(scenario.shareholdings.length)
+      ]
+    };
+  }
+
+  function removeShareholding(scenario, index) {
+    return {
+      ...scenario,
+      shareholdings: scenario.shareholdings.filter((_, itemIndex) => itemIndex !== index)
+    };
+  }
+
+  function addDrawdownTier(scenario) {
+    const used = new Set(scenario.household.drawdownPriority.flat().map(entry => entry.source));
+    const next = ['p0Super', 'p1Super', 'savings', 'cash'].find(source => !used.has(source)) || 'cash';
+    return {
+      ...scenario,
+      household: {
+        ...scenario.household,
+        drawdownPriority: [
+          ...scenario.household.drawdownPriority,
+          [{ source: next, weight: 1 }]
+        ]
+      }
+    };
+  }
+
+  function removeDrawdownTier(scenario, tierIndex) {
+    return {
+      ...scenario,
+      household: {
+        ...scenario.household,
+        drawdownPriority: scenario.household.drawdownPriority.filter(
+          (_, index) => index !== tierIndex
+        )
+      }
+    };
+  }
+
+  function moveDrawdownTier(scenario, tierIndex, direction) {
+    const tiers = [...scenario.household.drawdownPriority];
+    const target = tierIndex + direction;
+    if (target < 0 || target >= tiers.length) return scenario;
+    [tiers[tierIndex], tiers[target]] = [tiers[target], tiers[tierIndex]];
+    return {
+      ...scenario,
+      household: { ...scenario.household, drawdownPriority: tiers }
+    };
+  }
+
+  function toggleTierSplit(scenario, tierIndex, split) {
+    const allUsed = new Set(scenario.household.drawdownPriority.flat().map(entry => entry.source));
+    const tiers = scenario.household.drawdownPriority.map((tier, index) => {
+      if (index !== tierIndex) return tier;
+      if (!split) return [tier[0]];
+      const candidates = ['p0Super', 'p1Super', 'savings', 'cash']
+        .filter(source => source !== tier[0].source && !allUsed.has(source));
+      const second = candidates[0] ||
+        ['p0Super', 'p1Super', 'savings', 'cash'].find(source => source !== tier[0].source);
+      return [{ ...tier[0], weight: 0.5 }, { source: second, weight: 0.5 }];
+    });
+    return {
+      ...scenario,
+      household: { ...scenario.household, drawdownPriority: tiers }
+    };
+  }
+
+  function setTierWeightPct(scenario, tierIndex, pctA) {
+    const tiers = scenario.household.drawdownPriority.map((tier, index) => {
+      if (index !== tierIndex || tier.length < 2) return tier;
+      const a = Math.max(0, Math.min(100, pctA)) / 100;
+      return [{ ...tier[0], weight: a }, { ...tier[1], weight: 1 - a }];
+    });
+    return {
+      ...scenario,
+      household: { ...scenario.household, drawdownPriority: tiers }
+    };
+  }
+
+  function parseCsvLine(line) {
+    const cells = [];
+    let cell = '';
+    let quoted = false;
+    for (let index = 0; index < line.length; index += 1) {
+      const character = line[index];
+      if (character === '"' && line[index + 1] === '"') {
+        cell += '"';
+        index += 1;
+      } else if (character === '"') {
+        quoted = !quoted;
+      } else if (character === ',' && !quoted) {
+        cells.push(cell.trim());
+        cell = '';
+      } else {
+        cell += character;
+      }
+    }
+    cells.push(cell.trim());
+    return cells;
+  }
+
+  function parseCostBaseCsv(text, usdAud) {
+    const lines = text.split(/\r?\n/).filter(line => line.trim());
+    const headerIndex = lines.findIndex(line => /cost/i.test(line));
+    if (headerIndex < 0) throw new Error('No cost column found.');
+    const headers = parseCsvLine(lines[headerIndex]);
+    const costColumn = headers.findIndex(header => /cost\s*bas/i.test(header));
+    const quantityColumn = headers.findIndex(header => /quantity|shares/i.test(header));
+    if (costColumn < 0) throw new Error('No cost-basis column found.');
+    let costUsd = 0;
+    let quantity = 0;
+    for (const line of lines.slice(headerIndex + 1)) {
+      const cells = parseCsvLine(line);
+      const cost = Number(cells[costColumn]?.replace(/[$,]/g, ''));
+      const shares = Number(cells[quantityColumn]?.replace(/,/g, ''));
+      if (Number.isFinite(cost)) costUsd += cost;
+      if (Number.isFinite(shares)) quantity += shares;
+    }
+    if (!(costUsd > 0)) throw new Error('No cost values found.');
+    return { costBaseAud: costUsd * usdAud, quantity };
+  }
+
+  $('#controls').addEventListener('input', event => {
+    const path = event.target.dataset.path;
+    const isFreeText = path &&
+      !event.target.dataset.valueType &&
+      event.target.tagName !== 'SELECT' &&
+      event.target.type !== 'checkbox' &&
+      event.target.type !== 'month' &&
+      event.target.type !== 'file';
+    if (!isFreeText) return;
+    currentScenario = setPathImmutable(currentScenario, path, event.target.value);
+    const errors = core.validateScenario(currentScenario);
+    showValidation(errors);
+    if (!errors.length) scheduleSave(currentScenario);
+  });
+
+  $('#controls').addEventListener('change', event => {
+    if (event.target.matches('.holding-csv')) return;
+    if (event.target.dataset.saleIndex !== undefined) {
+      const index = Number(event.target.dataset.saleIndex);
+      const [saleYear, saleMonth] = event.target.value.split('-').map(Number);
+      currentScenario = setPathImmutable(
+        currentScenario,
+        `shareholdings.${index}.saleYear`,
+        saleYear
+      );
+      currentScenario = setPathImmutable(
+        currentScenario,
+        `shareholdings.${index}.saleMonth`,
+        saleMonth
+      );
+    } else {
+      const path = event.target.dataset.path;
+      if (!path) return;
+      currentScenario = setPathImmutable(
+        currentScenario,
+        path,
+        readControlValue(event.target)
+      );
+    }
+    const errors = core.validateScenario(currentScenario);
+    showValidation(errors);
+    if (errors.length) return;
+    scheduleSave(currentScenario);
+    renderScenario(currentScenario);
+  });
+
+  $('#addShareholding').addEventListener('click', () => {
+    currentScenario = addShareholding(currentScenario);
+    renderShareholdings(currentScenario.shareholdings, currentScenario.people);
+    bindMoneyInputs();
+    showValidation(core.validateScenario(currentScenario));
+  });
+
+  function refreshAfterTierChange() {
+    renderHousehold(currentScenario.household, currentScenario.assumptions, currentScenario.people);
+    scheduleSave(currentScenario);
+    showValidation(core.validateScenario(currentScenario));
+    recalculateAndRender();
+  }
+
+  $('#householdFields').addEventListener('click', event => {
+    if (event.target.matches('#addDrawdownTier')) {
+      currentScenario = addDrawdownTier(currentScenario);
+      refreshAfterTierChange();
+      return;
+    }
+    const upButton = event.target.closest('.tier-up');
+    if (upButton) {
+      currentScenario = moveDrawdownTier(currentScenario, Number(upButton.dataset.index), -1);
+      refreshAfterTierChange();
+      return;
+    }
+    const downButton = event.target.closest('.tier-down');
+    if (downButton) {
+      currentScenario = moveDrawdownTier(currentScenario, Number(downButton.dataset.index), 1);
+      refreshAfterTierChange();
+      return;
+    }
+    const removeButton = event.target.closest('.tier-remove');
+    if (removeButton) {
+      if (currentScenario.household.drawdownPriority.length <= 1) {
+        showScenarioMessage('At least one drawdown tier is required.', 'error');
+        return;
+      }
+      currentScenario = removeDrawdownTier(currentScenario, Number(removeButton.dataset.index));
+      refreshAfterTierChange();
+    }
+  });
+
+  $('#householdFields').addEventListener('change', event => {
+    if (event.target.matches('.tier-split-toggle')) {
+      currentScenario = toggleTierSplit(
+        currentScenario,
+        Number(event.target.dataset.index),
+        event.target.checked
+      );
+      refreshAfterTierChange();
+      return;
+    }
+    if (event.target.matches('.tier-weight')) {
+      currentScenario = setTierWeightPct(
+        currentScenario,
+        Number(event.target.dataset.index),
+        Number(event.target.value)
+      );
+      scheduleSave(currentScenario);
+      recalculateAndRender();
+    }
+  });
+
+  $('#shareholdingList').addEventListener('click', async event => {
+    const fetchButton = event.target.closest('.fetch-holding');
+    if (fetchButton) {
+      const index = Number(fetchButton.dataset.index);
+      fetchButton.disabled = true;
+      try {
+        const result = await fetchHoldingQuote(currentScenario.shareholdings[index]);
+        currentScenario = setPathImmutable(
+          currentScenario,
+          `shareholdings.${index}`,
+          result.holding
+        );
+        showScenarioMessage(result.messages.join(' · '));
+        saveScenario(currentScenario);
+        renderScenario(currentScenario);
+      } finally {
+        fetchButton.disabled = false;
+      }
+      return;
+    }
+    const removeButton = event.target.closest('.remove-share');
+    if (!removeButton) return;
+    if (!confirm('Remove this shareholding?')) return;
+    currentScenario = removeShareholding(
+      currentScenario,
+      Number(removeButton.dataset.index)
+    );
+    renderScenario(currentScenario);
+    scheduleSave(currentScenario);
+  });
+
+  $('#shareholdingList').addEventListener('change', async event => {
+    if (!event.target.matches('.holding-csv')) return;
+    const index = Number(event.target.dataset.index);
+    const [file] = event.target.files;
+    if (!file) return;
+    try {
+      const parsed = parseCostBaseCsv(
+        await file.text(),
+        currentScenario.shareholdings[index].fxToAud
+      );
+      currentScenario = setPathImmutable(
+        currentScenario,
+        `shareholdings.${index}.costBaseAud`,
+        parsed.costBaseAud
+      );
+      if (parsed.quantity > 0) {
+        currentScenario = setPathImmutable(
+          currentScenario,
+          `shareholdings.${index}.quantity`,
+          parsed.quantity
+        );
+      }
+      renderScenario(currentScenario);
+      scheduleSave(currentScenario);
+      showScenarioMessage('Cost-base CSV imported.', 'success');
+    } catch (error) {
+      showScenarioMessage(`CSV import failed: ${error.message}`, 'error');
+    }
+  });
+
+  $('#scenarioFile').addEventListener('change', async event => {
+    const [file] = event.target.files;
+    if (!file) return;
+    try {
+      const candidate = await readScenarioFile(file);
+      renderScenario(candidate);
+      saveScenario(candidate);
+      showScenarioMessage('Scenario imported.', 'success');
+    } catch (error) {
+      showScenarioMessage(`Import failed: ${error.message}`, 'error');
+    } finally {
+      event.target.value = '';
+    }
+  });
+
+  $('#newScenario').addEventListener('click', () => {
+    if (!confirm('Start a new scenario and replace the locally saved scenario?')) return;
+    const scenario = core.makeSampleScenario();
+    scenario.scenarioName = 'Untitled household';
+    scenario.people[0].name = 'Person 1';
+    scenario.people[1].name = 'Person 2';
+    scenario.shareholdings = [];
+    renderScenario(scenario);
+    saveScenario(scenario);
+  });
+
+  $('#resetSample').addEventListener('click', () => {
+    if (!confirm('Reset all inputs to the generic sample?')) return;
+    const scenario = core.makeSampleScenario();
+    renderScenario(scenario);
+    saveScenario(scenario);
+  });
+
+  $('#importScenario').addEventListener('click', () => $('#scenarioFile').click());
+  $('#exportScenario').addEventListener('click', async () => {
+    try {
+      const outcome = await downloadScenario(currentScenario);
+      if (outcome === 'saved') showScenarioMessage('Scenario saved.', 'success');
+      else if (outcome === 'downloaded') showScenarioMessage('Scenario downloaded.', 'success');
+    } catch (error) {
+      showScenarioMessage(`Export failed: ${error.message}`, 'error');
+    }
+  });
+
+  $('#tabs').addEventListener('click', event => {
+    if (!event.target.dataset.v) return;
+    view = event.target.dataset.v;
+    [...$('#tabs').children].forEach(button =>
+      button.classList.toggle('on', button.dataset.v === view));
+    recalculateAndRender();
+  });
+
+  chart.addEventListener('mousemove', event =>
+    inspectChartAt(event.clientX, event.clientY));
+  chart.addEventListener('mouseleave', hideChartTooltip);
+  chart.addEventListener('pointerup', event =>
+    inspectChartAt(event.clientX, event.clientY));
+  chart.addEventListener('keydown', event => {
+    if (!['ArrowLeft', 'ArrowRight'].includes(event.key) ||
+        chartState.segments.length === 0) return;
+    event.preventDefault();
+    keyboardSegmentIndex += event.key === 'ArrowRight' ? 1 : -1;
+    keyboardSegmentIndex =
+      (keyboardSegmentIndex + chartState.segments.length) %
+      chartState.segments.length;
+    const segment = chartState.segments[keyboardSegmentIndex];
+    showChartTooltip(
+      segment,
+      currentProjection.rows[segment.rowIndex],
+      { x: segment.x + segment.width, y: segment.y }
+    );
+  });
+  window.addEventListener('resize', () => {
+    if (currentProjection) renderDashboard(currentProjection, currentScenario);
+  });
+
+  renderSources();
+  renderScenario(loadScenario());
+})();
+</script>
+<script id="monte-carlo-core">
+(() => {
+  'use strict';
+
+  function mulberry32(seed) {
+    let state = seed >>> 0;
+    return function random() {
+      state |= 0;
+      state = state + 0x6D2B79F5 | 0;
+      let value = Math.imul(state ^ state >>> 15, 1 | state);
+      value = value + Math.imul(value ^ value >>> 7, 61 | value) ^ value;
+      return ((value ^ value >>> 14) >>> 0) / 4294967296;
+    };
+  }
+
+  function makeNormalGenerator(random) {
+    let spare = null;
+    return function normal() {
+      if (spare !== null) {
+        const value = spare;
+        spare = null;
+        return value;
+      }
+      let u = 0;
+      let v = 0;
+      while (u === 0) u = random();
+      while (v === 0) v = random();
+      const magnitude = Math.sqrt(-2 * Math.log(u));
+      const angle = 2 * Math.PI * v;
+      spare = magnitude * Math.sin(angle);
+      return magnitude * Math.cos(angle);
+    };
+  }
+
+  function mapShock(profile, standardShock) {
+    const raw =
+      profile.expectedReturnPct + profile.volatilityPct * standardShock;
+    return Math.max(profile.returnFloorPct ?? -99.99, raw);
+  }
+
+  function generateMarketPath({
+    seed,
+    startYear,
+    yearCount,
+    profiles,
+    profilesByYear = null
+  }) {
+    const random = mulberry32(seed);
+    const normal = makeNormalGenerator(random);
+    const shocks = Array.from({ length: yearCount }, () => normal());
+    return {
+      schemaVersion: 1,
+      shocks,
+      years: shocks.map((standardShock, index) => {
+        const active = profilesByYear?.[index] ?? profiles;
+        return {
+          year: startYear + index,
+          standardShock,
+          superAccumulationReturnPct: [
+            mapShock(active.p0Accum, standardShock),
+            mapShock(active.p1Accum, standardShock)
+          ],
+          superRetirementReturnPct: [
+            mapShock(active.p0Retire, standardShock),
+            mapShock(active.p1Retire, standardShock)
+          ]
+        };
+      })
+    };
+  }
+
+  function derivePathSeed(seed, index) {
+    return (seed + Math.imul(index + 1, 0x9E3779B1)) >>> 0;
+  }
+
+  function quantile(sorted, probability) {
+    if (!sorted.length) return 0;
+    const position = (sorted.length - 1) * probability;
+    const lower = Math.floor(position);
+    const upper = Math.ceil(position);
+    if (lower === upper) return sorted[lower];
+    const weight = position - lower;
+    return sorted[lower] * (1 - weight) + sorted[upper] * weight;
+  }
+
+  const RISK_MODE_POLICIES = Object.freeze({
+    'aggressive-spending': Object.freeze({
+      label: 'Aggressive spending',
+      successThreshold: 0.70,
+      terminalReserveYears: 0,
+      runBudgetMultiplier: 1.50,
+      minBudgetEnd: 140000,
+      detail: 'Tests a higher spending level, counts a path as successful if the selected budget is funded through the model horizon, and requires no terminal reserve.'
+    }),
+    'middle-ground': Object.freeze({
+      label: 'Middle ground',
+      successThreshold: 0.90,
+      terminalReserveYears: 1,
+      runBudgetMultiplier: 1.00,
+      minBudgetEnd: 140000,
+      detail: 'Tests the baseline spending level and requires at least one annual budget left at the model horizon.'
+    }),
+    'capital-preservation': Object.freeze({
+      label: 'Capital preservation',
+      successThreshold: 0.98,
+      terminalReserveYears: 5,
+      runBudgetMultiplier: 0.70,
+      minBudgetEnd: 140000,
+      detail: 'Tests a lower spending level, requires a higher confidence threshold, and keeps five annual budgets at the model horizon.'
+    })
+  });
+
+  function riskModePolicy(riskMode) {
+    return RISK_MODE_POLICIES[riskMode] ?? RISK_MODE_POLICIES['middle-ground'];
+  }
+
+  function terminalReserveFloor(scenario, riskMode) {
+    const policy = riskModePolicy(riskMode);
+    const budget = Number(
+      scenario.household?.annualBudget ?? scenario.household?.targetAfterTax ?? 0
+    );
+    return Math.max(0, budget * policy.terminalReserveYears);
+  }
+
+  function applyRiskModeToScenario(scenario, riskMode) {
+    const policy = riskModePolicy(riskMode);
+    const copy = structuredClone(scenario);
+    const baseBudget = Number(
+      copy.household?.annualBudget ?? copy.household?.targetAfterTax ?? 0
+    );
+    const adjustedBudget = Math.max(
+      0,
+      Math.round((baseBudget * policy.runBudgetMultiplier) / 1000) * 1000
+    );
+    copy.household = {
+      ...copy.household,
+      baselineAnnualBudget: baseBudget,
+      annualBudget: adjustedBudget
+    };
+    return copy;
+  }
+
+  const STRESS_ASSUMPTION_OVERRIDES = Object.freeze({
+    none: Object.freeze({
+      label: 'No assumption override',
+      detail: 'Imported inflation, cash, and savings assumptions are used as-is.',
+      inflationPctByYear: Object.freeze([])
+    }),
+    'severe-early-downturn': Object.freeze({
+      label: 'Inflation shock capped at 8%',
+      detail: 'Overrides the imported baseline with a five-year inflation path that peaks at 8%, with cash and savings rates lifting but lagging the inflation shock.',
+      inflationPctByYear: Object.freeze([8, 6, 4.5, 3.5, 3]),
+      cashInterestPct: 3,
+      savingsInterestPct: 5.5
+    }),
+    'prolonged-low-returns': Object.freeze({
+      label: 'Elevated inflation drag',
+      detail: 'Applies a moderate multi-year inflation path while low returns persist.',
+      inflationPctByYear: Object.freeze([6, 5, 4.25, 3.5, 3, 3]),
+      cashInterestPct: 2.5,
+      savingsInterestPct: 5
+    }),
+    'delayed-recovery': Object.freeze({
+      label: 'Delayed recovery inflation drag',
+      detail: 'Applies a shorter inflation shock while the portfolio recovery is delayed.',
+      inflationPctByYear: Object.freeze([7, 5.5, 4.5, 3.5, 3]),
+      cashInterestPct: 2.75,
+      savingsInterestPct: 5.25
+    })
+  });
+
+  function stressAssumptionOverride(stressEvent) {
+    return STRESS_ASSUMPTION_OVERRIDES[stressEvent] ??
+      STRESS_ASSUMPTION_OVERRIDES.none;
+  }
+
+  function applyStressAssumptionOverride(scenario, override) {
+    const copy = structuredClone(scenario);
+    if (!override?.inflationPctByYear?.length) return copy;
+    copy.assumptions = {
+      ...copy.assumptions,
+      inflationMode: 'stress-path',
+      stressInflationStartYear: copy.startYear,
+      stressInflationPctByYear: [...override.inflationPctByYear],
+      baselineInflationMode: copy.assumptions?.inflationMode,
+      baselineManualInflationPct: copy.assumptions?.manualInflationPct
+    };
+    copy.cash = {
+      ...copy.cash,
+      baselineInterestPct: copy.cash?.interestPct,
+      interestPct: Math.max(copy.cash?.interestPct ?? 0, override.cashInterestPct ?? 0)
+    };
+    copy.savings = {
+      ...copy.savings,
+      baselineInterestPct: copy.savings?.interestPct,
+      interestPct: Math.max(copy.savings?.interestPct ?? 0, override.savingsInterestPct ?? 0)
+    };
+    return copy;
+  }
+
+  function simulatePaths({
+    scenario,
+    pathCount,
+    seed,
+    profiles,
+    profilesByYear = null,
+    stressShocks = null,
+    projectScenario
+  }) {
+    const yearCount =
+      scenario.household.modelEndAge - scenario.people[0].age + 1;
+    return Array.from({ length: pathCount }, (_, index) => {
+      const pathSeed = derivePathSeed(seed, index);
+      try {
+        const generatedPath = generateMarketPath({
+          seed: pathSeed,
+          startYear: scenario.startYear,
+          yearCount,
+          profiles,
+          profilesByYear
+        });
+        const annualPath = stressShocks?.length
+          ? applyStressEventToPath({
+            annualPath: generatedPath,
+            stressShocks,
+            profiles,
+            profilesByYear
+          })
+          : generatedPath;
+        const projection = projectScenario(
+          structuredClone(scenario),
+          annualPath
+        );
+        return {
+          index,
+          pathSeed,
+          annualPath,
+          projection,
+          engineError: null
+        };
+      } catch (error) {
+        return {
+          index,
+          pathSeed,
+          annualPath: null,
+          projection: null,
+          engineError: error.message
+        };
+      }
+    });
+  }
+
+  function summarizeResults(results, scenario, riskMode = 'aggressive-spending') {
+    const failedEngine = results.filter(result => result.engineError);
+    if (failedEngine.length) {
+      throw new Error(
+        `${failedEngine.length} MC path(s) failed in the projection engine.`
+      );
+    }
+    const reserveFloor = terminalReserveFloor(scenario, riskMode);
+    const successes = results.filter(result =>
+      result.projection.rows.every(row => row.shortfall <= 1) &&
+      (result.projection.rows.at(-1)?.totalAssets ?? 0) >= reserveFloor
+    );
+    const rowCount = results[0]?.projection.rows.length ?? 0;
+    const assetPercentiles = Array.from({ length: rowCount }, (_, rowIndex) => {
+      const values = results
+        .map(result => result.projection.rows[rowIndex].totalAssets)
+        .sort((a, b) => a - b);
+      return {
+        year: scenario.startYear + rowIndex,
+        p10: quantile(values, 0.10),
+        p25: quantile(values, 0.25),
+        p50: quantile(values, 0.50),
+        p75: quantile(values, 0.75),
+        p90: quantile(values, 0.90)
+      };
+    });
+    const firstShortfallYears = results
+      .map(result => result.projection.firstShortfall?.year ?? null)
+      .filter(year => year !== null);
+    const savingsDepletedBefore2038 = results.filter(result =>
+      result.projection.rows.some(row =>
+        row.year < 2038 && row.savings <= 1
+      )
+    ).length;
+    return {
+      completedPaths: results.length,
+      engineErrors: 0,
+      riskModePolicy: riskModePolicy(riskMode),
+      terminalReserveFloor: reserveFloor,
+      successProbability: successes.length / results.length,
+      assetPercentiles,
+      firstShortfallYears,
+      savingsDepletedBefore2038Probability:
+        savingsDepletedBefore2038 / results.length
+    };
+  }
+
+  function calculateBudgetCurve({
+    scenario,
+    budgets,
+    pathCount,
+    seed,
+    profiles,
+    profilesByYear = null,
+    stressShocks = null,
+    riskMode = 'aggressive-spending',
+    projectScenario
+  }) {
+    return budgets.map(budget => {
+      const candidate = structuredClone(scenario);
+      candidate.household.annualBudget = budget;
+      const riskAdjustedCandidate = applyRiskModeToScenario(
+        candidate,
+        riskMode
+      );
+      const results = simulatePaths({
+        scenario: riskAdjustedCandidate,
+        pathCount,
+        seed,
+        profiles,
+        profilesByYear,
+        stressShocks,
+        projectScenario
+      });
+      return {
+        budget,
+        successProbability:
+          summarizeResults(
+            results,
+            riskAdjustedCandidate,
+            riskMode
+          ).successProbability
+      };
+    });
+  }
+
+  function deriveBudgetSweepBudgets({ start, end, step }) {
+    const safeStart = Math.max(0, Math.round(Number(start) || 0));
+    const safeEnd = Math.max(safeStart, Math.round(Number(end) || safeStart));
+    const safeStep = Math.max(1000, Math.round(Number(step) || 10000));
+    const budgets = [];
+    for (let budget = safeStart; budget <= safeEnd; budget += safeStep) {
+      budgets.push(budget);
+    }
+    if (budgets.at(-1) !== safeEnd) {
+      budgets.push(safeEnd);
+    }
+    return budgets;
+  }
+
+  function summarizeBudgetBreakpoints(
+    points,
+    { successThreshold = 0.90 } = {}
+  ) {
+    const sorted = [...points].sort((a, b) => a.budget - b.budget);
+    const atOrAboveThreshold = sorted.filter(point =>
+      point.successProbability >= successThreshold
+    );
+    return {
+      maxBudgetAtThreshold: atOrAboveThreshold.at(-1)?.budget ?? null,
+      firstBelowThreshold:
+        sorted.find(point =>
+          point.successProbability < successThreshold
+        )?.budget ?? null
+    };
+  }
+
+  function describeFailureMechanism({ summary, breakpoints }) {
+    if (!breakpoints.firstBelowThreshold) {
+      return 'Budget range did not break the selected confidence threshold.';
+    }
+    if ((summary.terminalReserveFloor ?? 0) > 0) {
+      const end = summary.assetPercentiles.at(-1);
+      if (end?.p10 < summary.terminalReserveFloor) {
+        return 'Terminal reserve requirement is breached before income funding fails.';
+      }
+    }
+    if (summary.savingsDepletedBefore2038Probability >= 0.25) {
+      return 'Savings buffer depletes before 2038 in a material share of paths.';
+    }
+    if (summary.firstShortfallYears.length) {
+      const sorted = [...summary.firstShortfallYears].sort((a, b) => a - b);
+      return `First shortfalls begin around ${sorted[0]}.`;
+    }
+    return 'Late-life asset depletion appears before the selected confidence threshold.';
+  }
+
+  function transformProfilesForReturnScenario(profiles, scenarioId) {
+    const transforms = {
+      base: { returnOffset: 0, volatilityOffset: 0 },
+      cautious: { returnOffset: -1.5, volatilityOffset: 1.0 },
+      'poor-decade': { returnOffset: -2.5, volatilityOffset: 2.0 },
+      'severe-early-crash': { returnOffset: -3.5, volatilityOffset: 3.0 }
+    };
+    const transform = transforms[scenarioId] ?? transforms.base;
+    return Object.fromEntries(Object.entries(profiles).map(([slot, profile]) => [
+      slot,
+      {
+        ...profile,
+        expectedReturnPct: Math.max(
+          -20,
+          Number((profile.expectedReturnPct + transform.returnOffset).toFixed(2))
+        ),
+        volatilityPct: Math.max(
+          0,
+          Number((profile.volatilityPct + transform.volatilityOffset).toFixed(2))
+        )
+      }
+    ]));
+  }
+
+  function practicalAges(person) {
+    const upper = Math.max(
+      person.age,
+      person.retireAge,
+      person.superAccessAge,
+      67
+    );
+    return Array.from(
+      { length: upper - person.age + 1 },
+      (_, index) => person.age + index
+    );
+  }
+
+  function generateTransitionCandidates(scenario) {
+    const percentages = [25, 50, 75, 100];
+    const ages0 = practicalAges(scenario.people[0]);
+    const ages1 = practicalAges(scenario.people[1]);
+    const candidates = [];
+    for (const age0 of ages0) {
+      for (const pct0 of percentages) {
+        for (const age1 of ages1) {
+          for (const pct1 of percentages) {
+            candidates.push({
+              people: [
+                { superAccessAge: age0, superAccessPct: pct0 },
+                { superAccessAge: age1, superAccessPct: pct1 }
+              ]
+            });
+          }
+        }
+      }
+    }
+    const imported = {
+      people: scenario.people.map(person => ({
+        superAccessAge: person.superAccessAge,
+        superAccessPct: person.superAccessPct
+      }))
+    };
+    const key = candidate => JSON.stringify(candidate.people);
+    const unique = new Map([[key(imported), imported]]);
+    candidates.forEach(candidate => unique.set(key(candidate), candidate));
+    return [...unique.values()];
+  }
+
+  function chooseMiddleGround(
+    results,
+    { threshold = 0.90, materialDifference = 0.02 } = {}
+  ) {
+    const acceptable = results.filter(result =>
+      result.successProbability >= threshold &&
+      result.sensitivityPass
+    );
+    if (!acceptable.length) return null;
+    const bestProbability = Math.max(
+      ...acceptable.map(result => result.successProbability)
+    );
+    return acceptable
+      .filter(result =>
+        bestProbability - result.successProbability <= materialDifference
+      )
+      .sort((a, b) =>
+        a.complexity - b.complexity ||
+        a.transitionAggression - b.transitionAggression ||
+        b.successProbability - a.successProbability
+      )[0];
+  }
+
+  function profileIdsForYear({
+    year,
+    glidePath,
+    accountProducts,
+    transitionYear = 2038
+  }) {
+    if (year < transitionYear || glidePath === 'stay-current') {
+      return {
+        p0Accum: 'indexed-balanced-accumulation',
+        p0Retire: 'indexed-balanced-pension',
+        p1Accum: 'balanced-accumulation',
+        p1Retire: 'balanced-pension'
+      };
+    }
+    if (glidePath === 'balanced' || glidePath === 'aggressive-growth') {
+      return {
+        p0Accum: 'balanced-accumulation',
+        p0Retire: 'balanced-pension',
+        p1Accum: 'balanced-accumulation',
+        p1Retire: 'balanced-pension'
+      };
+    }
+    if (glidePath === 'conservative') {
+      return {
+        p0Accum: 'indexed-conservative-accumulation',
+        p0Retire: 'indexed-conservative-pension',
+        p1Accum: 'conservative-accumulation',
+        p1Retire: 'conservative-pension'
+      };
+    }
+    if (glidePath === 'cpiplus') {
+      if (accountProducts.some(product => product !== 'pension')) {
+        throw new Error('CPIplus requires pension eligibility for both accounts.');
+      }
+      return {
+        p0Accum: 'indexed-conservative-accumulation',
+        p0Retire: 'cpiplus-pension',
+        p1Accum: 'conservative-accumulation',
+        p1Retire: 'cpiplus-pension'
+      };
+    }
+    throw new Error(`Unsupported glide path: ${glidePath}`);
+  }
+
+  function buildProfileSchedule({
+    startYear,
+    yearCount,
+    glidePath,
+    accountProducts,
+    profilePresets,
+    transitionYear = 2038
+  }) {
+    return Array.from({ length: yearCount }, (_, index) => {
+      const ids = profileIdsForYear({
+        year: startYear + index,
+        glidePath,
+        accountProducts,
+        transitionYear
+      });
+      const resolved = {};
+      Object.entries(ids).forEach(([slot, profileId]) => {
+        const profile = profilePresets[profileId];
+        if (!profile) {
+          throw new Error(`Missing approved profile preset: ${profileId}`);
+        }
+        resolved[slot] = profile;
+      });
+      return resolved;
+    });
+  }
+
+  function applyTransitionCandidate(scenario, candidate) {
+    const copy = structuredClone(scenario);
+    copy.people = copy.people.map((person, index) => ({
+      ...person,
+      ...candidate.people[index]
+    }));
+    return copy;
+  }
+
+  function screenStrategyResults(results, limit = 8) {
+    return [...results]
+      .sort((a, b) =>
+        b.successProbability - a.successProbability ||
+        a.complexity - b.complexity ||
+        a.transitionAggression - b.transitionAggression
+      )
+      .slice(0, limit);
+  }
+
+  const STRESS_SHOCK_SEQUENCES = Object.freeze({
+    'severe-early-downturn': Object.freeze([-4.0, -1.5, 1.0, 0.75, 0.5]),
+    'prolonged-low-returns': Object.freeze([
+      -0.75,
+      -0.75,
+      -0.75,
+      -0.75,
+      -0.5,
+      -0.5,
+      -0.25,
+      -0.25
+    ]),
+    'delayed-recovery': Object.freeze([
+      -3.0,
+      -1.5,
+      -0.75,
+      -0.5,
+      -0.25,
+      0.0,
+      0.5,
+      1.0
+    ])
+  });
+
+  function generatePathFromShocks({
+    shocks,
+    startYear,
+    yearCount,
+    profiles,
+    profilesByYear = null
+  }) {
+    const extended = Array.from(
+      { length: yearCount },
+      (_, index) => shocks[index] ?? 0
+    );
+    return {
+      schemaVersion: 1,
+      shocks: extended,
+      years: extended.map((standardShock, index) => {
+        const activeProfiles = profilesByYear?.[index] ?? profiles;
+        return {
+          year: startYear + index,
+          standardShock,
+          superAccumulationReturnPct: [
+            mapShock(activeProfiles.p0Accum, standardShock),
+            mapShock(activeProfiles.p1Accum, standardShock)
+          ],
+          superRetirementReturnPct: [
+            mapShock(activeProfiles.p0Retire, standardShock),
+            mapShock(activeProfiles.p1Retire, standardShock)
+          ]
+        };
+      })
+    };
+  }
+
+  function applyStressEventToPath({
+    annualPath,
+    stressShocks,
+    profiles,
+    profilesByYear = null
+  }) {
+    if (!stressShocks?.length) return annualPath;
+    const shocks = annualPath.shocks.map((shock, index) =>
+      index < stressShocks.length ? stressShocks[index] : shock
+    );
+    return {
+      ...annualPath,
+      shocks,
+      years: annualPath.years.map((yearRow, index) => {
+        const standardShock = shocks[index];
+        const activeProfiles = profilesByYear?.[index] ?? profiles;
+        return {
+          ...yearRow,
+          standardShock,
+          superAccumulationReturnPct: [
+            mapShock(activeProfiles.p0Accum, standardShock),
+            mapShock(activeProfiles.p1Accum, standardShock)
+          ],
+          superRetirementReturnPct: [
+            mapShock(activeProfiles.p0Retire, standardShock),
+            mapShock(activeProfiles.p1Retire, standardShock)
+          ]
+        };
+      })
+    };
+  }
+
+  function runStressTest({
+    id,
+    shocks,
+    scenario,
+    profiles,
+    profilesByYear = null,
+    projectScenario
+  }) {
+    const yearCount =
+      scenario.household.modelEndAge - scenario.people[0].age + 1;
+    const annualPath = generatePathFromShocks({
+      shocks,
+      startYear: scenario.startYear,
+      yearCount,
+      profiles,
+      profilesByYear
+    });
+    const projection = projectScenario(
+      structuredClone(scenario),
+      annualPath
+    );
+    const minimumSavings = Math.min(
+      ...projection.rows.map(row => row.savings)
+    );
+    const minimumAssets = Math.min(
+      ...projection.rows.map(row => row.totalAssets)
+    );
+    return {
+      id,
+      shocks: [...shocks],
+      budgetFunded: projection.rows.every(row => row.shortfall <= 1),
+      firstShortfallYear: projection.firstShortfall?.year ?? null,
+      minimumSavings,
+      minimumAssets,
+      endingAssets: projection.rows.at(-1).totalAssets,
+      projection
+    };
+  }
+
+  globalThis.RetirementMonteCarloCore = {
+    mulberry32,
+    makeNormalGenerator,
+    mapShock,
+    generateMarketPath,
+    derivePathSeed,
+    quantile,
+    riskModePolicy,
+    terminalReserveFloor,
+    applyRiskModeToScenario,
+    stressAssumptionOverride,
+    applyStressAssumptionOverride,
+    simulatePaths,
+    summarizeResults,
+    calculateBudgetCurve,
+    deriveBudgetSweepBudgets,
+    summarizeBudgetBreakpoints,
+    describeFailureMechanism,
+    transformProfilesForReturnScenario,
+    practicalAges,
+    generateTransitionCandidates,
+    chooseMiddleGround,
+    profileIdsForYear,
+    buildProfileSchedule,
+    applyTransitionCandidate,
+    screenStrategyResults,
+    STRESS_SHOCK_SEQUENCES,
+    generatePathFromShocks,
+    applyStressEventToPath,
+    runStressTest
+  };
+})();
+</script>
+<script id="monte-carlo-ui">
+(() => {
+  'use strict';
+  const simulator = globalThis.RetirementSimulatorCore;
+  const mc = globalThis.RetirementMonteCarloCore;
+  const scenarioFile = document.querySelector('#scenarioFile');
+  const runButton = document.querySelector('#runMonteCarlo');
+  const cancelButton = document.querySelector('#cancelRun');
+  const progress = document.querySelector('#runProgress');
+  const progressText = document.querySelector('#runProgressText');
+  const scenarioMessage = document.querySelector('#scenarioMessage');
+  const scenarioCallout = document.querySelector('#scenarioCallout');
+  const budgetChart = document.querySelector('#budgetChart');
+  const budgetChartTooltip = document.querySelector('#budgetChartTooltip');
+  const stressEventSelect = document.querySelector('#stressEvent');
+  const stressPreviewChart = document.querySelector('#stressPreviewChart');
+  const stressPreviewSummary = document.querySelector('#stressPreviewSummary');
+  const importButton = document.querySelector('#importScenario');
+  const MODEL_BUDGET = 60000;
+  const FAN_COLOURS = Object.freeze({
+    outer: 'rgba(87,199,227,0.16)',
+    inner: 'rgba(87,199,227,0.30)',
+    median: '#57C7E3',
+    grid: '#2B3D4F',
+    text: '#9FB0C0'
+  });
+  const RETURN_SCENARIOS = Object.freeze({
+    base: {
+      label: 'Base returns',
+      detail: 'Uses the selected profile return and volatility assumptions without an extra scenario overlay.'
+    },
+    cautious: {
+      label: 'Cautious returns',
+      detail: 'Subtracts 1.5 percentage points from expected annual returns and adds 1.0 percentage point of volatility.'
+    },
+    'poor-decade': {
+      label: 'Poor decade',
+      detail: 'Subtracts 2.5 percentage points from expected annual returns and adds 2.0 percentage points of volatility.'
+    },
+    'severe-early-crash': {
+      label: 'Severe return environment',
+      detail: 'Subtracts 3.5 percentage points from expected annual returns and adds 3.0 percentage points of volatility. Use the stress event selector for a literal early-crash sequence.'
+    }
+  });
+  const STRESS_EVENTS = Object.freeze({
+    none: {
+      label: 'No forced stress event',
+      detail: 'Monte Carlo paths are fully random after the selected return scenario.',
+      shocks: Object.freeze([])
+    },
+    'severe-early-downturn': {
+      label: 'Severe early downturn',
+      detail: 'Year 1 severe drawdown, year 2 weak follow-on, then a partial three-year recovery.',
+      shocks: Object.freeze([-4.0, -1.5, 1.0, 0.75, 0.5])
+    },
+    'prolonged-low-returns': {
+      label: 'Prolonged low returns',
+      detail: 'Eight below-mean years without one single crash dominating the sequence.',
+      shocks: Object.freeze([-0.75, -0.75, -0.75, -0.75, -0.5, -0.5, -0.25, -0.25])
+    },
+    'delayed-recovery': {
+      label: 'Delayed recovery',
+      detail: 'A material first-year loss, another weak year, then several years before recovery arrives.',
+      shocks: Object.freeze([-3.0, -1.5, -0.75, -0.5, -0.25, 0.0, 0.5, 1.0])
+    }
+  });
+  const GLIDE_PATHS = Object.freeze({
+    'stay-current': {
+      label: 'Keep imported baseline',
+      detail: 'Uses the imported baseline allocation for the whole model.'
+    },
+    balanced: {
+      label: 'Balanced after change year',
+      detail: 'From the change year onward, both people use the balanced accumulation/pension profile set.'
+    },
+    'aggressive-growth': {
+      label: 'Aggressive growth after change year',
+      detail: 'From the change year onward, both people use balanced profiles with a growth overlay of +1.0 percentage point return and +2.0 percentage points volatility.'
+    },
+    conservative: {
+      label: 'Conservative after change year',
+      detail: 'From the change year onward, both people use conservative accumulation/pension profiles.'
+    },
+    cpiplus: {
+      label: 'CPIplus after change year',
+      detail: 'From the change year onward, pension accounts use CPIplus; this requires both accounts to be pension eligible.'
+    }
+  });
+  const APPROVED_PROFILES = Object.freeze({
+    'indexed-balanced-accumulation': {
+      label: 'Hostplus Indexed Balanced — accumulation',
+      expectedReturnPct: 5.0,
+      volatilityPct: 7.4,
+      returnFloorPct: -99.99,
+      sourceDate: '2026-07-06'
+    },
+    'indexed-balanced-pension': {
+      label: 'Hostplus Indexed Balanced — pension',
+      expectedReturnPct: 5.5,
+      volatilityPct: 8.2,
+      returnFloorPct: -99.99,
+      sourceDate: '2026-07-06'
+    },
+    'balanced-accumulation': {
+      label: 'Hostplus Balanced — accumulation',
+      expectedReturnPct: 6.5,
+      volatilityPct: 7.0,
+      returnFloorPct: -99.99,
+      sourceDate: '2026-07-06'
+    },
+    'balanced-pension': {
+      label: 'Hostplus Balanced — pension',
+      expectedReturnPct: 7.0,
+      volatilityPct: 7.5,
+      returnFloorPct: -99.99,
+      sourceDate: '2026-07-06'
+    },
+    'indexed-conservative-accumulation': {
+      label: 'Hostplus Indexed Conservative — accumulation',
+      expectedReturnPct: 4.5,
+      volatilityPct: 4.8,
+      returnFloorPct: -99.99,
+      sourceDate: '2026-07-06'
+    },
+    'indexed-conservative-pension': {
+      label: 'Hostplus Indexed Conservative — pension',
+      expectedReturnPct: 5.5,
+      volatilityPct: 5.9,
+      returnFloorPct: -99.99,
+      sourceDate: '2026-07-06'
+    },
+    'conservative-accumulation': {
+      label: 'Hostplus Conservative — accumulation',
+      expectedReturnPct: 5.5,
+      volatilityPct: 4.8,
+      returnFloorPct: -99.99,
+      sourceDate: '2026-07-06'
+    },
+    'conservative-pension': {
+      label: 'Hostplus Conservative — pension',
+      expectedReturnPct: 6.5,
+      volatilityPct: 5.7,
+      returnFloorPct: -99.99,
+      sourceDate: '2026-07-06'
+    },
+    'cpiplus-pension': {
+      label: 'Hostplus CPIplus — pension',
+      expectedReturnPct: 5.0,
+      volatilityPct: 0.0,
+      returnFloorPct: 0.0,
+      sourceDate: '2026-07-06'
+    }
+  });
+  let scenario = null;
+  let cancelled = false;
+  let budgetChartHitPoints = [];
+  let activeRiskPolicy = mc.riskModePolicy('aggressive-spending');
+  let activeRunBudget = MODEL_BUDGET;
+
+  function escapeHtml(value) {
+    return String(value).replace(/[&<>"']/g, char => ({
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#39;'
+    }[char]));
+  }
+
+  function formatPercent(value) {
+    return `${(value * 100).toFixed(1)}%`;
+  }
+
+  function formatRunBudget() {
+    return simulator.formatMoney(activeRunBudget);
+  }
+
+  function percentClass(value, passThreshold = 0.90) {
+    if (value >= passThreshold) return 'good';
+    if (value >= 0.75) return 'warn';
+    return 'bad';
+  }
+
+  function depletionClass(value) {
+    if (value <= 0) return 'good';
+    if (value <= 0.10) return 'warn';
+    return 'bad';
+  }
+
+  function selectedGlidePathConfig() {
+    const glidePath = document.querySelector('#glidePath').value;
+    const firstYear = scenario?.startYear ?? 2026;
+    const lastYear = scenario
+      ? scenario.startYear + scenario.household.modelEndAge - scenario.people[0].age
+      : 2100;
+    const rawYear = Number(document.querySelector('#glideChangeYear').value) || 2038;
+    const transitionYear = Math.min(Math.max(Math.round(rawYear), firstYear), lastYear);
+    return { glidePath, transitionYear };
+  }
+
+  function selectedStressEventConfig() {
+    const stressEvent = stressEventSelect.value;
+    const info = STRESS_EVENTS[stressEvent] ?? STRESS_EVENTS.none;
+    const assumptionOverride = mc.stressAssumptionOverride(stressEvent);
+    return {
+      stressEvent,
+      label: info.label,
+      detail: info.detail,
+      shocks: [...info.shocks],
+      assumptionOverride
+    };
+  }
+
+  function applyAggressiveGrowthOverlay(schedule) {
+    return schedule.map(yearProfiles =>
+      Object.fromEntries(Object.entries(yearProfiles).map(([slot, profile]) => [
+        slot,
+        {
+          ...profile,
+          label: `${profile.label} + aggressive growth overlay`,
+          expectedReturnPct: Number((profile.expectedReturnPct + 1.0).toFixed(2)),
+          volatilityPct: Number((profile.volatilityPct + 2.0).toFixed(2))
+        }
+      ]))
+    );
+  }
+
+  function profileScheduleForGlidePath({
+    activeScenario,
+    profilePresets,
+    glidePath,
+    transitionYear
+  }) {
+    if (glidePath === 'stay-current') return null;
+    const schedule = mc.buildProfileSchedule({
+      startYear: activeScenario.startYear,
+      yearCount: activeScenario.household.modelEndAge - activeScenario.people[0].age + 1,
+      glidePath,
+      transitionYear,
+      accountProducts: ['pension', 'pension'],
+      profilePresets
+    });
+    return glidePath === 'aggressive-growth'
+      ? applyAggressiveGrowthOverlay(schedule)
+      : schedule;
+  }
+
+  function updateScenarioCallout() {
+    const returnScenario = document.querySelector('#returnScenario').value;
+    const { glidePath, transitionYear } = selectedGlidePathConfig();
+    const stress = selectedStressEventConfig();
+    const returnInfo = RETURN_SCENARIOS[returnScenario] ?? RETURN_SCENARIOS.base;
+    const glideInfo = GLIDE_PATHS[glidePath] ?? GLIDE_PATHS['stay-current'];
+    scenarioCallout.innerHTML =
+      `<b>${escapeHtml(returnInfo.label)}:</b> ${escapeHtml(returnInfo.detail)}<br>` +
+      `<b>${escapeHtml(glideInfo.label)}:</b> ${escapeHtml(glideInfo.detail)} ` +
+      `${glidePath === 'stay-current' ? '' : `Change year: ${escapeHtml(transitionYear)}.`}<br>` +
+      `<b>${escapeHtml(stress.label)}:</b> ${escapeHtml(stress.detail)} ` +
+      `${stress.shocks.length ? 'Applied to the first years of every Monte Carlo path.' : ''}`;
+    drawStressPreviewChart();
+  }
+
+  function setProgress(percent, message) {
+    progress.value = Math.max(0, Math.min(100, Math.round(percent)));
+    progressText.textContent = message;
+  }
+
+  function clamp(value, min, max) {
+    return Math.max(min, Math.min(max, value));
+  }
+
+  function marketProxyReturnPct(standardShock) {
+    return clamp(2 + standardShock * 10, -45, 25);
+  }
+
+  function averagePortfolioReturnPct(profileSet, standardShock) {
+    const values = [
+      mc.mapShock(profileSet.p0Accum, standardShock),
+      mc.mapShock(profileSet.p0Retire, standardShock),
+      mc.mapShock(profileSet.p1Accum, standardShock),
+      mc.mapShock(profileSet.p1Retire, standardShock)
+    ];
+    return values.reduce((sum, value) => sum + value, 0) / values.length;
+  }
+
+  function indexSeries(returnsPct) {
+    return returnsPct.reduce((series, returnPct) => {
+      series.push(series.at(-1) * (1 + returnPct / 100));
+      return series;
+    }, [100]);
+  }
+
+  function drawIndexedLine(ctx, points, x, y, colour, width = 2) {
+    ctx.strokeStyle = colour;
+    ctx.lineWidth = width;
+    ctx.beginPath();
+    points.forEach((value, index) => {
+      const method = index === 0 ? 'moveTo' : 'lineTo';
+      ctx[method](x(index), y(value));
+    });
+    ctx.stroke();
+    ctx.fillStyle = colour;
+    points.forEach((value, index) => {
+      ctx.beginPath();
+      ctx.arc(x(index), y(value), 3, 0, Math.PI * 2);
+      ctx.fill();
+    });
+  }
+
+  function drawStressPreviewChart() {
+    const stress = selectedStressEventConfig();
+    const previewShocks = Array.from({ length: 5 }, (_, index) =>
+      stress.shocks[index] ?? 0
+    );
+    const transformedProfiles = selectedProfiles();
+    const marketReturns = previewShocks.map(marketProxyReturnPct);
+    const portfolioReturns = previewShocks.map(shock =>
+      averagePortfolioReturnPct(transformedProfiles, shock)
+    );
+    const marketSeries = indexSeries(marketReturns);
+    const portfolioSeries = indexSeries(portfolioReturns);
+    const allValues = [...marketSeries, ...portfolioSeries];
+    const { ctx, width, height } = prepareCanvas(stressPreviewChart);
+    const minValue = Math.min(...allValues, 70);
+    const maxValue = Math.max(...allValues, 115);
+    const x = index => 42 + index * ((width - 64) / 5);
+    const y = value => height - 28 - ((value - minValue) / (maxValue - minValue || 1)) * (height - 54);
+    drawGrid(ctx, width, height);
+    ctx.strokeStyle = 'rgba(255,255,255,.18)';
+    ctx.setLineDash([4, 5]);
+    ctx.beginPath();
+    ctx.moveTo(42, y(100));
+    ctx.lineTo(width - 20, y(100));
+    ctx.stroke();
+    ctx.setLineDash([]);
+    drawIndexedLine(ctx, marketSeries, x, y, '#ff6b6b', 2.5);
+    drawIndexedLine(ctx, portfolioSeries, x, y, FAN_COLOURS.median, 2.5);
+    ctx.fillStyle = FAN_COLOURS.text;
+    ctx.font = '12px Segoe UI, sans-serif';
+    for (let index = 0; index <= 5; index += 1) {
+      ctx.fillText(index === 0 ? 'Start' : `Y${index}`, x(index) - 12, height - 9);
+    }
+    ctx.fillStyle = '#ff6b6b';
+    ctx.fillText('Market proxy', width - 138, 22);
+    ctx.fillStyle = FAN_COLOURS.median;
+    ctx.fillText('Modelled portfolio', width - 138, 40);
+    const marketLow = Math.min(...marketSeries);
+    const portfolioLow = Math.min(...portfolioSeries);
+    stressPreviewSummary.textContent =
+      `${stress.label}: market proxy trough ${marketLow.toFixed(0)}; modelled portfolio trough ${portfolioLow.toFixed(0)} over the first five years.`;
+  }
+
+  function scenarioForMc(input) {
+    const copy = structuredClone(input);
+    copy.household.annualBudget = MODEL_BUDGET;
+    copy.household.drawdownPriority = copy.household.drawdownPriority?.length
+      ? copy.household.drawdownPriority
+      : [[{ source: 'savings', weight: 1 }], [{ source: 'p0Super', weight: 1 }], [{ source: 'p1Super', weight: 1 }]];
+    return copy;
+  }
+
+  function nextFrame() {
+    return new Promise(resolve => requestAnimationFrame(resolve));
+  }
+
+  async function runBatched({
+    total,
+    batchSize,
+    runBatch,
+    onProgress
+  }) {
+    const output = [];
+    for (let start = 0; start < total; start += batchSize) {
+      if (cancelled) throw new Error('Run cancelled.');
+      const end = Math.min(total, start + batchSize);
+      output.push(...runBatch(start, end));
+      onProgress(end / total);
+      await nextFrame();
+    }
+    return output;
+  }
+
+  function activeProfiles() {
+    return {
+      p0Accum: APPROVED_PROFILES['indexed-balanced-accumulation'],
+      p0Retire: APPROVED_PROFILES['indexed-balanced-pension'],
+      p1Accum: APPROVED_PROFILES['balanced-accumulation'],
+      p1Retire: APPROVED_PROFILES['balanced-pension']
+    };
+  }
+
+  function selectedBudgetRange() {
+    const riskMode = document.querySelector('#riskMode').value;
+    const policy = mc.riskModePolicy(riskMode);
+    const start = Number(document.querySelector('#budgetStart').value) || 50000;
+    const inputEnd = Number(document.querySelector('#budgetEnd').value) || 140000;
+    const step = Number(document.querySelector('#budgetStep').value) || 10000;
+    return {
+      start,
+      end: Math.max(inputEnd, policy.minBudgetEnd ?? inputEnd),
+      step
+    };
+  }
+
+  function selectedProfiles() {
+    return mc.transformProfilesForReturnScenario(
+      activeProfiles(),
+      document.querySelector('#returnScenario').value
+    );
+  }
+
+  function runBatch({ scenario: candidate, seed, start, end, profiles, profilesByYear, stressShocks = null }) {
+    const yearCount =
+      candidate.household.modelEndAge - candidate.people[0].age + 1;
+    return Array.from({ length: end - start }, (_, offset) => {
+      const index = start + offset;
+      const pathSeed = mc.derivePathSeed(seed, index);
+      try {
+        const generatedPath = mc.generateMarketPath({
+          seed: pathSeed,
+          startYear: candidate.startYear,
+          yearCount,
+          profiles,
+          profilesByYear
+        });
+        const annualPath = stressShocks?.length
+          ? mc.applyStressEventToPath({
+            annualPath: generatedPath,
+            stressShocks,
+            profiles,
+            profilesByYear
+          })
+          : generatedPath;
+        const projection = simulator.projectScenario(
+          structuredClone(candidate),
+          annualPath
+        );
+        return { index, pathSeed, annualPath, projection, engineError: null };
+      } catch (error) {
+        return { index, pathSeed, annualPath: null, projection: null, engineError: error.message };
+      }
+    });
+  }
+
+  function renderHeadlineKpis(summary, middleGround, policy) {
+    const end = summary.assetPercentiles.at(-1);
+    const threshold = policy.successThreshold;
+    const cards = [
+      {
+        label: `Probability ${formatRunBudget()} budget is funded`,
+        value: formatPercent(summary.successProbability),
+        state: percentClass(summary.successProbability, threshold)
+      },
+      {
+        label: 'Working threshold',
+        value: summary.successProbability >= threshold
+          ? `Pass · ${formatPercent(threshold)}`
+          : `Below ${formatPercent(threshold)}`,
+        state: summary.successProbability >= threshold ? 'good' : 'bad'
+      },
+      {
+        label: 'Savings depleted before 2038',
+        value: formatPercent(summary.savingsDepletedBefore2038Probability),
+        state: depletionClass(summary.savingsDepletedBefore2038Probability)
+      },
+      {
+        label: '10th percentile assets at model end',
+        value: simulator.formatMoney(end.p10),
+        state: end.p10 > 0 ? 'good' : 'bad'
+      },
+      {
+        label: 'Median assets at model end',
+        value: simulator.formatMoney(end.p50),
+        state: end.p50 > 0 ? 'good' : 'bad'
+      },
+      {
+        label: 'Modelled middle ground',
+        value: middleGround?.label ?? 'No candidate met threshold',
+        state: middleGround ? 'good' : 'warn'
+      }
+    ];
+    document.querySelector('#headlineKpis').innerHTML = cards.map(
+      card =>
+        `<article class="kpi ${escapeHtml(card.state)}"><div class="lab">${escapeHtml(card.label)}</div><div class="num">${escapeHtml(card.value)}</div></article>`
+    ).join('');
+  }
+
+  function formatBudgetOrRange(value, fallback) {
+    return value === null ? fallback : simulator.formatMoney(value);
+  }
+
+  function renderBreakPointKpis({ breakpoints, summary, policy }) {
+    const thresholdLabel = formatPercent(policy.successThreshold);
+    const cards = [
+      [
+        `Maximum budget at ≥${thresholdLabel} success`,
+        formatBudgetOrRange(breakpoints.maxBudgetAtThreshold, 'Below range')
+      ],
+      [
+        `Budget where success drops below ${thresholdLabel}`,
+        formatBudgetOrRange(breakpoints.firstBelowThreshold, 'Above range')
+      ],
+      [
+        'Terminal reserve floor',
+        simulator.formatMoney(summary.terminalReserveFloor ?? 0)
+      ],
+      [
+        'Likely failure mechanism',
+        mc.describeFailureMechanism({ summary, breakpoints })
+      ]
+    ];
+    document.querySelector('#breakPointKpis').innerHTML = cards.map(
+      ([label, value]) =>
+        `<article class="kpi"><div class="lab">${escapeHtml(label)}</div><div class="num">${escapeHtml(value)}</div></article>`
+    ).join('');
+  }
+
+  function prepareCanvas(canvas) {
+    const rect = canvas.getBoundingClientRect();
+    const width = Math.max(320, Math.floor(rect.width || canvas.clientWidth || 800));
+    const height = Math.max(180, Math.floor(rect.height || canvas.clientHeight || 240));
+    const ratio = window.devicePixelRatio || 1;
+    canvas.width = width * ratio;
+    canvas.height = height * ratio;
+    const ctx = canvas.getContext('2d');
+    ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+    ctx.clearRect(0, 0, width, height);
+    return { ctx, width, height };
+  }
+
+  function drawGrid(ctx, width, height) {
+    ctx.strokeStyle = FAN_COLOURS.grid;
+    ctx.lineWidth = 1;
+    for (let i = 0; i <= 4; i += 1) {
+      const y = 24 + i * ((height - 56) / 4);
+      ctx.beginPath();
+      ctx.moveTo(48, y);
+      ctx.lineTo(width - 18, y);
+      ctx.stroke();
+    }
+  }
+
+  function drawFanChart(summary) {
+    const canvas = document.querySelector('#fanChart');
+    const { ctx, width, height } = prepareCanvas(canvas);
+    const rows = summary.assetPercentiles;
+    const maxValue = Math.max(...rows.map(row => row.p90), 1);
+    const minValue = Math.min(...rows.map(row => row.p10), 0);
+    const x = index => 48 + index * ((width - 70) / Math.max(1, rows.length - 1));
+    const y = value => height - 32 - ((value - minValue) / (maxValue - minValue || 1)) * (height - 64);
+    const band = (lowKey, highKey, fill) => {
+      ctx.beginPath();
+      rows.forEach((row, index) => {
+        const method = index === 0 ? 'moveTo' : 'lineTo';
+        ctx[method](x(index), y(row[highKey]));
+      });
+      [...rows].reverse().forEach((row, reverseIndex) => {
+        const index = rows.length - 1 - reverseIndex;
+        ctx.lineTo(x(index), y(row[lowKey]));
+      });
+      ctx.closePath();
+      ctx.fillStyle = fill;
+      ctx.fill();
+    };
+    drawGrid(ctx, width, height);
+    band('p10', 'p90', FAN_COLOURS.outer);
+    band('p25', 'p75', FAN_COLOURS.inner);
+    ctx.strokeStyle = FAN_COLOURS.median;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    rows.forEach((row, index) => {
+      const method = index === 0 ? 'moveTo' : 'lineTo';
+      ctx[method](x(index), y(row.p50));
+    });
+    ctx.stroke();
+    ctx.fillStyle = FAN_COLOURS.text;
+    ctx.font = '12px Segoe UI, sans-serif';
+    rows.forEach((row, index) => {
+      if (index === 0 || index === rows.length - 1 || row.year % 5 === 0) {
+        ctx.fillText(String(row.year), x(index) - 10, height - 10);
+      }
+    });
+    const end = rows.at(-1);
+    document.querySelector('#fanChartSummary').textContent =
+      `Ending assets: p10 ${simulator.formatMoney(end.p10)}, p50 ${simulator.formatMoney(end.p50)}, p90 ${simulator.formatMoney(end.p90)}.`;
+  }
+
+  function drawPointSeries(ctx, points, x, y) {
+    ctx.fillStyle = FAN_COLOURS.median;
+    points.forEach(point => {
+      ctx.beginPath();
+      ctx.arc(x(point.budget), y(point.successProbability), 3.5, 0, Math.PI * 2);
+      ctx.fill();
+    });
+  }
+
+  function drawBudgetChart(points, policy) {
+    const canvas = budgetChart;
+    const { ctx, width, height } = prepareCanvas(canvas);
+    const minBudget = Math.min(...points.map(point => point.budget));
+    const maxBudget = Math.max(...points.map(point => point.budget));
+    const x = budget => 48 + ((budget - minBudget) / (maxBudget - minBudget || 1)) * (width - 70);
+    const y = probability => height - 32 - probability * (height - 64);
+    const threshold = policy.successThreshold;
+    budgetChartHitPoints = points.map(point => ({
+      ...point,
+      x: x(point.budget),
+      y: y(point.successProbability)
+    }));
+    drawGrid(ctx, width, height);
+    ctx.strokeStyle = '#F0C571';
+    ctx.setLineDash([5, 5]);
+    ctx.beginPath();
+    ctx.moveTo(48, y(threshold));
+    ctx.lineTo(width - 18, y(threshold));
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.strokeStyle = FAN_COLOURS.median;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    points.forEach((point, index) => {
+      const method = index === 0 ? 'moveTo' : 'lineTo';
+      ctx[method](x(point.budget), y(point.successProbability));
+    });
+    ctx.stroke();
+    drawPointSeries(ctx, points, x, y);
+    ctx.fillStyle = FAN_COLOURS.text;
+    ctx.font = '12px Segoe UI, sans-serif';
+    ctx.fillText(formatPercent(threshold), width - 58, y(threshold) - 6);
+    ctx.fillText('100%', 48, y(1) + 14);
+    document.querySelector('#budgetChartSummary').textContent =
+      points.map(point => `${simulator.formatMoney(point.budget)}: ${formatPercent(point.successProbability)}`).join(' · ');
+  }
+
+  function nearestBudgetPoint(event) {
+    const rect = budgetChart.getBoundingClientRect();
+    const x = event.clientX - rect.left;
+    const y = event.clientY - rect.top;
+    return budgetChartHitPoints
+      .map(point => ({
+        point,
+        distance: Math.hypot(point.x - x, point.y - y)
+      }))
+      .filter(item => item.distance <= 18)
+      .sort((a, b) => a.distance - b.distance)[0]?.point ?? null;
+  }
+
+  function showBudgetTooltip(event) {
+    const point = nearestBudgetPoint(event);
+    if (!point) {
+      budgetChartTooltip.hidden = true;
+      return;
+    }
+    const panelRect = budgetChart.parentElement.getBoundingClientRect();
+    budgetChartTooltip.innerHTML = `
+      <b>${simulator.formatMoney(point.budget)} budget</b>
+      <span>Funded probability: ${formatPercent(point.successProbability)}</span>
+      <span>Status: ${point.successProbability >= activeRiskPolicy.successThreshold ? `At or above ${formatPercent(activeRiskPolicy.successThreshold)} target` : `Below ${formatPercent(activeRiskPolicy.successThreshold)} target`}</span>
+    `;
+    budgetChartTooltip.style.left =
+      `${Math.max(8, Math.min(event.clientX - panelRect.left + 12, panelRect.width - 260))}px`;
+    budgetChartTooltip.style.top =
+      `${Math.max(8, event.clientY - panelRect.top - 54)}px`;
+    budgetChartTooltip.hidden = false;
+  }
+
+  function renderStrategyTable(results, middleGround) {
+    document.querySelector('#strategyTable').innerHTML = `
+      <thead><tr><th>Strategy</th><th>Success</th><th>Savings depleted before 2038</th><th>P10 ending assets</th><th>Sensitivity</th><th>Verdict</th></tr></thead>
+      <tbody>${results.map(result => `
+        <tr>
+          <td>${escapeHtml(result.label)}</td>
+          <td>${formatPercent(result.successProbability)}</td>
+          <td>${formatPercent(result.savingsDepletedBefore2038Probability)}</td>
+          <td>${simulator.formatMoney(result.p10EndingAssets)}</td>
+          <td>${result.sensitivityPass ? 'Pass' : 'Watch'}</td>
+          <td>${middleGround?.id === result.id ? 'Modelled middle ground' : 'Candidate'}</td>
+        </tr>
+      `).join('')}</tbody>`;
+  }
+
+  function renderStressCards(stresses) {
+    document.querySelector('#stressResults').className = 'stress-grid';
+    document.querySelector('#stressResults').innerHTML = stresses.map(stress => `
+      <article class="stress-card">
+        <h4>${escapeHtml(stress.id)}</h4>
+        <p>Budget funded: ${stress.budgetFunded ? 'Yes' : 'No'}</p>
+        <p>First shortfall: ${stress.firstShortfallYear ?? 'None'}</p>
+        <p>Minimum savings: ${simulator.formatMoney(stress.minimumSavings)}</p>
+        <p>Minimum assets: ${simulator.formatMoney(stress.minimumAssets)}</p>
+        <p>Ending assets: ${simulator.formatMoney(stress.endingAssets)}</p>
+      </article>
+    `).join('');
+  }
+
+  function renderAssumptions({
+    scenario: activeScenario,
+    seed,
+    pathCount,
+    glidePath,
+    transitionYear,
+    stress,
+    riskMode,
+    riskPolicy,
+    returnScenario,
+    budgetRange,
+    profilePresets,
+    stressOverride
+  }) {
+    const returnInfo = RETURN_SCENARIOS[returnScenario] ?? RETURN_SCENARIOS.base;
+    const glideInfo = GLIDE_PATHS[glidePath] ?? GLIDE_PATHS['stay-current'];
+    const profileRows = Object.entries(profilePresets).map(([id, profile]) =>
+      `<li>${escapeHtml(id)}: ${profile.expectedReturnPct}% mean, ${profile.volatilityPct}% volatility, source ${profile.sourceDate}</li>`
+    ).join('');
+    const glideSentence = glidePath === 'stay-current'
+      ? `${glideInfo.label}: ${glideInfo.detail}`
+      : `${glideInfo.label}: ${glideInfo.detail} Change year ${transitionYear}.`;
+    const overrideSentence = stressOverride?.inflationPctByYear?.length
+      ? `Inflation override ${stressOverride.inflationPctByYear.map(value => `${value}%`).join(' -> ')}. Cash interest ${activeScenario.cash.interestPct}%; savings interest ${activeScenario.savings.interestPct}%.`
+      : 'No inflation, cash-interest, or savings-interest override is applied.';
+    document.querySelector('#assumptionsPanel').innerHTML = `
+      <p>Scenario: ${escapeHtml(activeScenario.scenarioName ?? 'Imported scenario')} · schema ${escapeHtml(activeScenario.schemaVersion)}</p>
+      <p>Config version: 3 · seed ${escapeHtml(seed)} · paths ${escapeHtml(pathCount)}.</p>
+      <p><b>Return scenario:</b> ${escapeHtml(returnInfo.label)}. ${escapeHtml(returnInfo.detail)}</p>
+      <p><b>Selected glide path:</b> ${escapeHtml(glideSentence)}</p>
+      <p><b>Stress event:</b> ${escapeHtml(stress.label)}. ${escapeHtml(stress.detail)} ${stress.shocks.length ? `Shock sequence ${escapeHtml(JSON.stringify(stress.shocks))} is applied to the first years of every Monte Carlo path and budget-sweep path.` : 'No deterministic stress sequence is forced into the Monte Carlo paths.'}</p>
+      <p><b>Stress assumption override:</b> ${escapeHtml(overrideSentence)}</p>
+      <p><b>Risk mode:</b> ${escapeHtml(riskPolicy.label)}. ${escapeHtml(riskPolicy.detail)} Confidence target ${escapeHtml(formatPercent(riskPolicy.successThreshold))}; terminal reserve ${simulator.formatMoney(activeScenario.household.annualBudget * riskPolicy.terminalReserveYears)}.</p>
+      <p>Break-point mode: ${escapeHtml(riskMode)} · budget sweep ${simulator.formatMoney(budgetRange.start)} to ${simulator.formatMoney(budgetRange.end)} by ${simulator.formatMoney(budgetRange.step)}.</p>
+      <ul>${profileRows}</ul>
+      <p>FX, salary, pension, tax and non-stressed savings assumptions are inherited from the imported deterministic scenario.</p>
+      <p>Deterministic stress tests are reported separately and do not alter the Monte Carlo probability denominator.</p>
+      <p>Stochastic scope excludes inflation, FX, tax-rule changes, employment changes, policy changes, longevity, health, aged-care costs, and home-value uncertainty.</p>
+      <p>Aggressive growth is a scenario overlay for comparison, not a sourced product recommendation.</p>
+      <p>Local only: imported data and browser storage stay on this device and are not encrypted by this standalone file.</p>
+      <p>Estimate only; not financial or tax advice.</p>
+    `;
+  }
+
+  function strategyFromSummary(id, label, summary, sensitivityPass = true) {
+    const end = summary.assetPercentiles.at(-1);
+    return {
+      id,
+      label,
+      successProbability: summary.successProbability,
+      savingsDepletedBefore2038Probability:
+        summary.savingsDepletedBefore2038Probability,
+      p10EndingAssets: end.p10,
+      sensitivityPass,
+      complexity: id === 'baseline' ? 0 : 1,
+      transitionAggression: id === 'baseline' ? 0 : 1
+    };
+  }
+
+  async function calculateBudgetCurveWithProgress({
+    scenario: activeScenario,
+    budgets,
+    pathCount,
+    seed,
+    profiles,
+    profilesByYear,
+    stressShocks,
+    riskMode
+  }) {
+    const points = [];
+    for (let index = 0; index < budgets.length; index += 1) {
+      if (cancelled) throw new Error('Run cancelled.');
+      const [point] = mc.calculateBudgetCurve({
+        scenario: activeScenario,
+        budgets: [budgets[index]],
+        pathCount,
+        seed,
+        profiles,
+        profilesByYear,
+        stressShocks,
+        riskMode,
+        projectScenario: simulator.projectScenario
+      });
+      points.push(point);
+      setProgress(
+        50 + ((index + 1) / budgets.length) * 45,
+        `Budget sweep ${index + 1} of ${budgets.length}: ${simulator.formatMoney(point.budget)}`
+      );
+      await nextFrame();
+    }
+    return points;
+  }
+
+  async function runMonteCarlo() {
+    if (!scenario) return;
+    const seed = Number(document.querySelector('#seed').value) >>> 0;
+    const pathCount = Number(document.querySelector('#pathCount').value);
+    const riskMode = document.querySelector('#riskMode').value;
+    const returnScenario = document.querySelector('#returnScenario').value;
+    const { glidePath, transitionYear } = selectedGlidePathConfig();
+    const stress = selectedStressEventConfig();
+    const stressOverride = stress.assumptionOverride;
+    const riskPolicy = mc.riskModePolicy(riskMode);
+    activeRiskPolicy = riskPolicy;
+    const budgetRange = selectedBudgetRange();
+    const profiles = selectedProfiles();
+    const transformedPresets = mc.transformProfilesForReturnScenario(
+      APPROVED_PROFILES,
+      returnScenario
+    );
+    const importedScenario = scenarioForMc(scenario);
+    const riskAdjustedScenario = mc.applyRiskModeToScenario(
+      importedScenario,
+      riskMode
+    );
+    const activeScenario = mc.applyStressAssumptionOverride(
+      riskAdjustedScenario,
+      stressOverride
+    );
+    activeRunBudget = activeScenario.household.annualBudget;
+    let profilesByYear = null;
+    cancelled = false;
+    runButton.disabled = true;
+    cancelButton.disabled = false;
+    progress.hidden = false;
+    progressText.hidden = false;
+    progress.value = 0;
+    setProgress(2, 'Preparing Monte Carlo run.');
+    scenarioMessage.textContent = 'Running Monte Carlo analysis…';
+    try {
+      profilesByYear = profileScheduleForGlidePath({
+        activeScenario,
+        profilePresets: transformedPresets,
+        glidePath,
+        transitionYear
+      });
+      const results = await runBatched({
+        total: pathCount,
+        batchSize: 100,
+        runBatch: (start, end) => runBatch({
+          scenario: activeScenario,
+          seed,
+          start,
+          end,
+          profiles,
+          profilesByYear,
+          stressShocks: stress.shocks
+        }),
+        onProgress: value => {
+          setProgress(
+            5 + value * 25,
+            `Primary path run: ${Math.round(value * pathCount)} of ${pathCount} paths.`
+          );
+        }
+      });
+      const summary = mc.summarizeResults(results, activeScenario, riskMode);
+      let baselineSummary = summary;
+      if (glidePath !== 'stay-current') {
+        const baselineResults = await runBatched({
+          total: pathCount,
+          batchSize: 100,
+          runBatch: (start, end) => runBatch({
+            scenario: activeScenario,
+            seed,
+            start,
+            end,
+            profiles,
+            stressShocks: stress.shocks
+          }),
+          onProgress: value => {
+            setProgress(
+              31 + value * 17,
+              `Baseline comparison: ${Math.round(value * pathCount)} of ${pathCount} paths.`
+            );
+          }
+        });
+        baselineSummary = mc.summarizeResults(
+          baselineResults,
+          activeScenario,
+          riskMode
+        );
+      } else {
+        setProgress(48, 'Baseline comparison matches selected glide path.');
+        await nextFrame();
+      }
+      const strategies = [
+        strategyFromSummary('baseline', 'Imported baseline', baselineSummary)
+      ];
+      if (glidePath !== 'stay-current') {
+        strategies.push(
+          strategyFromSummary(glidePath, GLIDE_PATHS[glidePath].label, summary)
+        );
+      }
+      const middleGround = mc.chooseMiddleGround(
+        strategies,
+        { threshold: riskPolicy.successThreshold }
+      ) ?? null;
+      const budgets = mc.deriveBudgetSweepBudgets(budgetRange);
+      const budgetCurve = await calculateBudgetCurveWithProgress({
+        scenario: activeScenario,
+        budgets,
+        pathCount,
+        seed,
+        profiles,
+        profilesByYear,
+        stressShocks: stress.shocks,
+        riskMode
+      });
+      const breakpoints = mc.summarizeBudgetBreakpoints(
+        budgetCurve,
+        { successThreshold: riskPolicy.successThreshold }
+      );
+      setProgress(97, 'Running explicit stress tests.');
+      const stresses = Object.entries(mc.STRESS_SHOCK_SEQUENCES).map(([id, shocks]) =>
+        mc.runStressTest({
+          id,
+          shocks,
+          scenario: activeScenario,
+          profiles,
+          profilesByYear,
+          projectScenario: simulator.projectScenario
+        })
+      );
+      renderHeadlineKpis(summary, middleGround, riskPolicy);
+      renderBreakPointKpis({ breakpoints, summary, policy: riskPolicy });
+      drawFanChart(summary);
+      drawBudgetChart(budgetCurve, riskPolicy);
+      renderStrategyTable(strategies, middleGround);
+      renderStressCards(stresses);
+      renderAssumptions({
+        scenario: activeScenario,
+        seed,
+        pathCount,
+        glidePath,
+        transitionYear,
+        stress,
+        riskMode,
+        riskPolicy,
+        returnScenario,
+        budgetRange,
+        profilePresets: transformedPresets,
+        stressOverride
+      });
+      setProgress(100, 'Analysis complete.');
+      document.querySelector('#mcDashboard').hidden = false;
+      scenarioMessage.textContent = 'Analysis complete.';
+    } catch (error) {
+      scenarioMessage.textContent = error.message;
+    } finally {
+      runButton.disabled = !scenario;
+      cancelButton.disabled = true;
+      progress.hidden = true;
+      progressText.hidden = true;
+    }
+  }
+
+  importButton?.addEventListener('click', () => scenarioFile.click());
+  document.querySelector('#returnScenario').addEventListener('change', updateScenarioCallout);
+  document.querySelector('#glidePath').addEventListener('change', updateScenarioCallout);
+  document.querySelector('#glideChangeYear').addEventListener('input', updateScenarioCallout);
+  stressEventSelect.addEventListener('change', updateScenarioCallout);
+  budgetChart.addEventListener('mousemove', showBudgetTooltip);
+  budgetChart.addEventListener('mouseleave', () => {
+    budgetChartTooltip.hidden = true;
+  });
+  cancelButton.addEventListener('click', () => {
+    cancelled = true;
+  });
+  runButton.addEventListener('click', runMonteCarlo);
+
+  scenarioFile.addEventListener('change', async event => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    try {
+      scenario = simulator.importScenario(await file.text());
+      scenarioMessage.textContent =
+        `${scenario.scenarioName} · schema ${scenario.schemaVersion}`;
+      runButton.disabled = false;
+      updateScenarioCallout();
+    } catch (error) {
+      scenario = null;
+      runButton.disabled = true;
+      scenarioMessage.textContent = error.message;
+    }
+  });
+  updateScenarioCallout();
+})();
+</script>
+<footer class="page-footer">Estimate only; not financial or tax advice.</footer>
+</body>
+</html>
