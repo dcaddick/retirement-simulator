@@ -45,4 +45,6 @@ Keep changes focused and reviewable. Before opening a pull request:
 4. Run a privacy scan over the changed files.
 5. Update documentation and the changelog when behaviour changes.
 
+GitHub Actions runs both `.mjs` suites for pull requests and pushes to `main`. A contribution is not ready to merge while that workflow is failing, even if the change appears unrelated to the model.
+
 By contributing, you agree that your contribution is licensed under Apache License 2.0.

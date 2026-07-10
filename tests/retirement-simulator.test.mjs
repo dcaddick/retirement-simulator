@@ -49,6 +49,8 @@ check('sample has UK pensions cleared and disabled',
   sample.people.every(p => p.ukStateAnnualGbp === 0) && sample.assumptions.ukPensionsEnabled === false);
 check('sample distinguishes preferred income from essential budget',
   sample.household.targetAfterTax === 80000 && sample.household.annualBudget === 70000);
+check('sample uses the approved manual inflation default',
+  sample.assumptions.inflationMode === 'manual' && sample.assumptions.manualInflationPct === 3);
 check('v1.00 terminology is rendered',
   html.includes('Preferred Retirement Income') && html.includes('Essential Annual Budget'));
 check('return assumptions are explained below the table',
@@ -57,6 +59,51 @@ check('return assumptions are explained below the table',
 check('assumptions and methodology moved out of the controls panel',
   html.indexOf('<summary>Model assumptions and sources</summary>') > html.indexOf('<div class="tblwrap">') &&
   html.indexOf('id="methodologySection"') > html.indexOf('<div class="tblwrap">'));
+check('v1.00 document version is consistent',
+  html.includes('<title>Family Retirement Income Simulator v1.00</title>') &&
+  html.includes('<span class="version">v1.00</span>'));
+check('returns and inflation share a dedicated upper controls block',
+  html.indexOf('id="returnAssumptions"') < html.indexOf('id="peopleFields"') &&
+  html.includes('Estimated net returns after fees and tax'));
+check('defined benefit wording leads the combined pension section',
+  html.includes('Defined Benefit/UK Pensions') &&
+  html.includes('Australian defined benefit'));
+check('deterministic CSP bounds scripts, styles and external connections',
+  /Content-Security-Policy[^>]+default-src 'none'/.test(html) &&
+  html.includes("connect-src https://api.frankfurter.app https://stooq.com"));
+check('theme toggle sits immediately after Export JSON',
+  /id="exportScenario"[^>]*>Export JSON<\/button>\s*<button[^>]+id="themeToggle"/.test(html));
+check('theme preference is locally persisted and accessible',
+  html.includes('retirement-simulator-theme') &&
+  html.includes('aria-pressed') && html.includes('aria-label'));
+check('all control sections after People use collapsible chevrons',
+  ['cashSavingsSection', 'shareholdingsSection', 'ukPensionsSection',
+    'otherItemsSection', 'householdSection'].every(id =>
+    new RegExp(`<details[^>]+id="${id}"[^>]*open`).test(html)));
+
+console.log('\nreal-return readouts');
+check('real return uses nominal less inflation', core.realReturnPct(7, 2.5) === 4.5);
+check('real return preserves a negative spread', core.realReturnPct(3, 5) === -2);
+check('Treasury 2026 accumulation spread is calculated',
+  core.realReturnPct(5.5, core.TREASURY_INFLATION.rates[2026] * 100) === 0.5);
+check('Treasury long-run retirement spread is calculated',
+  core.realReturnPct(6.5, core.TREASURY_INFLATION.longRunRate * 100) === 4);
+
+console.log('\nmarket quote policy');
+const manualHolding = core.makeShareholding(0);
+check('new holdings default to manual quotes', manualHolding.quoteMarket === 'manual');
+check('manual holdings do not construct a Stooq URL',
+  core.stooqQuoteUrl({ ...manualHolding, symbol: 'BHP' }) === null);
+check('US Stooq holdings construct an explicit .us URL',
+  core.stooqQuoteUrl({ ...manualHolding, symbol: 'VTI', quoteMarket: 'stooq-us' }) ===
+    'https://stooq.com/q/l/?s=vti.us&f=sd2t2ohlcv&h&e=csv');
+
+console.log('\ncurrent Medicare thresholds');
+check('Medicare data is for 2025-26', core.MEDICARE_BASE.effectiveYear === 2025);
+check('ordinary Medicare thresholds are current',
+  core.MEDICARE_BASE.ordinary.lower === 28011 && core.MEDICARE_BASE.ordinary.upper === 35013);
+check('SAPTO Medicare thresholds are current',
+  core.MEDICARE_BASE.sapto.lower === 44268 && core.MEDICARE_BASE.sapto.upper === 55335);
 
 console.log('\nbaseline projection');
 const base = core.projectScenario(sample);

@@ -12,6 +12,15 @@ This changelog summarizes public, non-personal milestones. Early development use
 - Renamed the two household planning anchors to **Preferred Retirement Income** and **Essential Annual Budget**.
 - Clarified that accumulation and retirement-phase inputs are estimated net returns after fees and tax.
 - Moved model assumptions, sources and the step-by-step calculation method beneath the projection table.
+- Grouped returns and inflation in the upper controls and added live long-run/near-term real-return spreads.
+- Added a locally persisted light/dark theme switch to both tools.
+- Made every left-panel section after People independently collapsible.
+- Reframed pension inputs as **Defined Benefit/UK Pensions**, with Australian defined benefits first and UK State Pension second.
+- Made share-price entry manual by default and labelled optional Stooq lookup as US-only.
+- Disclosed the network and privacy effects of optional Stooq and Frankfurter requests.
+- Updated Medicare low-income thresholds for 2025–26, checked 10 July 2026.
+- Added CSP coverage to the experimental Monte Carlo page.
+- Added GitHub Actions enforcement for both regression suites.
 
 ## Deterministic simulator 0.99
 

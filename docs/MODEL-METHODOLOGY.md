@@ -29,21 +29,23 @@ The application contains a more detailed step-by-step explanation and shows the 
 
 The model separates accumulation and retirement-phase balances, accepts separate estimated net return assumptions after fees and tax, and supports configurable transition timing. A higher retirement-phase assumption can represent pension-phase tax treatment; it does not imply a different underlying investment portfolio. Early access is simplified and is not a complete Transition-to-Retirement compliance model.
 
+The interface displays a simple real-return spread calculated as nominal return minus inflation. Under the Treasury schedule it shows the long-run spread against 2.5% and, when different, the near-term spread against the modelled calendar-year rate. This readout is an assumption aid, not a forecast of purchasing-power returns.
+
 ### Drawdown
 
 Guaranteed income and mandatory minimum payments are counted before discretionary top-ups. Users configure ordered drawdown tiers; a tier can split a draw between two sources.
 
 ### Tax and government support
 
-The simulator contains simplified, dated estimates for Australian income tax, Medicare, selected offsets, Age Pension and the Commonwealth Seniors Health Card. Rules and thresholds change and must be reviewed against current authoritative sources before relying on them.
+The simulator contains simplified, dated estimates for Australian income tax, Medicare, selected offsets, Age Pension and the Commonwealth Seniors Health Card. Medicare low-income thresholds are the legislated 2025–26 amounts checked on 10 July 2026: ordinary individual $28,011 lower/$35,013 upper and SAPTO $44,268 lower/$55,335 upper. Rules and thresholds change and must be reviewed against current authoritative sources before relying on them.
 
 ### Assets and other income
 
-Cash, savings, shareholdings, other income and other assets are simplified. Timing is annual, share-price forecasting is limited, capital-loss carry-forward is not fully modelled, and disposal tax may be excluded for generic other assets.
+Cash, savings, shareholdings, other income and other assets are simplified. Timing is annual, share-price forecasting is limited, capital-loss carry-forward is not fully modelled, and disposal tax may be excluded for generic other assets. Share prices are manual by default. The optional Stooq integration is explicitly limited to US-listed symbols and always appends Stooq's `.us` market suffix; Australian and other holdings use manual prices.
 
 ### Foreign pensions and currency
 
-UK State Pension and currency conversion are supported with explicit assumptions. Cross-border tax treatment and indexation can be complex; the model uses approximations rather than jurisdiction-specific advice.
+Australian defined-benefit income is the primary pension-entry path and uses AUD with fixed or CPI-linked indexation. UK State Pension is a secondary path with GBP/AUD conversion, frozen-uprating comparison and a simplified UPP tax deduction. Cross-border tax treatment and indexation can be complex; the model uses approximations rather than jurisdiction-specific advice.
 
 ## Today's dollars and nominal dollars
 
@@ -52,6 +54,8 @@ Calculations run using nominal values. Today's-dollar views divide future nomina
 ## Experimental Monte Carlo report
 
 The companion report imports a validated scenario and applies synthetic investment-return paths. Seeded runs support reproducibility, while deterministic stress cases are reported separately.
+
+Monte Carlo v0.5 accepts the standard v1.00 fictional sample and scenarios using the fields its experimental engine supports. It rejects, with a visible explanation, v1.00 imports containing populated Other income/Other assets or active Defined Benefit/UK Pension income; it does not silently discard those cash flows.
 
 The reported success rate is conditional on the selected model and assumptions. It is not a personal forecast. The model does not make every material retirement risk stochastic, and deterministic stresses do not alter the Monte Carlo probability denominator.
 

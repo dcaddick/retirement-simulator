@@ -13,6 +13,8 @@ The deterministic suite checks core-engine extraction, script syntax, schema mig
 
 The Monte Carlo suite checks imported-scenario handling, risk-mode behaviour, deterministic stress overrides and invariants that keep stress results outside the stochastic probability denominator.
 
+The repository workflow at `.github/workflows/test.yml` runs both commands with Node 20 for pull requests and pushes to `main`.
+
 ## Browser verification
 
 Automated tests do not replace a real-browser pass. For user-interface changes, verify at least:
@@ -26,6 +28,10 @@ Automated tests do not replace a real-browser pass. For user-interface changes, 
 - JSON import and export;
 - local-storage reset and new-scenario behaviour;
 - transfer of a simulator export into the experimental Monte Carlo report.
+- light and dark themes, including persistence after reload;
+- Treasury/manual inflation changes and both real-return readouts;
+- manual share pricing and explicitly selected US Stooq lookup;
+- collapse/expand behavior for every left-panel section after People.
 
 ## Modelling-change checklist
 

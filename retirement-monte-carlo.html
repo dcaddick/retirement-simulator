@@ -3,12 +3,18 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src https://api.frankfurter.app https://stooq.com; base-uri 'none'; form-action 'none'" />
 <title>Family Retirement Monte Carlo Report v0.5</title>
 <style>
   :root{
     --bg:#0f1720; --panel:#18232f; --panel2:#1e2c3a; --line:#2b3d4f;
     --text:#e6edf3; --muted:#9fb0c0; --accent:#4fc3f7; --accent2:#8bd450;
     --warn:#ffb454; --bad:#ff6b6b; --uk:#c77dff; --share:#ffd166; --pot:#5dcaa5;
+  }
+  :root[data-theme="light"]{
+    --bg:#eef3f6; --panel:#ffffff; --panel2:#e7eef3; --line:#b9c8d3;
+    --text:#152330; --muted:#536a7b; --accent:#087da8; --accent2:#3f7d18;
+    --warn:#9a5a00; --bad:#b52929; --uk:#7542a3; --share:#8a6500; --pot:#16765b;
   }
   *{box-sizing:border-box}
   body{margin:0;background:var(--bg);color:var(--text);font:14px/1.5 -apple-system,Segoe UI,Roboto,sans-serif}
@@ -72,7 +78,7 @@
   .flag.bad{background:rgba(255,107,107,.08);border-color:rgba(255,107,107,.4)}
   .chart-shell{position:relative}
   canvas{width:100%;background:var(--panel);border:1px solid var(--line);border-radius:10px;margin-top:4px}
-  .chart-tooltip{position:absolute;z-index:5;display:grid;gap:2px;max-width:250px;padding:9px 11px;border:1px solid var(--line);border-radius:8px;background:#101923;color:var(--text);box-shadow:0 8px 24px rgba(0,0,0,.28);pointer-events:none;font-size:12px}
+  .chart-tooltip{position:absolute;z-index:5;display:grid;gap:2px;max-width:250px;padding:9px 11px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--text);box-shadow:0 8px 24px rgba(0,0,0,.28);pointer-events:none;font-size:12px}
   .chart-tooltip[hidden]{display:none}
   .legend{display:flex;gap:14px;flex-wrap:wrap;font-size:11.5px;color:var(--muted);margin:8px 2px}
   .legend i{display:inline-block;width:11px;height:11px;border-radius:2px;margin-right:5px;vertical-align:-1px}
@@ -150,10 +156,11 @@
     <button type="button" id="resetSample">Reset sample</button>
     <button type="button" id="importScenario">Import JSON</button>
     <button type="button" id="exportScenario">Export JSON</button>
+    <button type="button" id="themeToggle" aria-label="Switch to light theme" aria-pressed="false">Light theme</button>
     <input type="file" id="scenarioFile" accept=".json,application/json" hidden>
   </nav>
   <p id="scenarioMessage" class="scenario-message" aria-live="polite"></p>
-  <p class="privacy-note">Saved locally on this device. Local data is not encrypted or uploaded.</p>
+  <p class="privacy-note">Scenario data is saved locally and not uploaded. Optional US quote/FX fetches contact Stooq and Frankfurter.</p>
 </header>
 <main class="wrap">
   <section class="group" aria-labelledby="mcInputHeading">
@@ -268,7 +275,7 @@
       <div id="shareholdingList"></div>
     </section>
     <section class="group uk" aria-labelledby="ukPensionsHeading">
-      <h3 id="ukPensionsHeading">UK pensions</h3>
+      <h3 id="ukPensionsHeading">Defined Benefit/UK Pensions</h3>
       <label><span class="k">GBP&rarr;AUD rate</span>
         <input type="number" id="gbpAud" min="0" step="0.0001"
           data-value-type="number" data-path="assumptions.gbpAud">
@@ -332,7 +339,7 @@
     <div class="legend" id="legend"></div>
     <div class="tblwrap"><table id="tbl"></table></div>
     <div class="note">
-      <b>v0.95.</b> Generic two-person sample data is stored locally on this device and can be imported or exported as JSON. Calculations are transparent estimates in today&rsquo;s AUD and are not financial or tax advice.
+      <b>v0.5 experimental companion.</b> Generic two-person sample data is stored locally on this device and can be imported or exported as JSON. Calculations are transparent estimates in today&rsquo;s AUD and are not financial or tax advice.
     </div>
   </div>
 </div>
@@ -411,11 +418,11 @@
     url: 'https://www.ato.gov.au/tax-rates-and-codes/tax-rates-australian-residents'
   });
   const MEDICARE_BASE = Object.freeze({
-    effectiveYear: 2024,
-    checkedDate: '2026-07-06',
-    sourceUrl: 'https://www.ato.gov.au/myTax25MedicareLevy',
-    ordinary: { lower: 27222, upper: 34027 },
-    sapto: { lower: 43020, upper: 53775 }
+    effectiveYear: 2025,
+    checkedDate: '2026-07-10',
+    sourceUrl: 'https://iorder.com.au/publication/Download.aspx?ProdID=71050-6.2026',
+    ordinary: { lower: 28011, upper: 35013 },
+    sapto: { lower: 44268, upper: 55335 }
   });
   const SERVICES_AUSTRALIA_2026 = Object.freeze({
     effectiveDate: '2026-07-01',
@@ -563,21 +570,21 @@
     return {
       schemaVersion: SCHEMA_VERSION,
       scenarioName: 'Sample household',
-      startYear: new Date().getFullYear(),
+      startYear: 2026,
       people: [
         {
           id: 'p0',
-          name: 'Alex',
-          age: 62,
-          super: 600000,
-          retireAge: 67,
-          superAccessAge: 67,
+          name: 'John',
+          age: 63,
+          super: 220000,
+          retireAge: 65,
+          superAccessAge: 65,
           superAccessPct: 100,
-          salary: 55000,
+          salary: 85000,
           sgPct: 12,
-          accumulationReturnPct: 7,
-          retirementReturnPct: 6,
-          ukStateAnnualGbp: 10000,
+          accumulationReturnPct: 5.5,
+          retirementReturnPct: 6.5,
+          ukStateAnnualGbp: 0,
           ukStateStartAge: 67,
           ukPrivateAmountGbp: 0,
           ukPrivateTakeAge: 67,
@@ -585,16 +592,16 @@
         },
         {
           id: 'p1',
-          name: 'Jordan',
-          age: 60,
-          super: 350000,
-          retireAge: 67,
-          superAccessAge: 67,
+          name: 'Jane',
+          age: 61,
+          super: 165000,
+          retireAge: 65,
+          superAccessAge: 65,
           superAccessPct: 100,
-          salary: 30000,
+          salary: 45000,
           sgPct: 12,
-          accumulationReturnPct: 7,
-          retirementReturnPct: 6,
+          accumulationReturnPct: 5.5,
+          retirementReturnPct: 6.5,
           ukStateAnnualGbp: 0,
           ukStateStartAge: 67,
           ukPrivateAmountGbp: 0,
@@ -602,21 +609,27 @@
           ukPrivateType: 'lump'
         }
       ],
-      cash: { amount: 50000, interestPct: 0, owner: 'joint' },
-      savings: { amount: 150000, interestPct: 4, owner: 'p1' },
+      cash: { amount: 25000, interestPct: 0, owner: 'joint' },
+      savings: { amount: 60000, interestPct: 4.5, owner: 'p1' },
       shareholdings: [],
       household: {
-        targetAfterTax: 90000,
-        annualBudget: 60000,
-        modelEndAge: 100,
-        drawdownPriority: defaultDrawdownPriority(true),
+        targetAfterTax: 80000,
+        annualBudget: 70000,
+        modelEndAge: 95,
+        drawdownPriority: [
+          [
+            { source: 'p0Super', weight: 0.5 },
+            { source: 'p1Super', weight: 0.5 }
+          ],
+          [{ source: 'savings', weight: 0.5 }]
+        ],
         applyMinimumDrawdown: true,
         includeAgePension: true,
         showSurvival: true
       },
       assumptions: {
-        inflationMode: 'treasury',
-        manualInflationPct: 2.5,
+        inflationMode: 'manual',
+        manualInflationPct: 3,
         gbpAud: 1.95,
         uppPct: 8
       }
@@ -696,6 +709,30 @@
     return JSON.stringify(scenario, null, 2);
   }
 
+  function adaptV1ScenarioForExperimentalMonteCarlo(scenario) {
+    if (scenario.schemaVersion !== 6) return scenario;
+    if ((scenario.otherIncomes ?? []).length || (scenario.otherAssets ?? []).length) {
+      throw new Error('Monte Carlo v0.5 cannot yet model populated Other income or Other assets. Remove them from a fictional copy before importing.');
+    }
+    const hasPensionIncome = scenario.people?.some(person =>
+      Number(person.ukStateAnnualGbp) > 0);
+    if (scenario.assumptions?.ukPensionsEnabled !== false && hasPensionIncome) {
+      throw new Error('Monte Carlo v0.5 cannot yet preserve v1.00 Defined Benefit/UK Pension treatment. Use a fictional copy with those pensions excluded.');
+    }
+    const adapted = structuredClone(scenario);
+    adapted.schemaVersion = SCHEMA_VERSION;
+    adapted.people = adapted.people.map(person => ({
+      ...person,
+      ukStateAnnualGbp: 0,
+      ukPrivateAmountGbp: 0,
+      ukPrivateTakeAge: person.ukStateStartAge ?? 67,
+      ukPrivateType: 'lump'
+    }));
+    delete adapted.otherIncomes;
+    delete adapted.otherAssets;
+    return adapted;
+  }
+
   function importScenario(text) {
     let parsed;
     try {
@@ -703,7 +740,7 @@
     } catch {
       throw new Error('Scenario file is not valid JSON.');
     }
-    const scenario = migrateScenario(parsed);
+    const scenario = migrateScenario(adaptV1ScenarioForExperimentalMonteCarlo(parsed));
     const errors = validateScenario(scenario);
     if (errors.length) {
       throw new Error(`${errors[0].path}: ${errors[0].message}`);
@@ -732,6 +769,7 @@
       symbol: '',
       quantity: 0,
       quoteCurrency: 'AUD',
+      quoteMarket: 'manual',
       price: 0,
       fxToAud: 1,
       owner: 'joint',
@@ -740,6 +778,15 @@
       saleYear: new Date().getFullYear() + 1,
       saleMonth: 1
     };
+  }
+
+  function stooqQuoteUrl(holding) {
+    const quoteMarket = holding.quoteMarket ??
+      (holding.quoteCurrency === 'USD' ? 'stooq-us' : 'manual');
+    if (quoteMarket !== 'stooq-us') return null;
+    const symbol = encodeURIComponent(String(holding.symbol ?? '').trim().toLowerCase());
+    if (!symbol) return null;
+    return `https://stooq.com/q/l/?s=${symbol}.us&f=sd2t2ohlcv&h&e=csv`;
   }
 
   function ukPensionFlows(person, age, gbpAud, inflationFactor) {
@@ -1398,6 +1445,7 @@
     allocateOwnedAmount,
     discountedCapitalGainByPerson,
     makeShareholding,
+    stooqQuoteUrl,
     ukPensionFlows,
     TREASURY_INFLATION,
     TAX_SCHEDULES,
@@ -1439,11 +1487,31 @@
 
   const core = globalThis.RetirementSimulatorCore;
   const STORAGE_KEY = 'family-retirement-simulator:v0.95:scenario';
+  const THEME_STORAGE_KEY = 'retirement-simulator-theme';
   let currentScenario = null;
   let currentProjection = null;
   let saveTimer = null;
   let view = 'income';
   const $ = selector => document.querySelector(selector);
+
+  function applyTheme(theme) {
+    const resolved = theme === 'light' ? 'light' : 'dark';
+    document.documentElement.dataset.theme = resolved;
+    const button = $('#themeToggle');
+    if (button) {
+      const light = resolved === 'light';
+      button.textContent = light ? 'Dark theme' : 'Light theme';
+      button.setAttribute('aria-label', light ? 'Switch to dark theme' : 'Switch to light theme');
+      button.setAttribute('aria-pressed', String(light));
+    }
+  }
+
+  function initialiseTheme() {
+    const saved = window.__safeStorage.getItem(THEME_STORAGE_KEY);
+    const preferred = window.matchMedia?.('(prefers-color-scheme: light)').matches
+      ? 'light' : 'dark';
+    applyTheme(saved || preferred);
+  }
   const chart = $('#chart');
   function buildIncomeSegments(scenario) {
     const people = scenario.people;
@@ -1855,7 +1923,8 @@
   async function fetchHoldingQuote(holding) {
     const results = { ...holding };
     const messages = [];
-    if (holding.quoteCurrency === 'USD') {
+    const quoteUrl = core.stooqQuoteUrl(holding);
+    if (quoteUrl) {
       try {
         const fxResponse = await fetch('https://api.frankfurter.app/latest?from=USD&to=AUD');
         if (!fxResponse.ok) throw new Error(`FX HTTP ${fxResponse.status}`);
@@ -1866,10 +1935,7 @@
         messages.push('FX unavailable; retained manual rate');
       }
       try {
-        const symbol = encodeURIComponent(holding.symbol.toLowerCase());
-        const response = await fetch(
-          `https://stooq.com/q/l/?s=${symbol}.us&f=sd2t2ohlcv&h&e=csv`
-        );
+        const response = await fetch(quoteUrl);
         if (!response.ok) throw new Error(`Quote HTTP ${response.status}`);
         const rows = (await response.text()).trim().split(/\r?\n/);
         const close = Number(rows[1]?.split(',')[6]);
@@ -1880,7 +1946,7 @@
         messages.push('Quote unavailable; retained manual price');
       }
     } else {
-      messages.push('AUD holding: retained manual price');
+      messages.push('Manual price retained; no market-data request made');
     }
     return { holding: results, messages };
   }
@@ -2623,6 +2689,12 @@
     }
   });
 
+  $('#themeToggle').addEventListener('click', () => {
+    const next = document.documentElement.dataset.theme === 'light' ? 'dark' : 'light';
+    applyTheme(next);
+    window.__safeStorage.setItem(THEME_STORAGE_KEY, next);
+  });
+
   $('#tabs').addEventListener('click', event => {
     if (!event.target.dataset.v) return;
     view = event.target.dataset.v;
@@ -2656,6 +2728,7 @@
   });
 
   renderSources();
+  initialiseTheme();
   renderScenario(loadScenario());
 })();
 </script>
@@ -3407,6 +3480,8 @@
   const stressPreviewChart = document.querySelector('#stressPreviewChart');
   const stressPreviewSummary = document.querySelector('#stressPreviewSummary');
   const importButton = document.querySelector('#importScenario');
+  const resetButton = document.querySelector('#resetSample');
+  const newButton = document.querySelector('#newScenario');
   const MODEL_BUDGET = 60000;
   const FAN_COLOURS = Object.freeze({
     outer: 'rgba(87,199,227,0.16)',
@@ -4341,6 +4416,23 @@
   }
 
   importButton?.addEventListener('click', () => scenarioFile.click());
+  resetButton?.addEventListener('click', event => {
+    event.stopImmediatePropagation();
+    scenario = simulator.makeSampleScenario();
+    scenarioMessage.textContent = `${scenario.scenarioName} · demo values loaded`;
+    runButton.disabled = false;
+    updateScenarioCallout();
+  }, true);
+  newButton?.addEventListener('click', event => {
+    event.stopImmediatePropagation();
+    scenario = simulator.makeSampleScenario();
+    scenario.scenarioName = 'Untitled household';
+    scenario.people[0].name = 'Person 1';
+    scenario.people[1].name = 'Person 2';
+    scenarioMessage.textContent = 'Untitled fictional scenario loaded.';
+    runButton.disabled = false;
+    updateScenarioCallout();
+  }, true);
   document.querySelector('#returnScenario').addEventListener('change', updateScenarioCallout);
   document.querySelector('#glidePath').addEventListener('change', updateScenarioCallout);
   document.querySelector('#glideChangeYear').addEventListener('input', updateScenarioCallout);

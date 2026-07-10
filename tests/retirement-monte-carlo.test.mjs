@@ -7,6 +7,30 @@ const html = await readFile(
   'utf8'
 );
 
+assert.match(
+  html,
+  /Content-Security-Policy[^>]+default-src 'none'/,
+  'Monte Carlo should declare a CSP'
+);
+assert.match(
+  html,
+  /connect-src https:\/\/api\.frankfurter\.app https:\/\/stooq\.com/,
+  'Monte Carlo CSP should allow only its declared quote and FX services'
+);
+assert.ok(
+  html.includes('Defined Benefit/UK Pensions'),
+  'Australian defined-benefit wording should lead the combined pension section'
+);
+assert.match(
+  html,
+  /id="exportScenario"[^>]*>Export JSON<\/button>\s*<button[^>]+id="themeToggle"/,
+  'Monte Carlo theme toggle should sit immediately after Export JSON'
+);
+assert.ok(
+  html.includes('retirement-simulator-theme'),
+  'Monte Carlo should share the locally persisted theme preference'
+);
+
 const scripts = [...html.matchAll(/<script[^>]*>([\s\S]*?)<\/script>/g)].map(
   match => match[1]
 );
@@ -21,6 +45,45 @@ const context = {
 context.globalThis = context;
 
 vm.createContext(context);
+const simulatorCoreScript = scripts.find(script =>
+  script.includes('globalThis.RetirementSimulatorCore =')
+);
+assert.ok(simulatorCoreScript, 'embedded deterministic core should exist');
+vm.runInContext(simulatorCoreScript, context);
+const simulator = context.RetirementSimulatorCore;
+const monteCarloDemo = simulator.makeSampleScenario();
+assert.equal(monteCarloDemo.people[0].name, 'John');
+assert.equal(monteCarloDemo.people[0].super, 220000);
+assert.equal(monteCarloDemo.people[1].name, 'Jane');
+assert.equal(monteCarloDemo.people[1].super, 165000);
+assert.equal(monteCarloDemo.household.targetAfterTax, 80000);
+assert.equal(monteCarloDemo.household.annualBudget, 70000);
+assert.equal(monteCarloDemo.assumptions.inflationMode, 'manual');
+assert.equal(monteCarloDemo.assumptions.manualInflationPct, 3);
+
+const v1Scenario = simulator.makeSampleScenario();
+v1Scenario.schemaVersion = 6;
+v1Scenario.otherIncomes = [];
+v1Scenario.otherAssets = [];
+v1Scenario.assumptions.ukPensionsEnabled = false;
+v1Scenario.people = v1Scenario.people.map(person => {
+  const { ukPrivateAmountGbp, ukPrivateTakeAge, ukPrivateType, ...rest } = person;
+  return rest;
+});
+const adaptedV1Scenario = simulator.importScenario(JSON.stringify(v1Scenario));
+assert.equal(adaptedV1Scenario.schemaVersion, 3,
+  'v1.00 schema should adapt to the experimental engine schema');
+assert.ok(adaptedV1Scenario.people.every(person => person.ukPrivateAmountGbp === 0),
+  'v1.00 adapter should install inert legacy pension fields');
+
+const unsupportedV1Scenario = structuredClone(v1Scenario);
+unsupportedV1Scenario.otherIncomes = [{ label: 'Rental', amount: 1000 }];
+assert.throws(
+  () => simulator.importScenario(JSON.stringify(unsupportedV1Scenario)),
+  /cannot yet model populated Other income or Other assets/,
+  'unsupported v1.00 cash flows should be rejected rather than silently omitted'
+);
+
 const monteCarloCoreScript = scripts.find(script =>
   script.includes('RetirementMonteCarloCore')
 );
@@ -29,6 +92,12 @@ vm.runInContext(monteCarloCoreScript, context);
 
 const core = context.RetirementMonteCarloCore;
 const plain = value => JSON.parse(JSON.stringify(value));
+
+assert.match(html, /effectiveYear:\s*2025/, 'Medicare data should be for 2025-26');
+assert.match(html, /ordinary:\s*\{ lower: 28011, upper: 35013 \}/,
+  'ordinary Medicare thresholds should be current');
+assert.match(html, /sapto:\s*\{ lower: 44268, upper: 55335 \}/,
+  'SAPTO Medicare thresholds should be current');
 
 assert.equal(
   typeof core.riskModePolicy,

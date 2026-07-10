@@ -11,6 +11,11 @@
     --text:#e6edf3; --muted:#9fb0c0; --accent:#4fc3f7; --accent2:#8bd450;
     --warn:#ffb454; --bad:#ff6b6b; --uk:#c77dff; --share:#ffd166; --pot:#5dcaa5;
   }
+  :root[data-theme="light"]{
+    --bg:#eef3f6; --panel:#ffffff; --panel2:#e7eef3; --line:#b9c8d3;
+    --text:#152330; --muted:#536a7b; --accent:#087da8; --accent2:#3f7d18;
+    --warn:#9a5a00; --bad:#b52929; --uk:#7542a3; --share:#8a6500; --pot:#16765b;
+  }
   *{box-sizing:border-box}
   /* v0.98c: author display rules (e.g. label{display:flex}) override the UA's
      [hidden]{display:none}, which left "hidden" rows visible. Restore hidden. */
@@ -52,6 +57,7 @@
   .scenario-actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:10px}
   .scenario-message,.privacy-note{margin:6px 0 0;color:var(--muted);font-size:11.5px}
   .scenario-message.error{color:var(--bad)} .scenario-message.success{color:var(--accent2)}
+  #themeToggle{min-width:92px}
   .section-heading{display:flex;align-items:center;justify-content:space-between;gap:10px}
   .section-heading h3{margin-bottom:0}
   .shareholding{border-top:1px solid var(--line);padding:7px 0}
@@ -64,6 +70,10 @@
   .assumptions{margin:12px 0;color:var(--muted);font-size:11.5px}
   .assumptions summary{cursor:pointer;color:var(--text)}
   .supporting-notes{margin-top:12px;border-top:1px solid var(--line);padding-top:2px}
+  .return-readout{margin:2px 0 7px;color:var(--muted);font-size:11px;text-align:right;font-variant-numeric:tabular-nums}
+  .return-readout .near-term{display:block;margin-top:1px}
+  .divergence-badge{display:inline-block;margin-left:4px;padding:1px 5px;border:1px solid color-mix(in srgb,var(--warn) 55%,transparent);border-radius:999px;background:color-mix(in srgb,var(--warn) 10%,transparent);color:var(--warn);font-size:10px;font-weight:700}
+  .inflation-summary{margin:7px 0 2px;padding-top:7px;border-top:1px solid var(--line)}
   .stage .assumptions{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
   .stage .assumptions summary{font-weight:600}
   .tabs{display:flex;gap:6px;margin-bottom:10px}
@@ -80,7 +90,7 @@
   .flag.bad{background:rgba(255,107,107,.08);border-color:rgba(255,107,107,.4)}
   .chart-shell{position:relative}
   canvas{width:100%;background:var(--panel);border:1px solid var(--line);border-radius:10px;margin-top:4px}
-  .chart-tooltip{position:absolute;z-index:5;display:grid;gap:2px;max-width:250px;padding:9px 11px;border:1px solid var(--line);border-radius:8px;background:#101923;color:var(--text);box-shadow:0 8px 24px rgba(0,0,0,.28);pointer-events:none;font-size:12px}
+  .chart-tooltip{position:absolute;z-index:5;display:grid;gap:2px;max-width:250px;padding:9px 11px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--text);box-shadow:0 8px 24px rgba(0,0,0,.28);pointer-events:none;font-size:12px}
   .chart-tooltip[hidden]{display:none}
   .legend{display:flex;gap:14px;flex-wrap:wrap;font-size:11.5px;color:var(--muted);margin:8px 2px}
   .legend i{display:inline-block;width:11px;height:11px;border-radius:2px;margin-right:5px;vertical-align:-1px}
@@ -140,10 +150,11 @@
     <button type="button" id="resetSample">Reset sample</button>
     <button type="button" id="importScenario">Import JSON</button>
     <button type="button" id="exportScenario">Export JSON</button>
+    <button type="button" id="themeToggle" aria-label="Switch to light theme" aria-pressed="false">Light theme</button>
     <input type="file" id="scenarioFile" accept=".json,application/json" hidden>
   </nav>
   <p id="scenarioMessage" class="scenario-message" aria-live="polite"></p>
-  <p class="privacy-note">Saved locally on this device. Local data is not encrypted or uploaded.</p>
+  <p class="privacy-note">Scenario data is saved locally and not uploaded. Optional US quote/FX fetches contact Stooq and Frankfurter.</p>
 </header>
 <div class="wrap">
   <div class="controls" id="controls">
@@ -153,27 +164,56 @@
         <input id="scenarioName" data-path="scenarioName">
       </label>
     </section>
+    <section class="group" id="returnAssumptions" aria-labelledby="returnAssumptionsHeading">
+      <h3 id="returnAssumptionsHeading">Returns &amp; inflation</h3>
+      <p class="sub">Estimated net returns after fees and tax. Real-return figures show the spread after inflation.</p>
+      <div id="returnFields" class="people-split"></div>
+      <div class="inflation-summary">
+        <label>
+          <span class="k">Inflation assumption</span>
+          <select id="inflationMode" data-path="assumptions.inflationMode">
+            <option value="treasury">Treasury schedule</option>
+            <option value="manual">Manual rate</option>
+          </select>
+        </label>
+        <label id="manualInflationRow" hidden>
+          <span class="k">Manual inflation %</span>
+          <input type="number" id="manualInflationPct" min="0" max="20" step="0.1"
+            data-value-type="number" data-path="assumptions.manualInflationPct">
+        </label>
+        <p class="sub" id="treasurySource">Treasury: 5.0% in calendar 2026, then 2.5% long-run.
+          <a href="https://budget.gov.au/content/bp1/index.htm" target="_blank" rel="noreferrer">Official source</a>.
+        </p>
+      </div>
+    </section>
     <section class="group">
       <h3>People</h3>
       <div id="peopleFields" class="people-split"></div>
     </section>
-    <section class="group pot">
-      <h3>Cash and savings</h3>
+    <details class="group pot" id="cashSavingsSection" open>
+      <summary class="group-toggle"><h3>Cash and savings</h3></summary>
       <div id="cashSavingsFields" class="people-split"></div>
-    </section>
-    <section class="group share" aria-labelledby="shareholdingsHeading">
+    </details>
+    <details class="group share" id="shareholdingsSection" aria-labelledby="shareholdingsHeading" open>
+      <summary class="group-toggle"><h3 id="shareholdingsHeading">Shareholdings</h3></summary>
       <div class="section-heading">
-        <h3 id="shareholdingsHeading">Shareholdings</h3>
+        <span class="sub">Manual prices or optional US market lookup</span>
         <button type="button" id="addShareholding">Add shareholding</button>
       </div>
       <div id="shareholdingList"></div>
-    </section>
-    <details class="group uk" id="ukPensionsSection">
-      <summary class="group-toggle"><h3 id="ukPensionsHeading">UK / defined-benefit pensions</h3></summary>
+    </details>
+    <details class="group uk" id="ukPensionsSection" open>
+      <summary class="group-toggle"><h3 id="ukPensionsHeading">Defined Benefit/UK Pensions</h3></summary>
       <label><span class="k">Include these pensions in the projection</span>
         <input type="checkbox" id="ukPensionsEnabled" data-path="assumptions.ukPensionsEnabled">
       </label>
-      <label><span class="k">GBP&rarr;AUD rate</span>
+      <label><span class="k">Pension type</span>
+        <select id="pensionType">
+          <option value="defined-benefit">Australian defined benefit</option>
+          <option value="uk-state">UK State Pension</option>
+        </select>
+      </label>
+      <label id="gbpAudRow"><span class="k">GBP&rarr;AUD rate</span>
         <input type="number" id="gbpAud" min="0" step="0.0001"
           data-value-type="number" data-path="assumptions.gbpAud">
       </label>
@@ -181,11 +221,15 @@
         <fieldset id="ukPerson0"></fieldset>
         <fieldset id="ukPerson1"></fieldset>
       </div>
-      <p class="sub">State Pension is annual lifetime income from the selected age. For an AUD defined-benefit pension (e.g. Defence/CSC): set the rate to 1.0, UPP % to 0 and indexation to CPI. Private pensions, annuities and lump sums now live under &ldquo;Other income &amp; assets&rdquo; below.</p>
+      <label id="uppRow"><span class="k">UK pension UPP deduction %</span>
+        <input type="number" min="0" max="100" step="0.1" data-value-type="number" data-path="assumptions.uppPct">
+      </label>
+      <p class="sub" id="pensionHelp">Australian defined benefits are entered in AUD and may be fixed or CPI-indexed. Switch to UK State Pension for GBP conversion, frozen-uprating comparison and UPP tax treatment.</p>
     </details>
-    <section class="group" aria-labelledby="otherHeading">
+    <details class="group" id="otherItemsSection" aria-labelledby="otherHeading" open>
+      <summary class="group-toggle"><h3 id="otherHeading">Other income &amp; assets</h3></summary>
       <div class="section-heading">
-        <h3 id="otherHeading">Other income &amp; assets</h3>
+        <span class="sub">Income streams and disposable assets</span>
       </div>
       <div class="scenario-actions">
         <button type="button" id="addOtherIncome">Add income</button>
@@ -194,28 +238,11 @@
       <div id="otherIncomeList"></div>
       <div id="otherAssetList"></div>
       <p class="sub">Income items are annual amounts, indexed to inflation. Taxable income is split 50/50 between the household for tax. Assets grow (or shrink) at their own rate and their value moves into the savings pot in the disposal year; they count toward the Age Pension assets test but are not deemed, and CGT on disposal is not modelled.</p>
-    </section>
-    <section class="group">
-      <h3>Household</h3>
+    </details>
+    <details class="group" id="householdSection" open>
+      <summary class="group-toggle"><h3>Household</h3></summary>
       <div id="householdFields"></div>
-      <label>
-        <span class="k">Inflation assumption</span>
-        <select id="inflationMode" data-path="assumptions.inflationMode">
-          <option value="treasury">Treasury forecast</option>
-          <option value="manual">Manual rate</option>
-        </select>
-      </label>
-      <label id="manualInflationRow" hidden>
-        <span class="k">Manual inflation %</span>
-        <input type="number" id="manualInflationPct" min="0" max="20" step="0.1"
-          data-value-type="number" data-path="assumptions.manualInflationPct">
-      </label>
-      <p class="sub" id="treasurySource">Treasury Budget 2026–27 forecast, published 12 May 2026:
-        5% through the year to June 2026 (Middle East oil shock), then 2.5% from 2026–27.
-        The model applies this as calendar 2026 = 5%, calendar 2027 onward = 2.5%.
-        <a href="https://budget.gov.au/content/bp1/index.htm" target="_blank" rel="noreferrer">Official source</a>.
-      </p>
-    </section>
+    </details>
     <ul id="validationSummary" class="validation-summary" aria-live="polite"></ul>
   </div>
   <div id="splitter" role="separator" aria-orientation="vertical" aria-label="Resize panels"></div>
@@ -265,6 +292,17 @@
             <li>Early super access is simplified, not full Transition-to-Retirement (TTR). There is no 10%-of-balance annual payment cap, no commutation restriction, and no automatic cessation rule. Tax treatment assumes the member is over 60, where TTR and full retirement-phase withdrawals are both tax-free; the model will misstate results for anyone under 60 drawing super while still working.</li>
           </ul>
         </div>
+      </details>
+      <details class="assumptions" id="fundingOrderSection">
+        <summary>How each projected year is funded, in order</summary>
+        <ul>
+          <li><strong>Guaranteed income first:</strong> salary, defined-benefit or UK pensions, and the Aust. Age Pension are counted before anything is drawn.</li>
+          <li><strong>ABP minimum drawdown:</strong> when enabled, the legislated minimum comes out of each account-based pension regardless of need.</li>
+          <li><strong>Configured drawdown tiers:</strong> any remaining gap up to the <em>Preferred Retirement Income</em> is filled tier by tier until the target is met or every tier is exhausted.</li>
+          <li><strong>Surplus is banked:</strong> income above the <em>Essential Annual Budget</em> moves to savings and earns taxable interest in later years.</li>
+          <li><strong>Shortfall:</strong> flagged only when every tier is exhausted and income remains below the Essential Annual Budget.</li>
+          <li>A two-source tier uses the chosen split while both sources remain available.</li>
+        </ul>
       </details>
       <details class="assumptions" id="methodologySection">
         <summary>How each year is calculated (step by step)</summary>
@@ -388,11 +426,11 @@
     url: 'https://www.ato.gov.au/tax-rates-and-codes/tax-rates-australian-residents'
   });
   const MEDICARE_BASE = Object.freeze({
-    effectiveYear: 2024,
-    checkedDate: '2026-07-06',
-    sourceUrl: 'https://www.ato.gov.au/myTax25MedicareLevy',
-    ordinary: { lower: 27222, upper: 34027 },
-    sapto: { lower: 43020, upper: 53775 }
+    effectiveYear: 2025,
+    checkedDate: '2026-07-10',
+    sourceUrl: 'https://iorder.com.au/publication/Download.aspx?ProdID=71050-6.2026',
+    ordinary: { lower: 28011, upper: 35013 },
+    sapto: { lower: 44268, upper: 55335 }
   });
   const SERVICES_AUSTRALIA_2026 = Object.freeze({
     effectiveDate: '2026-07-01',
@@ -417,6 +455,10 @@
       return assumptions.manualInflationPct / 100;
     }
     return TREASURY_INFLATION.rates[year] ?? TREASURY_INFLATION.longRunRate;
+  }
+
+  function realReturnPct(nominalPct, inflationPct) {
+    return Math.round((nominalPct - inflationPct) * 10) / 10;
   }
 
   function taxScheduleForYear(year) {
@@ -770,6 +812,7 @@
       symbol: '',
       quantity: 0,
       quoteCurrency: 'AUD',
+      quoteMarket: 'manual',
       price: 0,
       fxToAud: 1,
       owner: 'joint',
@@ -778,6 +821,15 @@
       saleYear: new Date().getFullYear() + 1,
       saleMonth: 1
     };
+  }
+
+  function stooqQuoteUrl(holding) {
+    const quoteMarket = holding.quoteMarket ??
+      (holding.quoteCurrency === 'USD' ? 'stooq-us' : 'manual');
+    if (quoteMarket !== 'stooq-us') return null;
+    const symbol = encodeURIComponent(String(holding.symbol ?? '').trim().toLowerCase());
+    if (!symbol) return null;
+    return `https://stooq.com/q/l/?s=${symbol}.us&f=sd2t2ohlcv&h&e=csv`;
   }
 
   function makeOtherIncome(index) {
@@ -1445,11 +1497,13 @@
     allocateOwnedAmount,
     discountedCapitalGainByPerson,
     makeShareholding,
+    stooqQuoteUrl,
     makeOtherIncome,
     makeOtherAsset,
     otherItemFx,
     ukPensionFlows,
     TREASURY_INFLATION,
+    realReturnPct,
     TAX_SCHEDULES,
     TAX_SOURCE,
     MEDICARE_BASE,
@@ -1487,6 +1541,7 @@
 
   const core = globalThis.RetirementSimulatorCore;
   const STORAGE_KEY = 'family-retirement-simulator:v1.00:scenario';
+  const THEME_STORAGE_KEY = 'retirement-simulator-theme';
   // Read-only fallbacks so scenarios saved under earlier versions carry over
   // on first load (they migrate to schema v6 automatically).
   const LEGACY_STORAGE_KEYS = [
@@ -1513,6 +1568,25 @@
     }
   }
   const $ = selector => document.querySelector(selector);
+
+  function applyTheme(theme) {
+    const resolved = theme === 'light' ? 'light' : 'dark';
+    document.documentElement.dataset.theme = resolved;
+    const button = $('#themeToggle');
+    if (button) {
+      const light = resolved === 'light';
+      button.textContent = light ? 'Dark theme' : 'Light theme';
+      button.setAttribute('aria-label', light ? 'Switch to dark theme' : 'Switch to light theme');
+      button.setAttribute('aria-pressed', String(light));
+    }
+  }
+
+  function initialiseTheme() {
+    const saved = window.__safeStorage.getItem(THEME_STORAGE_KEY);
+    const preferred = window.matchMedia?.('(prefers-color-scheme: light)').matches
+      ? 'light' : 'dark';
+    applyTheme(saved || preferred);
+  }
   const chart = $('#chart');
   // v0.98: gbpAud of exactly 1 means the amounts are already AUD (e.g. an
   // Australian defined-benefit pension), so the UK/GBP labelling is swapped out.
@@ -1639,8 +1713,6 @@
       ${numberField('Retire age', `${path}.retireAge`, person.retireAge, 'min="0" max="120"')}
       ${moneyField('Salary', `${path}.salary`, person.salary)}
       ${numberField('SG %', `${path}.sgPct`, person.sgPct, 'min="0" max="30" step="0.1"')}
-      ${numberField('Accumulation return %', `${path}.accumulationReturnPct`, person.accumulationReturnPct, 'min="-20" max="30" step="0.1"')}
-      ${numberField('Retirement return %', `${path}.retirementReturnPct`, person.retirementReturnPct, 'min="-20" max="30" step="0.1"')}
       ${numberField('Super access age', `${path}.superAccessAge`, person.superAccessAge, 'min="0" max="120"')}
       ${numberField('Super access %', `${path}.superAccessPct`, person.superAccessPct, 'min="0" max="100" step="1"')}
       <p class="sub">Age and % of super balance moved into drawdown phase. Independent of retire age &mdash; simplified early-access modelling, not full TTR (see Model assumptions).</p>
@@ -1649,6 +1721,60 @@
 
   function renderPeople(people) {
     $('#peopleFields').innerHTML = people.map(personFields).join('');
+  }
+
+  function signedPct(value) {
+    return `${value >= 0 ? '+' : ''}${value.toFixed(1)}%`;
+  }
+
+  function returnReadout(person, index, key, assumptions) {
+    const nominal = person[key];
+    const longRunInflation = core.TREASURY_INFLATION.longRunRate * 100;
+    const currentInflation = assumptions.inflationMode === 'manual'
+      ? assumptions.manualInflationPct
+      : (core.TREASURY_INFLATION.rates[currentScenario.startYear] ??
+        core.TREASURY_INFLATION.longRunRate) * 100;
+    const longRun = core.realReturnPct(nominal, longRunInflation);
+    const current = core.realReturnPct(nominal, currentInflation);
+    const diverges = assumptions.inflationMode === 'treasury' && currentInflation !== longRunInflation;
+    return `<p class="return-readout" id="returnReadout-${index}-${key}">
+      real: ${signedPct(longRun)} long-run
+      ${diverges ? `<span class="near-term">${signedPct(current)} in ${currentScenario.startYear}<span class="divergence-badge">near-term inflation</span></span>` : ''}
+    </p>`;
+  }
+
+  function returnFields(person, index, assumptions) {
+    const path = `people.${index}`;
+    return `<fieldset>
+      <legend>${escapeHtml(person.name)}</legend>
+      ${numberField('Accumulation return %', `${path}.accumulationReturnPct`, person.accumulationReturnPct, 'min="-20" max="30" step="0.1"')}
+      ${returnReadout(person, index, 'accumulationReturnPct', assumptions)}
+      ${numberField('Retirement return %', `${path}.retirementReturnPct`, person.retirementReturnPct, 'min="-20" max="30" step="0.1"')}
+      ${returnReadout(person, index, 'retirementReturnPct', assumptions)}
+    </fieldset>`;
+  }
+
+  function renderReturnAssumptions(scenario) {
+    $('#returnFields').innerHTML = scenario.people.map((person, index) =>
+      returnFields(person, index, scenario.assumptions)).join('');
+    $('#inflationMode').value = scenario.assumptions.inflationMode;
+    $('#manualInflationPct').value = scenario.assumptions.manualInflationPct;
+    $('#manualInflationRow').hidden = scenario.assumptions.inflationMode !== 'manual';
+    $('#manualInflationPct').disabled = scenario.assumptions.inflationMode !== 'manual';
+    $('#treasurySource').hidden = scenario.assumptions.inflationMode === 'manual';
+  }
+
+  function refreshReturnReadouts() {
+    if (!currentScenario) return;
+    currentScenario.people.forEach((person, index) => {
+      ['accumulationReturnPct', 'retirementReturnPct'].forEach(key => {
+        const existing = $(`#returnReadout-${index}-${key}`);
+        if (!existing) return;
+        const wrapper = document.createElement('div');
+        wrapper.innerHTML = returnReadout(person, index, key, currentScenario.assumptions);
+        existing.replaceWith(wrapper.firstElementChild);
+      });
+    });
   }
 
   function renderCashAndSavings(scenario) {
@@ -1669,11 +1795,19 @@
 
   function shareholdingFields(holding, index, people) {
     const path = `shareholdings.${index}`;
+    const quoteMarket = holding.quoteMarket ??
+      (holding.quoteCurrency === 'USD' ? 'stooq-us' : 'manual');
     return `
       <label><span class="k">Symbol</span>
         <input data-path="${path}.symbol" value="${escapeHtml(holding.symbol)}">
       </label>
       ${numberField('Quantity', `${path}.quantity`, holding.quantity, 'min="0" step="0.0001"')}
+      <label><span class="k">Price source</span>
+        <select class="quote-market" data-path="${path}.quoteMarket" data-index="${index}">
+          <option value="manual"${quoteMarket === 'manual' ? ' selected' : ''}>Manual price (AU/other)</option>
+          <option value="stooq-us"${quoteMarket === 'stooq-us' ? ' selected' : ''}>US market (Stooq)</option>
+        </select>
+      </label>
       <label><span class="k">Quote currency</span>
         <select data-path="${path}.quoteCurrency">
           <option value="AUD"${holding.quoteCurrency === 'AUD' ? ' selected' : ''}>AUD</option>
@@ -1698,9 +1832,9 @@
       <label><span class="k">Cost-base CSV</span>
         <input type="file" class="holding-csv" data-index="${index}" accept=".csv,text/csv">
       </label>
-      <button type="button" class="fetch-holding" data-index="${index}">
-        Fetch latest available close and FX
-      </button>`;
+      ${quoteMarket === 'stooq-us'
+        ? `<button type="button" class="fetch-holding" data-index="${index}">Fetch US close and USD/AUD FX</button>`
+        : '<p class="sub">Manual pricing makes no market-data network request.</p>'}`;
   }
 
   function renderShareholding(holding, index, people) {
@@ -1735,8 +1869,8 @@
       ${numberField(`${stateLabel} start age`, `${path}.ukStateStartAge`, person.ukStateStartAge, 'min="55" max="80"')}
       <label><span class="k">${escapeHtml(stateLabel)} indexation</span>
         <select data-path="${path}.ukStateIndexation">
-          <option value="frozen"${person.ukStateIndexation !== 'cpi' ? ' selected' : ''}>Frozen (AU resident, no uprating)</option>
-          <option value="cpi"${person.ukStateIndexation === 'cpi' ? ' selected' : ''}>CPI-indexed (comparison only)</option>
+          <option value="frozen"${person.ukStateIndexation !== 'cpi' ? ' selected' : ''}>${dbMode ? 'Fixed nominal amount' : 'Frozen (AU resident, no uprating)'}</option>
+          <option value="cpi"${person.ukStateIndexation === 'cpi' ? ' selected' : ''}>${dbMode ? 'CPI-indexed' : 'CPI-indexed (comparison only)'}</option>
         </select>
       </label>`;
   }
@@ -1745,7 +1879,11 @@
     const enabled = assumptions.ukPensionsEnabled !== false;
     const toggle = $('#ukPensionsEnabled');
     if (toggle) toggle.checked = enabled;
+    const dbMode = assumptions.gbpAud === 1;
+    $('#pensionType').value = dbMode ? 'defined-benefit' : 'uk-state';
     $('#gbpAud').value = assumptions.gbpAud;
+    $('#gbpAudRow').hidden = dbMode;
+    $('#uppRow').hidden = dbMode;
     $('#ukPerson0').innerHTML = ukPersonFields(people[0], 0, assumptions);
     $('#ukPerson1').innerHTML = ukPersonFields(people[1], 1, assumptions);
     // v0.98: dim the per-person inputs when the pensions are excluded so it is
@@ -1754,14 +1892,6 @@
     if (fields) {
       fields.style.opacity = enabled ? '' : '0.45';
       fields.style.pointerEvents = enabled ? '' : 'none';
-    }
-    // v0.97: collapsed by default; opens once per page load if the scenario
-    // uses it. Manual collapse is respected on later re-renders.
-    const section = $('#ukPensionsSection');
-    if (section && !renderUkPensions.autoOpened) {
-      renderUkPensions.autoOpened = true;
-      section.open = enabled && people.some(person =>
-        person.ukStateAnnualGbp > 0);
     }
   }
 
@@ -1873,16 +2003,7 @@
       ${drawdownPriority.map((tier, index) =>
         tierFields(tier, index, people, drawdownPriority.length)).join('')}
     </div>
-    <button type="button" id="addDrawdownTier">Add drawdown tier</button>
-    <p class="sub">How each projected year is funded, in order:</p>
-    <ul class="sub sub-list">
-      <li><strong>Guaranteed income first:</strong> salary, UK pensions and the Aust. Aged Pension are counted before anything is drawn.</li>
-      <li><strong>Priority 1, ABP minimum drawdown (when enforced):</strong> the legislated minimum comes out of each account-based pension regardless of need.</li>
-      <li><strong>Priority 2+, the tiers below, in order:</strong> any remaining gap up to the <em>Preferred Retirement Income</em> is filled tier by tier (e.g. Savings) until the target is met or every tier is exhausted. Preferred Retirement Income is the modelling lever: raise or lower it to see the effect on later-year assets.</li>
-      <li><strong>Surplus is banked:</strong> income above the Essential Annual Budget moves to the savings pot, where it earns taxable interest in later years.</li>
-      <li><strong>Shortfall:</strong> flagged only when every tier is exhausted and income still sits below the Essential Annual Budget.</li>
-      <li>A two-source tier splits its draw by the chosen %% while both sources remain available.</li>
-    </ul>`;
+    <button type="button" id="addDrawdownTier">Add drawdown tier</button>`;
   }
 
   function renderHousehold(household, assumptions, people) {
@@ -1899,16 +2020,8 @@
       <label><span class="k">Show illustrative survival band</span>
         <input type="checkbox" data-path="household.showSurvival"${household.showSurvival ? ' checked' : ''}>
       </label>
-      ${numberField('UK pension UPP deduction %', 'assumptions.uppPct', assumptions.uppPct, 'min="0" max="100" step="0.1"')}
       <h4>Drawdown order</h4>
       ${drawdownPriorityFields(household.drawdownPriority, people)}`;
-    $('#inflationMode').value = assumptions.inflationMode;
-    $('#manualInflationPct').value = assumptions.manualInflationPct;
-    $('#manualInflationRow').hidden = assumptions.inflationMode !== 'manual';
-    // Belt and braces alongside the [hidden] CSS fix: an ignored input must
-    // never be editable.
-    $('#manualInflationPct').disabled = assumptions.inflationMode !== 'manual';
-    $('#treasurySource').hidden = assumptions.inflationMode === 'manual';
   }
 
   function bindMoneyInputs() {
@@ -2019,7 +2132,8 @@
   async function fetchHoldingQuote(holding) {
     const results = { ...holding };
     const messages = [];
-    if (holding.quoteCurrency === 'USD') {
+    const quoteUrl = core.stooqQuoteUrl(holding);
+    if (quoteUrl) {
       try {
         const fxResponse = await fetch('https://api.frankfurter.app/latest?from=USD&to=AUD');
         if (!fxResponse.ok) throw new Error(`FX HTTP ${fxResponse.status}`);
@@ -2030,10 +2144,7 @@
         messages.push('FX unavailable; retained manual rate');
       }
       try {
-        const symbol = encodeURIComponent(holding.symbol.toLowerCase());
-        const response = await fetch(
-          `https://stooq.com/q/l/?s=${symbol}.us&f=sd2t2ohlcv&h&e=csv`
-        );
+        const response = await fetch(quoteUrl);
         if (!response.ok) throw new Error(`Quote HTTP ${response.status}`);
         const rows = (await response.text()).trim().split(/\r?\n/);
         const close = Number(rows[1]?.split(',')[6]);
@@ -2044,7 +2155,7 @@
         messages.push('Quote unavailable; retained manual price');
       }
     } else {
-      messages.push('AUD holding: retained manual price');
+      messages.push('Manual price retained; no market-data request made');
     }
     return { holding: results, messages };
   }
@@ -2571,6 +2682,7 @@
   function renderScenario(scenario) {
     currentScenario = structuredClone(scenario);
     $('#scenarioName').value = currentScenario.scenarioName;
+    renderReturnAssumptions(currentScenario);
     renderPeople(currentScenario.people);
     renderCashAndSavings(currentScenario);
     renderShareholdings(currentScenario.shareholdings, currentScenario.people);
@@ -2739,6 +2851,7 @@
       const value = Number(raw);
       if (raw === '' || !Number.isFinite(value)) return;
       currentScenario = setPathImmutable(currentScenario, path, value);
+      refreshReturnReadouts();
       const errors = core.validateScenario(currentScenario);
       showValidation(errors);
       if (errors.length) {
@@ -2752,6 +2865,27 @@
 
   $('#controls').addEventListener('change', event => {
     if (event.target.matches('.holding-csv')) return;
+    if (event.target.matches('#pensionType')) {
+      const dbMode = event.target.value === 'defined-benefit';
+      currentScenario = setPathImmutable(
+        currentScenario,
+        'assumptions.gbpAud',
+        dbMode ? 1 : (currentScenario.assumptions.gbpAud === 1 ? 1.95 : currentScenario.assumptions.gbpAud)
+      );
+      if (dbMode) {
+        currentScenario = setPathImmutable(currentScenario, 'assumptions.uppPct', 0);
+      }
+      currentScenario = {
+        ...currentScenario,
+        people: currentScenario.people.map(person => ({
+          ...person,
+          ukStateIndexation: dbMode ? 'cpi' : 'frozen'
+        }))
+      };
+      scheduleSave(currentScenario);
+      renderScenario(currentScenario);
+      return;
+    }
     if (event.target.dataset.saleIndex !== undefined) {
       const index = Number(event.target.dataset.saleIndex);
       const [saleYear, saleMonth] = event.target.value.split('-').map(Number);
@@ -2773,6 +2907,22 @@
         path,
         readControlValue(event.target)
       );
+    }
+    if (event.target.matches('.quote-market')) {
+      const index = Number(event.target.dataset.index);
+      const isUs = event.target.value === 'stooq-us';
+      currentScenario = setPathImmutable(
+        currentScenario,
+        `shareholdings.${index}.quoteCurrency`,
+        isUs ? 'USD' : currentScenario.shareholdings[index].quoteCurrency
+      );
+      if (isUs && currentScenario.shareholdings[index].fxToAud === 1) {
+        currentScenario = setPathImmutable(
+          currentScenario,
+          `shareholdings.${index}.fxToAud`,
+          1.5
+        );
+      }
     }
     // Changing an other-item currency resets its FX rate to a sensible default
     // (GBP follows the scenario GBP->AUD rate; AUD needs no conversion).
@@ -3010,6 +3160,13 @@
     }
   });
 
+  $('#themeToggle').addEventListener('click', () => {
+    const next = document.documentElement.dataset.theme === 'light' ? 'dark' : 'light';
+    applyTheme(next);
+    window.__safeStorage.setItem(THEME_STORAGE_KEY, next);
+    recalculateAndRender();
+  });
+
   $('#displayMode').addEventListener('change', event => {
     displayMode = event.target.value === 'nominal' ? 'nominal' : 'real';
     updateDollarNotes();
@@ -3090,6 +3247,7 @@
   })();
 
   renderSources();
+  initialiseTheme();
   renderScenario(loadScenario());
 })();
 </script>

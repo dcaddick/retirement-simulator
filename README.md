@@ -9,6 +9,10 @@ The repository contains two self-contained browser tools:
 
 > **Estimate only. Not financial, tax, legal or investment advice.** The models are simplified, assumptions become stale, and results are not predictions.
 
+![Retirement Income Simulator showing the fictional John and Jane sample, income chart and annual projection table](docs/assets/retirement-simulator-v1.00.png)
+
+*The deterministic simulator combines editable household assumptions with an inspectable income chart and year-by-year projection.*
+
 ## Why this exists
 
 This started as a tool for understanding one household's retirement choices. It is not a commercial product, a regulated calculator or a promise of universal suitability. It is published under an open-source licence so people can inspect it, adapt it, raise issues and propose improvements.
@@ -24,7 +28,7 @@ No server, account or build step is required.
 3. Start with the fictional sample, create a new scenario or import your own JSON file.
 4. Optionally export the scenario and import it into `retirement-monte-carlo.html`.
 
-Scenario data stays in the browser's local storage unless you explicitly import or export a file.
+Scenario data stays in the browser's local storage unless you explicitly import or export a file. Both pages include a locally remembered light/dark theme control.
 
 ## Retirement Simulator
 
@@ -35,12 +39,14 @@ The deterministic simulator models a reusable two-person household and includes:
 - flexible super-access timing and ordered drawdown tiers;
 - cash, savings, shareholdings, other income and other assets;
 - Australian income-tax estimates, Medicare, LITO/SAPTO, Age Pension and CSHC estimates;
-- UK State Pension support and currency conversion;
+- Australian defined-benefit and UK State Pension support;
 - account-based pension minimum drawdowns;
 - Preferred Retirement Income, Essential Annual Budget and surplus banking;
 - today's-dollar and nominal-dollar views;
 - year-by-year projection tables and inspectable charts;
 - local autosave plus JSON import and export.
+
+Return assumptions and inflation are shown together. The interface calculates the nominal-minus-inflation spread live, showing both the long-run 2.5% view and the near-term Treasury rate when they differ.
 
 The app favours transparent approximations over hidden precision. See [Model methodology](docs/MODEL-METHODOLOGY.md) for the calculation sequence and boundaries.
 
@@ -52,13 +58,19 @@ It does **not** calculate a dependable personal probability of retirement succes
 
 Use it as a sensitivity and comparison tool, not a forecast or recommendation.
 
+Monte Carlo v0.5 can import the standard v1.00 sample. Because its experimental engine does not yet reproduce every deterministic cash flow, it explicitly rejects imports containing populated Other income/Other assets or active Defined Benefit/UK Pension income instead of silently omitting them.
+
 ## Privacy
 
 - Core calculations run locally in the browser.
 - No account is required.
-- Scenario data is not uploaded by the core tools.
+- Scenario data is not uploaded by the core calculation tools.
 - Browser local storage is convenient but not encrypted.
 - Exported JSON files may contain highly sensitive financial information.
+- Share prices are manual by default. Choosing **US market (Stooq)** and pressing fetch sends the requested US ticker to Stooq and requests USD/AUD from Frankfurter.
+- Those optional requests expose ordinary network metadata, including the browser's IP address, to the relevant third party. Manual pricing makes no market-data request.
+
+The application CSP limits browser connections to `stooq.com` and `api.frankfurter.app`. It cannot control how those independent services process their request logs.
 
 Never commit a personal scenario to a public repository or attach one to a public issue. Reproduce bugs with fictional values. See [Security and privacy reporting](SECURITY.md).
 
@@ -71,7 +83,7 @@ node tests/retirement-simulator.test.mjs
 node tests/retirement-monte-carlo.test.mjs
 ```
 
-The suites exercise core calculations, schema migration, validation and model invariants. Browser behaviour and visual output still require a real-browser review. See [Testing](docs/TESTING.md).
+The suites exercise core calculations, schema migration, validation, CSP/market boundaries and model invariants. GitHub Actions runs both suites on every pull request and push to `main`. Browser behaviour and visual output still require a real-browser review. See [Testing](docs/TESTING.md).
 
 ## Project history
 
