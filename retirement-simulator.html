@@ -26,6 +26,7 @@
   header{padding:12px 22px;border-bottom:1px solid var(--line)}
   .header-row{display:flex;align-items:center;gap:18px}
   .header-actions{display:flex;gap:7px;flex-wrap:wrap;margin-left:auto;padding-left:18px;border-left:1px solid var(--line)}
+  .header-meta{max-width:620px;margin:-1px 0 0 auto;text-align:right}
   h1{margin:0;font-size:19px}
   .sub{color:var(--muted);font-size:12.5px;margin-top:3px}
   .wrap{display:grid;grid-template-columns:var(--left-w,24vw) 6px 1fr;min-height:calc(100vh - 62px)}
@@ -35,7 +36,6 @@
   .stage{padding:14px 18px;overflow-x:hidden}
   .group{margin-bottom:13px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
   .group h3{margin:0 0 8px;font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--accent)}
-  .group.uk h3{color:var(--uk)} .group.share h3{color:var(--share)} .group.pot h3{color:var(--pot)}
   summary.group-toggle{cursor:pointer;list-style:none;display:flex;align-items:center;gap:6px}
   summary.group-toggle::-webkit-details-marker{display:none}
   summary.group-toggle::before{content:'';width:7px;height:7px;border-right:2px solid var(--muted);border-bottom:2px solid var(--muted);transform:rotate(-45deg);transition:transform .15s ease;flex:0 0 auto;margin-top:-2px}
@@ -143,7 +143,7 @@
     .group{border-radius:8px}
     .shareholding summary{grid-template-columns:1fr auto}
   }
-  @media (max-width:760px){.header-row{align-items:flex-start;flex-wrap:wrap}.header-actions{margin-left:0;padding-left:0;border-left:0}}
+  @media (max-width:760px){.header-row{align-items:flex-start;flex-wrap:wrap}.header-actions{margin-left:0;padding-left:0;border-left:0}.header-meta{max-width:none;margin-top:5px;text-align:left}}
   @media (prefers-reduced-motion:reduce){
     *,*::before,*::after{scroll-behavior:auto!important;transition-duration:.01ms!important;animation-duration:.01ms!important}
   }
@@ -164,8 +164,10 @@
   </nav>
   </div>
   <div class="sub">A transparent two-person household projection. Working estimate, not financial advice.</div>
-  <p id="scenarioMessage" class="scenario-message" aria-live="polite"></p>
-  <p class="privacy-note">Scenario data is saved locally and not uploaded. Optional US quote/FX fetches contact Stooq and Frankfurter.</p>
+  <div class="header-meta">
+    <p id="scenarioMessage" class="scenario-message" aria-live="polite"></p>
+    <p class="privacy-note">Scenario data is saved locally and not uploaded. Optional US quote/FX fetches contact Stooq and Frankfurter.</p>
+  </div>
 </header>
 <div class="wrap">
   <div class="controls" id="controls">
@@ -179,6 +181,7 @@
       <summary class="group-toggle"><h3 id="returnAssumptionsHeading">Returns &amp; inflation</h3></summary>
       <div id="returnAssumptions" aria-labelledby="returnAssumptionsHeading">
       <p class="sub">Estimated net returns after fees and tax. Real-return figures show the spread after inflation.</p>
+      <p class="sub"><strong>Real return:</strong> Nominal return minus inflation. Changing the inflation assumption updates these figures.</p>
       <div id="returnFields" class="people-split"></div>
       <div class="inflation-summary">
         <label>
@@ -589,10 +592,11 @@
   }
 
   function makeSampleScenario() {
+    const startYear = new Date().getFullYear();
     return {
       schemaVersion: SCHEMA_VERSION,
       scenarioName: 'Sample household',
-      startYear: new Date().getFullYear(),
+      startYear,
       people: [
         {
           id: 'p0',
@@ -630,7 +634,10 @@
       cash: { amount: 25000, interestPct: 0, owner: 'joint' },
       savings: { amount: 60000, interestPct: 4.5, owner: 'p1' },
       shareholdings: [],
-      lumpSumWithdrawals: [],
+      lumpSumWithdrawals: [
+        { id: 'sample-lump-car', amount: 20000, reason: 'New car', year: startYear + 3, source: 'automatic' },
+        { id: 'sample-lump-holiday', amount: 50000, reason: 'European holiday', year: startYear + 5, source: 'automatic' }
+      ],
       otherIncomes: [],
       otherAssets: [],
       household: {
@@ -649,7 +656,7 @@
         showSurvival: true
       },
       assumptions: {
-        inflationMode: 'manual',
+        inflationMode: 'treasury',
         manualInflationPct: 3,
         gbpAud: 1,
         uppPct: 0,
@@ -2364,31 +2371,29 @@
 
   function drawSurvivalRibbon(ctx, rows, scenario, xScale, top) {
     if (!scenario.household.showSurvival) return;
-    const people = scenario.people.filter(person => String(person.name || '').trim());
+    const person = scenario.people[0];
     ctx.save();
-    ctx.font = '9px Segoe UI, sans-serif';
-    people.forEach((person, lane) => {
-      const y = top + lane * 16;
-      ctx.fillStyle = 'rgba(159,176,192,.14)';
-      const start = xScale(0), end = xScale(rows.length - 1);
-      ctx.fillRect(start, y, Math.max(1, end - start), 14);
-      ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--chart-label').trim() || '#9FB0C0';
-      ctx.textAlign = 'left'; ctx.fillText(person.name, start + 4, y + 10);
-      const milestones = core.survivalMilestones(person.age, person.age + rows.length - 1);
-      [0.8, 0.5, 0.2, 0.05].forEach(probability => {
-        if (!Number.isInteger(milestones[probability])) return;
-        const index = Math.max(0, milestones[probability] - person.age);
-        const xx = xScale(Math.min(rows.length - 1, index));
-        ctx.fillRect(xx, y + 2, 1, 12);
-        ctx.fillText(`${Math.round(probability * 100)}%`, xx + 2, y + 10);
-      });
+    const start = xScale(0), end = xScale(rows.length - 1);
+    ctx.fillStyle = 'rgba(235,238,240,.78)';
+    ctx.fillRect(start, top, Math.max(1, end - start), 22);
+    ctx.fillStyle = '#263746';
+    ctx.font = '10px Segoe UI, sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText('Chance of living to each age ▶', start + 8, top + 15);
+    const milestones = core.survivalMilestones(person.age, person.age + rows.length - 1);
+    [0.8, 0.5, 0.2, 0.05].forEach(probability => {
+      if (!Number.isInteger(milestones[probability])) return;
+      const xx = xScale(milestones[probability] - person.age);
+      ctx.fillRect(xx, top + 8, 1, 14);
+      ctx.textAlign = 'center';
+      ctx.fillText(`${Math.round(probability * 100)}%`, xx, top + 9);
     });
     ctx.restore();
   }
 
   function drawIncomeChart(rows, scenario) {
     const { ctx, width, height } = prepareChart();
-    const pads = { left: 54, right: 18, top: 18, bottom: scenario.household.showSurvival ? 70 : 34 };
+    const pads = { left: 54, right: 18, top: 18, bottom: scenario.household.showSurvival ? 58 : 34 };
     const plotWidth = width - pads.left - pads.right;
     const plotHeight = height - pads.top - pads.bottom;
     const endFactor = displayFactor(rows.at(-1));
@@ -2445,7 +2450,7 @@
           height: blockHeight, rowIndex, year: row.year, ages: row.ages,
           key: 'lumpSum', label: 'Lump sum withdrawal', value: lumpValue });
       }
-      if (rowIndex % 5 === 0 || rowIndex === rows.length - 1) {
+      if (row.ages[0] % 5 === 0) {
         ctx.fillStyle = '#9FB0C0';
         ctx.font = '10px Segoe UI, sans-serif';
         ctx.textAlign = 'center';
@@ -2494,7 +2499,7 @@
     ).join('') +
       `<span><i style="background:${TARGET_COLOUR}"></i>Preferred Retirement Income</span>` +
       `<span><i style="background:${BUDGET_COLOUR}"></i>Essential Annual Budget</span>`;
-    drawSurvivalRibbon(ctx, rows, scenario, x, height - 36);
+    drawSurvivalRibbon(ctx, rows, scenario, x, height - 27);
     chart.setAttribute(
       'aria-label',
       'Income funding sources chart. Salary and UK pensions form the base, then the chosen drawdown order. Use arrow keys to inspect chart segments.'
@@ -2517,7 +2522,7 @@
 
   function drawBalanceChart(rows, scenario) {
     const { ctx, width, height } = prepareChart();
-    const pads = { left: 54, right: 18, top: 18, bottom: scenario.household.showSurvival ? 70 : 42 };
+    const pads = { left: 54, right: 18, top: 18, bottom: scenario.household.showSurvival ? 58 : 42 };
     const plotWidth = width - pads.left - pads.right;
     const plotHeight = height - pads.top - pads.bottom;
     const maximum = Math.max(1, ...rows.map(row => row.totalAssets * displayFactor(row))) * 1.08;
@@ -2552,7 +2557,7 @@
       ctx.stroke();
     });
 
-    drawSurvivalRibbon(ctx, rows, scenario, x, height - 36);
+    drawSurvivalRibbon(ctx, rows, scenario, x, height - 27);
 
     drawBalanceEventMarkers(
       ctx,

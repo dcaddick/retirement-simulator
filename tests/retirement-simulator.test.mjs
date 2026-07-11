@@ -49,11 +49,15 @@ check('sample has UK pensions cleared and disabled',
   sample.people.every(p => p.ukStateAnnualGbp === 0) && sample.assumptions.ukPensionsEnabled === false);
 check('sample defaults to Australian defined benefit mode',
   sample.assumptions.gbpAud === 1 && sample.assumptions.uppPct === 0);
-check('sample starts with no lump sums', Array.isArray(sample.lumpSumWithdrawals) && sample.lumpSumWithdrawals.length === 0);
+check('sample includes two relative-year demo lump sums',
+  sample.lumpSumWithdrawals.length === 2 &&
+  sample.lumpSumWithdrawals[0].reason === 'New car' && sample.lumpSumWithdrawals[0].amount === 20000 && sample.lumpSumWithdrawals[0].year === sample.startYear + 3 &&
+  sample.lumpSumWithdrawals[1].reason === 'European holiday' && sample.lumpSumWithdrawals[1].amount === 50000 && sample.lumpSumWithdrawals[1].year === sample.startYear + 5 &&
+  sample.lumpSumWithdrawals.every(item => item.source === 'automatic'));
 check('sample distinguishes preferred income from essential budget',
   sample.household.targetAfterTax === 80000 && sample.household.annualBudget === 70000);
-check('sample uses the approved manual inflation default',
-  sample.assumptions.inflationMode === 'manual' && sample.assumptions.manualInflationPct === 3);
+check('sample uses the approved Treasury inflation default',
+  sample.assumptions.inflationMode === 'treasury');
 check('v1.00 terminology is rendered',
   html.includes('Preferred Retirement Income') && html.includes('Essential Annual Budget'));
 check('return assumptions are explained below the table',
@@ -92,6 +96,13 @@ check('Cash & Savings and lump sum editor are present',
   html.includes('Cash &amp; Savings') && html.includes('id="addLumpSum"'));
 check('chart-table splitter is persistent and accessible',
   html.includes('id="chartTableSplitter"') && html.includes('family-retirement-simulator:chart-height'));
+check('privacy copy sits in header meta beneath actions',
+  html.includes('class="header-meta"') && html.includes('class="privacy-note"'));
+check('all section headings use one accent colour',
+  !html.includes('.group.uk h3') && !html.includes('.group.share h3') && !html.includes('.group.pot h3'));
+check('real return meaning is explained', html.includes('Nominal return minus inflation'));
+check('single Mercer-style survival label is present', html.includes('Chance of living to each age'));
+check('age labels use conventional multiples of five', html.includes('row.ages[0] % 5 === 0'));
 
 console.log('\nreal-return readouts');
 check('real return uses nominal less inflation', core.realReturnPct(7, 2.5) === 4.5);
@@ -267,6 +278,7 @@ passed += 1;
 console.log('\nmigration v1 -> v7 (full chain)');
 const v1 = structuredClone(v5);
 v1.schemaVersion = 1;
+delete v1.lumpSumWithdrawals;
 delete v1.household.annualBudget;
 v1.people = v1.people.map(({ superAccessAge, superAccessPct, ukStateIndexation, ...rest }) => rest);
 delete v1.assumptions.ukPensionsEnabled;
