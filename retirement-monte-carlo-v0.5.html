@@ -710,9 +710,12 @@
   }
 
   function adaptV1ScenarioForExperimentalMonteCarlo(scenario) {
-    if (scenario.schemaVersion !== 6) return scenario;
+    if (![6, 7].includes(scenario.schemaVersion)) return scenario;
     if ((scenario.otherIncomes ?? []).length || (scenario.otherAssets ?? []).length) {
       throw new Error('Monte Carlo v0.5 cannot yet model populated Other income or Other assets. Remove them from a fictional copy before importing.');
+    }
+    if ((scenario.lumpSumWithdrawals ?? []).length) {
+      throw new Error('Monte Carlo v0.5 cannot yet model lump-sum withdrawals. Remove them from a fictional copy before importing.');
     }
     const hasPensionIncome = scenario.people?.some(person =>
       Number(person.ukStateAnnualGbp) > 0);
@@ -730,6 +733,7 @@
     }));
     delete adapted.otherIncomes;
     delete adapted.otherAssets;
+    delete adapted.lumpSumWithdrawals;
     return adapted;
   }
 

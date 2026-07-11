@@ -32,7 +32,7 @@ vm.runInContext(extract('simulator-core'), context, { filename: 'simulator-core.
 const core = context.RetirementSimulatorCore;
 
 console.log('\nschema + sample');
-check('schema version is 6', core.SCHEMA_VERSION === 6);
+check('schema version is 7', core.SCHEMA_VERSION === 7);
 const sample = core.makeSampleScenario();
 check('sample validates', core.validateScenario(sample).length === 0,
   JSON.stringify(core.validateScenario(sample)[0] ?? null));
@@ -40,13 +40,16 @@ check('sample has otherIncomes/otherAssets arrays',
   Array.isArray(sample.otherIncomes) && Array.isArray(sample.otherAssets));
 check('sample people have no ukPrivate fields',
   sample.people.every(p => !('ukPrivateAmountGbp' in p)));
-check('v1.00 fictional couple sample is installed',
+check('v1.01 fictional couple sample is installed',
   sample.people[0].name === 'John' && sample.people[0].age === 63 && sample.people[0].super === 220000 &&
   sample.people[1].name === 'Jane' && sample.people[1].age === 61 && sample.people[1].super === 165000);
 check('sample uses lower accumulation and higher retirement-phase net returns',
   sample.people.every(p => p.accumulationReturnPct === 5.5 && p.retirementReturnPct === 6.5));
 check('sample has UK pensions cleared and disabled',
   sample.people.every(p => p.ukStateAnnualGbp === 0) && sample.assumptions.ukPensionsEnabled === false);
+check('sample defaults to Australian defined benefit mode',
+  sample.assumptions.gbpAud === 1 && sample.assumptions.uppPct === 0);
+check('sample starts with no lump sums', Array.isArray(sample.lumpSumWithdrawals) && sample.lumpSumWithdrawals.length === 0);
 check('sample distinguishes preferred income from essential budget',
   sample.household.targetAfterTax === 80000 && sample.household.annualBudget === 70000);
 check('sample uses the approved manual inflation default',
@@ -59,9 +62,9 @@ check('return assumptions are explained below the table',
 check('assumptions and methodology moved out of the controls panel',
   html.indexOf('<summary>Model assumptions and sources</summary>') > html.indexOf('<div class="tblwrap">') &&
   html.indexOf('id="methodologySection"') > html.indexOf('<div class="tblwrap">'));
-check('v1.00 document version is consistent',
-  html.includes('<title>Family Retirement Income Simulator v1.00</title>') &&
-  html.includes('<span class="version">v1.00</span>'));
+check('v1.01 document version is consistent',
+  html.includes('<title>Family Retirement Income Simulator v1.01</title>') &&
+  html.includes('<span class="version">v1.01</span>'));
 check('returns and inflation share a dedicated upper controls block',
   html.indexOf('id="returnAssumptions"') < html.indexOf('id="peopleFields"') &&
   html.includes('Estimated net returns after fees and tax'));
@@ -76,10 +79,19 @@ check('theme toggle sits immediately after Export JSON',
 check('theme preference is locally persisted and accessible',
   html.includes('retirement-simulator-theme') &&
   html.includes('aria-pressed') && html.includes('aria-label'));
-check('all control sections after People use collapsible chevrons',
-  ['cashSavingsSection', 'shareholdingsSection', 'ukPensionsSection',
+check('every control section uses collapsible chevrons',
+  ['scenarioSection', 'returnsSection', 'peopleSection', 'cashSavingsSection',
+    'lumpSumSection', 'shareholdingsSection', 'ukPensionsSection',
     'otherItemsSection', 'householdSection'].every(id =>
-    new RegExp(`<details[^>]+id="${id}"[^>]*open`).test(html)));
+    new RegExp(`<details[^>]+id="${id}"`).test(html)));
+check('only the first three sections start open',
+  ['scenarioSection', 'returnsSection', 'peopleSection'].every(id =>
+    new RegExp(`<details[^>]+id="${id}"[^>]*open`).test(html)) &&
+  !/<details[^>]+id="cashSavingsSection"[^>]*open/.test(html));
+check('Cash & Savings and lump sum editor are present',
+  html.includes('Cash &amp; Savings') && html.includes('id="addLumpSum"'));
+check('chart-table splitter is persistent and accessible',
+  html.includes('id="chartTableSplitter"') && html.includes('family-retirement-simulator:chart-height'));
 
 console.log('\nreal-return readouts');
 check('real return uses nominal less inflation', core.realReturnPct(7, 2.5) === 4.5);
@@ -184,6 +196,35 @@ check('asset shrinks with negative growth',
   projShrink.rows[10].otherAssets < projShrink.rows[0].otherAssets);
 check('never NaN with negative growth', projShrink.rows.every(r => Number.isFinite(r.otherAssets)));
 
+console.log('\nlump-sum withdrawals');
+const withLump = structuredClone(sample);
+withLump.people.forEach(person => { person.salary = 0; person.super = 0; });
+withLump.cash.amount = 10000;
+withLump.savings.amount = 30000;
+withLump.household.targetAfterTax = 0;
+withLump.household.annualBudget = 0;
+withLump.lumpSumWithdrawals = [{ id: 'l1', amount: 25000, reason: 'New car', year: withLump.startYear, source: 'cash' }];
+const lumpRow = core.projectScenario(withLump).rows[0];
+check('lump sum is excluded from income', lumpRow.totalIncome === 0);
+check('explicit source falls back through household order',
+  lumpRow.lumpSumTotal === 25000 && lumpRow.lumpSumDraws.cash === 10000 && lumpRow.lumpSumDraws.savings === 15000,
+  JSON.stringify(lumpRow.lumpSumDraws));
+check('lump sum is recorded in Event data', lumpRow.events.some(event =>
+  event.type === 'lump-sum' && event.label.includes('New car') && event.label.includes('Cash') && event.label.includes('Savings')));
+const assetFunded = structuredClone(withLump);
+assetFunded.cash.amount = 0;
+assetFunded.savings.amount = 0;
+assetFunded.otherAssets = [{ id: 'car-fund', label: 'Investment property', currency: 'AUD', fxToAud: 1, amount: 40000, growthPct: 0, disposalYear: assetFunded.startYear + 10 }];
+assetFunded.lumpSumWithdrawals = [{ id: 'l2', amount: 25000, reason: 'Help kids', year: assetFunded.startYear, source: 'asset:car-fund' }];
+const assetFundedRow = core.projectScenario(assetFunded).rows[0];
+check('named asset can fund a lump sum', assetFundedRow.lumpSumTotal === 25000 &&
+  assetFundedRow.events.some(event => event.type === 'lump-sum' && event.label.includes('Investment property')),
+  JSON.stringify(assetFundedRow.events));
+check('survival milestones are ordered', (() => {
+  const m = core.survivalMilestones(63, 110);
+  return m[0.8] < m[0.5] && m[0.5] < m[0.2] && m[0.2] < m[0.05];
+})());
+
 console.log('\nvalidation rejects bad items');
 const badIncome = structuredClone(sample);
 badIncome.otherIncomes = [{ id: 'x', label: '', currency: 'EUR', fxToAud: 0, amount: -5, taxable: 'yes' }];
@@ -208,7 +249,7 @@ v5.people[1].ukPrivateAmountGbp = 20000;
 v5.people[1].ukPrivateTakeAge = 66;
 v5.people[1].ukPrivateType = 'lump';
 const migrated = core.migrateScenario(structuredClone(v5));
-check('migrates to v6', migrated.schemaVersion === 6);
+check('migrates to v7', migrated.schemaVersion === 7);
 check('annuity becomes other income', migrated.otherIncomes.length === 1 &&
   migrated.otherIncomes[0].amount === 5000 && migrated.otherIncomes[0].currency === 'GBP');
 check('lump becomes other asset with disposal year',
@@ -223,14 +264,15 @@ core.projectScenario(migrated);
 console.log('  ok   migrated scenario projects without error');
 passed += 1;
 
-console.log('\nmigration v1 -> v6 (full chain)');
+console.log('\nmigration v1 -> v7 (full chain)');
 const v1 = structuredClone(v5);
 v1.schemaVersion = 1;
 delete v1.household.annualBudget;
 v1.people = v1.people.map(({ superAccessAge, superAccessPct, ukStateIndexation, ...rest }) => rest);
 delete v1.assumptions.ukPensionsEnabled;
 const chained = core.migrateScenario(structuredClone(v1));
-check('v1 chains to v6', chained.schemaVersion === 6);
+check('v1 chains to v7', chained.schemaVersion === 7);
+check('migration adds empty lump sums', Array.isArray(chained.lumpSumWithdrawals) && chained.lumpSumWithdrawals.length === 0);
 check('chained validates', core.validateScenario(chained).length === 0,
   JSON.stringify(core.validateScenario(chained)[0] ?? null));
 

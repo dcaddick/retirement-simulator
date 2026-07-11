@@ -9,9 +9,19 @@ The repository contains two self-contained browser tools:
 
 > **Estimate only. Not financial, tax, legal or investment advice.** The models are simplified, assumptions become stale, and results are not predictions.
 
-![Retirement Income Simulator showing the fictional John and Jane sample, income chart and annual projection table](docs/assets/retirement-simulator-v1.00.png)
+![Retirement Income Simulator v1.01 showing the fictional John and Jane sample, planned lump sums, survival ribbon and annual projection table](docs/assets/retirement-simulator-v1.01.png)
 
-*The deterministic simulator combines editable household assumptions with an inspectable income chart and year-by-year projection.*
+*The deterministic v1.01 simulator combines editable household assumptions, planned lump-sum spending, inspectable charts and a year-by-year projection.*
+
+## Yours to download and use
+
+Download the HTML files, keep them locally, modify them and use them however the licence permits. There are no accounts, analytics, advertising pixels, trackers, telemetry or background callbacks. Scenario data stays in your browser's local storage.
+
+The only network requests are optional and user-triggered: a US share-price lookup through Stooq and a currency-rate lookup through Frankfurter. The simulator works without either service, and the interface tells you before those requests are used.
+
+## Inspiration
+
+The income-chart concept and survival-context treatment were inspired by the retirement income graphs in [SuperCalcs Retirement Income Simulator](https://supercalcs.com.au/ris9/mst/graphs). This project is an independent implementation with its own transparent assumptions and calculation model; it is not affiliated with or endorsed by SuperCalcs.
 
 ## Why this exists
 

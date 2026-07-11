@@ -4,27 +4,31 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src https://api.frankfurter.app https://stooq.com; base-uri 'none'; form-action 'none'" />
-<title>Family Retirement Income Simulator v1.00</title>
+<title>Family Retirement Income Simulator v1.01</title>
 <style>
   :root{
     --bg:#0f1720; --panel:#18232f; --panel2:#1e2c3a; --line:#2b3d4f;
     --text:#e6edf3; --muted:#9fb0c0; --accent:#4fc3f7; --accent2:#8bd450;
     --warn:#ffb454; --bad:#ff6b6b; --uk:#c77dff; --share:#ffd166; --pot:#5dcaa5;
+    --chart-work:#69c0e6;--chart-super-1:#58a6db;--chart-super-2:#55c79a;--chart-pension:#b995dc;--chart-pot:#a7b9ee;--chart-lump:#f0c571;--chart-grid:#2b3d4f;--chart-label:#9fb0c0;
   }
   :root[data-theme="light"]{
     --bg:#eef3f6; --panel:#ffffff; --panel2:#e7eef3; --line:#b9c8d3;
     --text:#152330; --muted:#536a7b; --accent:#087da8; --accent2:#3f7d18;
     --warn:#9a5a00; --bad:#b52929; --uk:#7542a3; --share:#8a6500; --pot:#16765b;
+    --chart-work:#08779f;--chart-super-1:#205f9c;--chart-super-2:#177252;--chart-pension:#704399;--chart-pot:#596eaa;--chart-lump:#9a5a00;--chart-grid:#c3d0d9;--chart-label:#40596b;
   }
   *{box-sizing:border-box}
   /* v0.98c: author display rules (e.g. label{display:flex}) override the UA's
      [hidden]{display:none}, which left "hidden" rows visible. Restore hidden. */
   [hidden]{display:none!important}
   body{margin:0;background:var(--bg);color:var(--text);font:14px/1.5 -apple-system,Segoe UI,Roboto,sans-serif}
-  header{padding:16px 22px;border-bottom:1px solid var(--line)}
+  header{padding:12px 22px;border-bottom:1px solid var(--line)}
+  .header-row{display:flex;align-items:center;gap:18px}
+  .header-actions{display:flex;gap:7px;flex-wrap:wrap;margin-left:auto;padding-left:18px;border-left:1px solid var(--line)}
   h1{margin:0;font-size:19px}
   .sub{color:var(--muted);font-size:12.5px;margin-top:3px}
-  .wrap{display:grid;grid-template-columns:var(--left-w,400px) 6px 1fr;min-height:calc(100vh - 62px)}
+  .wrap{display:grid;grid-template-columns:var(--left-w,24vw) 6px 1fr;min-height:calc(100vh - 62px)}
   #splitter{cursor:col-resize;background:var(--line);opacity:.6;transition:opacity .15s;touch-action:none}
   #splitter:hover,#splitter.dragging{opacity:1;background:var(--accent, #0B81A2)}
   .controls{padding:14px 16px;border-right:1px solid var(--line);overflow-y:auto;max-height:calc(100vh - 62px)}
@@ -61,7 +65,7 @@
   .section-heading{display:flex;align-items:center;justify-content:space-between;gap:10px}
   .section-heading h3{margin-bottom:0}
   .shareholding{border-top:1px solid var(--line);padding:7px 0}
-  .other-item{border-top:1px solid var(--line);padding:7px 0}
+  .other-item,.lump-item{border-top:1px solid var(--line);padding:7px 0}
   .other-item:first-child{border-top:0}
   .shareholding summary{display:grid;grid-template-columns:1fr auto auto auto;gap:8px;cursor:pointer;color:var(--muted);font-size:11.5px}
   .shareholding-fields{padding:8px 0 2px}
@@ -89,12 +93,14 @@
   .flag.warn{background:rgba(255,180,84,.08);border-color:rgba(255,180,84,.4)}
   .flag.bad{background:rgba(255,107,107,.08);border-color:rgba(255,107,107,.4)}
   .chart-shell{position:relative}
-  canvas{width:100%;background:var(--panel);border:1px solid var(--line);border-radius:10px;margin-top:4px}
+  canvas{width:100%;height:var(--chart-h,396px);background:var(--panel);border:1px solid var(--line);border-radius:10px;margin-top:4px}
   .chart-tooltip{position:absolute;z-index:5;display:grid;gap:2px;max-width:250px;padding:9px 11px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--text);box-shadow:0 8px 24px rgba(0,0,0,.28);pointer-events:none;font-size:12px}
   .chart-tooltip[hidden]{display:none}
   .legend{display:flex;gap:14px;flex-wrap:wrap;font-size:11.5px;color:var(--muted);margin:8px 2px}
   .legend i{display:inline-block;width:11px;height:11px;border-radius:2px;margin-right:5px;vertical-align:-1px}
-  .tblwrap{margin-top:14px;border:1px solid var(--line);border-radius:10px;overflow:auto;max-height:280px}
+  .chart-table-splitter{height:9px;margin:5px 0 1px;cursor:row-resize;border-radius:5px;background:linear-gradient(transparent 3px,var(--line) 3px,var(--line) 6px,transparent 6px);touch-action:none}
+  .chart-table-splitter:hover,.chart-table-splitter.dragging{background:linear-gradient(transparent 3px,var(--accent) 3px,var(--accent) 6px,transparent 6px)}
+  .tblwrap{margin-top:5px;border:1px solid var(--line);border-radius:10px;overflow:auto;max-height:224px}
   table{border-collapse:collapse;width:100%;font-size:11px;font-variant-numeric:tabular-nums}
   th,td{padding:4px 7px;text-align:right;white-space:nowrap;border-bottom:1px solid var(--line)}
   th{position:sticky;top:0;background:var(--panel2);color:var(--muted);font-weight:500;z-index:1}
@@ -128,6 +134,8 @@
     .people-split>fieldset+fieldset{border-left:0;border-top:1px solid var(--line);margin-top:12px;padding-top:12px}
     .kpis{grid-template-columns:repeat(2,minmax(0,1fr))}
     .tblwrap{max-width:100%;overflow-x:auto}
+    canvas{height:330px}
+    .chart-table-splitter{display:none}
   }
   @media (max-width:480px){
     .kpis{grid-template-columns:1fr}
@@ -135,6 +143,7 @@
     .group{border-radius:8px}
     .shareholding summary{grid-template-columns:1fr auto}
   }
+  @media (max-width:760px){.header-row{align-items:flex-start;flex-wrap:wrap}.header-actions{margin-left:0;padding-left:0;border-left:0}}
   @media (prefers-reduced-motion:reduce){
     *,*::before,*::after{scroll-behavior:auto!important;transition-duration:.01ms!important;animation-duration:.01ms!important}
   }
@@ -143,9 +152,9 @@
 <body>
 <div class="disclaimer-banner top" role="note">Local, reproducible retirement-risk analysis. Estimate only; not financial or tax advice.</div>
 <header>
-  <h1>Family Retirement Income Simulator <span class="version">v1.00</span></h1>
-  <div class="sub">A transparent two-person household projection. Working estimate, not financial advice.</div>
-  <nav class="scenario-actions" aria-label="Scenario actions">
+  <div class="header-row">
+  <h1>Family Retirement Income Simulator <span class="version">v1.01</span></h1>
+  <nav class="header-actions" aria-label="Scenario actions">
     <button type="button" id="newScenario">New</button>
     <button type="button" id="resetSample">Reset sample</button>
     <button type="button" id="importScenario">Import JSON</button>
@@ -153,19 +162,22 @@
     <button type="button" id="themeToggle" aria-label="Switch to light theme" aria-pressed="false">Light theme</button>
     <input type="file" id="scenarioFile" accept=".json,application/json" hidden>
   </nav>
+  </div>
+  <div class="sub">A transparent two-person household projection. Working estimate, not financial advice.</div>
   <p id="scenarioMessage" class="scenario-message" aria-live="polite"></p>
   <p class="privacy-note">Scenario data is saved locally and not uploaded. Optional US quote/FX fetches contact Stooq and Frankfurter.</p>
 </header>
 <div class="wrap">
   <div class="controls" id="controls">
-    <section class="group">
-      <h3>Scenario</h3>
+    <details class="group" id="scenarioSection" open>
+      <summary class="group-toggle"><h3>Scenario</h3></summary>
       <label><span class="k">Scenario name</span>
         <input id="scenarioName" data-path="scenarioName">
       </label>
-    </section>
-    <section class="group" id="returnAssumptions" aria-labelledby="returnAssumptionsHeading">
-      <h3 id="returnAssumptionsHeading">Returns &amp; inflation</h3>
+    </details>
+    <details class="group" id="returnsSection" open>
+      <summary class="group-toggle"><h3 id="returnAssumptionsHeading">Returns &amp; inflation</h3></summary>
+      <div id="returnAssumptions" aria-labelledby="returnAssumptionsHeading">
       <p class="sub">Estimated net returns after fees and tax. Real-return figures show the spread after inflation.</p>
       <div id="returnFields" class="people-split"></div>
       <div class="inflation-summary">
@@ -185,16 +197,22 @@
           <a href="https://budget.gov.au/content/bp1/index.htm" target="_blank" rel="noreferrer">Official source</a>.
         </p>
       </div>
-    </section>
-    <section class="group">
-      <h3>People</h3>
+      </div>
+    </details>
+    <details class="group" id="peopleSection" open>
+      <summary class="group-toggle"><h3>People</h3></summary>
       <div id="peopleFields" class="people-split"></div>
-    </section>
-    <details class="group pot" id="cashSavingsSection" open>
-      <summary class="group-toggle"><h3>Cash and savings</h3></summary>
+    </details>
+    <details class="group pot" id="cashSavingsSection">
+      <summary class="group-toggle"><h3>Cash &amp; Savings</h3></summary>
       <div id="cashSavingsFields" class="people-split"></div>
     </details>
-    <details class="group share" id="shareholdingsSection" aria-labelledby="shareholdingsHeading" open>
+    <details class="group" id="lumpSumSection">
+      <summary class="group-toggle"><h3>Lump Sum Withdrawals</h3></summary>
+      <div class="section-heading"><span class="sub">One-off spending that reduces assets, not income</span><button type="button" id="addLumpSum">Add withdrawal</button></div>
+      <div id="lumpSumList"></div>
+    </details>
+    <details class="group share" id="shareholdingsSection" aria-labelledby="shareholdingsHeading">
       <summary class="group-toggle"><h3 id="shareholdingsHeading">Shareholdings</h3></summary>
       <div class="section-heading">
         <span class="sub">Manual prices or optional US market lookup</span>
@@ -202,7 +220,7 @@
       </div>
       <div id="shareholdingList"></div>
     </details>
-    <details class="group uk" id="ukPensionsSection" open>
+    <details class="group uk" id="ukPensionsSection">
       <summary class="group-toggle"><h3 id="ukPensionsHeading">Defined Benefit/UK Pensions</h3></summary>
       <label><span class="k">Include these pensions in the projection</span>
         <input type="checkbox" id="ukPensionsEnabled" data-path="assumptions.ukPensionsEnabled">
@@ -226,7 +244,7 @@
       </label>
       <p class="sub" id="pensionHelp">Australian defined benefits are entered in AUD and may be fixed or CPI-indexed. Switch to UK State Pension for GBP conversion, frozen-uprating comparison and UPP tax treatment.</p>
     </details>
-    <details class="group" id="otherItemsSection" aria-labelledby="otherHeading" open>
+    <details class="group" id="otherItemsSection" aria-labelledby="otherHeading">
       <summary class="group-toggle"><h3 id="otherHeading">Other income &amp; assets</h3></summary>
       <div class="section-heading">
         <span class="sub">Income streams and disposable assets</span>
@@ -239,7 +257,7 @@
       <div id="otherAssetList"></div>
       <p class="sub">Income items are annual amounts, indexed to inflation. Taxable income is split 50/50 between the household for tax. Assets grow (or shrink) at their own rate and their value moves into the savings pot in the disposal year; they count toward the Age Pension assets test but are not deemed, and CGT on disposal is not modelled.</p>
     </details>
-    <details class="group" id="householdSection" open>
+    <details class="group" id="householdSection">
       <summary class="group-toggle"><h3>Household</h3></summary>
       <div id="householdFields"></div>
     </details>
@@ -261,6 +279,7 @@
     </div>
     <div class="legend" id="legend"></div>
     <p class="dollars-note" id="chartDollarsNote">Chart and headline figures in today&rsquo;s (2026) dollars. Income components are after tax.</p>
+    <div id="chartTableSplitter" class="chart-table-splitter" role="separator" aria-label="Resize chart and table" aria-orientation="horizontal" aria-valuemin="280" aria-valuemax="600" tabindex="0"></div>
     <div class="table-tools">
       <span class="dollars-note" id="tableDollarsNote">Table values in today&rsquo;s (2026) dollars.</span>
       <span class="dollars-note" id="recalcStamp" aria-live="polite"></span>
@@ -346,7 +365,7 @@
       </details>
     </div>
     <div class="note">
-      <b>v1.00.</b> Fictional Australian couple sample data is stored locally on this device and can be imported or exported as JSON. Calculations are transparent estimates and are not financial or tax advice. The Display toggle switches the whole dashboard &mdash; table, chart and headline figures &mdash; between today&rsquo;s dollars and nominal (future) dollars, except the CSHC estimate which stays in today&rsquo;s dollars against its fixed threshold. Numeric inputs recalculate live as you type; the &ldquo;Recalculated&rdquo; stamp above the table confirms each run. See &ldquo;How each year is calculated&rdquo; below the projection table for the exact maths.
+      <b>v1.01.</b> Fictional Australian couple sample data is stored locally on this device and can be imported or exported as JSON. Calculations are transparent estimates and are not financial or tax advice. The Display toggle switches the whole dashboard &mdash; table, chart and headline figures &mdash; between today&rsquo;s dollars and nominal (future) dollars, except the CSHC estimate which stays in today&rsquo;s dollars against its fixed threshold. Numeric inputs recalculate live as you type; the &ldquo;Recalculated&rdquo; stamp above the table confirms each run. See &ldquo;How each year is calculated&rdquo; below the projection table for the exact maths.
     </div>
   </div>
 </div>
@@ -401,7 +420,7 @@
 <script id="simulator-core">
 (function () {
   'use strict';
-  const SCHEMA_VERSION = 6;
+  const SCHEMA_VERSION = 7;
   const VALID_OWNERS = new Set(['p0', 'p1', 'joint']);
   const DRAWDOWN_SOURCES = new Set(['p0Super', 'p1Super', 'cash', 'savings']);
   const OTHER_CURRENCIES = new Set(['AUD', 'GBP', 'USD']);
@@ -611,6 +630,7 @@
       cash: { amount: 25000, interestPct: 0, owner: 'joint' },
       savings: { amount: 60000, interestPct: 4.5, owner: 'p1' },
       shareholdings: [],
+      lumpSumWithdrawals: [],
       otherIncomes: [],
       otherAssets: [],
       household: {
@@ -631,8 +651,8 @@
       assumptions: {
         inflationMode: 'manual',
         manualInflationPct: 3,
-        gbpAud: 1.95,
-        uppPct: 8,
+        gbpAud: 1,
+        uppPct: 0,
         ukPensionsEnabled: false
       }
     };
@@ -763,6 +783,14 @@
         return rest;
       });
       current = migrated;
+    }
+    if (current.schemaVersion === 6) {
+      current = {
+        ...current,
+        schemaVersion: 7,
+        lumpSumWithdrawals: Array.isArray(current.lumpSumWithdrawals)
+          ? current.lumpSumWithdrawals : []
+      };
     }
     if (current.schemaVersion !== SCHEMA_VERSION) {
       throw new Error(`Unsupported schema version: ${raw.schemaVersion}.`);
@@ -944,6 +972,54 @@
     return { drawsBySource, drawn: amount - remaining, remaining };
   }
 
+  function lumpSourceLabel(source, people) {
+    if (source.startsWith('named:')) return source.slice(6);
+    return ({ automatic: 'Automatic', cash: 'Cash', savings: 'Savings',
+      p0Super: `${people[0].name} super`, p1Super: `${people[1].name} super` })[source] || source;
+  }
+
+  function drawForLumpSum(state, tiers, amount, requestedSource) {
+    const liquid = DRAWDOWN_SOURCES.has(requestedSource) ? requestedSource : null;
+    const first = liquid ? [[{ source: liquid, weight: 1 }]] : [];
+    const fallback = tiers.map(tier =>
+      tier.filter(entry => !liquid || entry.source !== liquid)).filter(tier => tier.length);
+    return drawFromTiers(state, [...first, ...fallback], amount);
+  }
+
+  function sourceSummary(draws, people) {
+    return Object.entries(draws).filter(([, value]) => value > 0.005)
+      .map(([source]) => lumpSourceLabel(source, people)).join(' + ') || 'Unfunded';
+  }
+
+  function liquidateNamedSource(state, source, amount, inflationFactor) {
+    if (source.startsWith('share:')) {
+      const holding = state.holdings.find(item => item.id === source.slice(6));
+      if (!holding || holding.sold) return { drawn: 0, gains: [0, 0], event: null, label: 'Shareholding' };
+      const value = shareValueAud(holding);
+      const drawn = Math.min(amount, value);
+      const fraction = value > 0 ? drawn / value : 0;
+      const costBase = holding.costBaseAud * fraction;
+      const gain = Math.max(0, drawn - costBase) * (holding.cgtDiscountEligible ? 0.5 : 1);
+      holding.quantity *= 1 - fraction;
+      holding.costBaseAud -= costBase;
+      holding.sold = holding.quantity <= 1e-8;
+      return { drawn, gains: allocateOwnedAmount(gain, holding.owner), label: holding.symbol || 'Shareholding', event: {
+        type: 'share-sale', label: `${holding.symbol || 'Shareholding'} sold for ${formatMoney(drawn / inflationFactor)}`,
+        amount: drawn / inflationFactor, gain: gain / inflationFactor
+      } };
+    }
+    if (source.startsWith('asset:')) {
+      const asset = state.otherAssets.find(item => item.id === source.slice(6));
+      const drawn = Math.min(amount, asset?.sold ? 0 : asset?.value ?? 0);
+      if (asset) { asset.value -= drawn; asset.sold = asset.value <= 1e-8; }
+      return { drawn, gains: [0, 0], label: asset?.label || 'Asset', event: drawn > 0 ? {
+        type: 'asset-disposal', label: `${asset.label || 'Asset'} disposed for ${formatMoney(drawn / inflationFactor)}`,
+        amount: drawn / inflationFactor
+      } : null };
+    }
+    return { drawn: 0, gains: [0, 0], event: null, label: '' };
+  }
+
   function inflationFactors(scenario, rowCount) {
     const factors = [1];
     for (let index = 1; index < rowCount; index += 1) {
@@ -1102,6 +1178,34 @@
       }
       otherAssetsNominal += asset.value;
     });
+
+    const lumpSumDrawsNominal = { p0Super: 0, p1Super: 0, cash: 0, savings: 0 };
+    let lumpSumTotalNominal = 0;
+    (scenario.lumpSumWithdrawals ?? []).filter(item => item.year === year)
+      .forEach(withdrawal => {
+        const requestedNominal = withdrawal.amount * inflationFactor;
+        const named = liquidateNamedSource(state, withdrawal.source, requestedNominal, inflationFactor);
+        if (named.event) events.push(named.event);
+        discountedGainByPerson.forEach((_, index) => { discountedGainByPerson[index] += named.gains[index]; });
+        if (withdrawal.source.startsWith('asset:')) otherAssetsNominal = Math.max(0, otherAssetsNominal - named.drawn);
+        const result = drawForLumpSum(
+          state, scenario.household.drawdownPriority, requestedNominal - named.drawn,
+          DRAWDOWN_SOURCES.has(withdrawal.source) ? withdrawal.source : 'automatic');
+        const actualDraws = { ...result.drawsBySource };
+        if (named.drawn > 0) actualDraws[`named:${named.label}`] = named.drawn;
+        Object.keys(lumpSumDrawsNominal).forEach(source => {
+          lumpSumDrawsNominal[source] += result.drawsBySource[source];
+        });
+        lumpSumTotalNominal += result.drawn + named.drawn;
+        events.push({
+          type: 'lump-sum',
+          reason: withdrawal.reason,
+          requestedSource: withdrawal.source,
+          drawsBySource: actualDraws,
+          amount: (result.drawn + named.drawn) / inflationFactor,
+          label: `Lump sum - ${withdrawal.reason}: ${formatMoney((result.drawn + named.drawn) / inflationFactor)} (${sourceSummary(actualDraws, scenario.people)})`
+        });
+      });
 
     // Other income: annual amounts, CPI-indexed. Taxable items join assessable
     // income (split 50/50 between the household); non-taxable items are added
@@ -1305,6 +1409,9 @@
       savings: state.savings / inflationFactor,
       shares: unsoldShares / inflationFactor,
       otherAssets: otherAssetsNominal / inflationFactor,
+      lumpSumTotal: lumpSumTotalNominal / inflationFactor,
+      lumpSumDraws: Object.fromEntries(Object.entries(lumpSumDrawsNominal)
+        .map(([source, amount]) => [source, amount / inflationFactor])),
       events: [...events]
     };
   }
@@ -1480,12 +1587,45 @@
     if (!['treasury', 'manual'].includes(scenario.assumptions?.inflationMode)) {
       add('assumptions.inflationMode', 'Inflation mode must be Treasury or manual.');
     }
+    const horizonEnd = scenario.startYear + scenario.household.modelEndAge - scenario.people[0].age;
+    const validLumpSources = new Set(['automatic', ...DRAWDOWN_SOURCES,
+      ...scenario.shareholdings.map(item => `share:${item.id}`),
+      ...(scenario.otherAssets ?? []).map(item => `asset:${item.id}`)]);
+    if (!Array.isArray(scenario.lumpSumWithdrawals)) {
+      add('lumpSumWithdrawals', 'Lump-sum withdrawals must be a list.');
+    } else scenario.lumpSumWithdrawals.forEach((item, index) => {
+      const base = `lumpSumWithdrawals.${index}`;
+      if (!(Number.isFinite(item.amount) && item.amount > 0)) add(`${base}.amount`, 'Enter an amount greater than zero.');
+      if (!String(item.reason ?? '').trim()) add(`${base}.reason`, 'Enter a reason.');
+      if (!Number.isInteger(item.year) || item.year < scenario.startYear || item.year > horizonEnd) add(`${base}.year`, 'Choose a year inside the model horizon.');
+      if (!validLumpSources.has(item.source)) add(`${base}.source`, 'Choose a valid funding source.');
+    });
     return errors;
+  }
+
+  function survivalProbability(currentAge, age) {
+    const A = 5.55e-6, G = 0.11;
+    const hazard = value => (A / G) * Math.exp(G * value);
+    return age <= currentAge ? 1 : Math.exp(-(hazard(age) - hazard(currentAge)));
+  }
+
+  function survivalMilestones(currentAge, maxAge) {
+    return Object.fromEntries([0.8, 0.5, 0.2, 0.05].map(probability => {
+      for (let age = currentAge; age <= maxAge; age += 1) {
+        if (survivalProbability(currentAge, age) <= probability) return [probability, age];
+      }
+      return [probability, null];
+    }));
   }
 
   globalThis.RetirementSimulatorCore = { SCHEMA_VERSION };
   Object.assign(globalThis.RetirementSimulatorCore, {
     makeSampleScenario,
+    migrateScenario,
+    survivalProbability,
+    survivalMilestones,
+    lumpSourceLabel,
+    sourceSummary,
     validateScenario,
     parseMoney,
     formatMoney,
@@ -1540,7 +1680,7 @@
   'use strict';
 
   const core = globalThis.RetirementSimulatorCore;
-  const STORAGE_KEY = 'family-retirement-simulator:v1.00:scenario';
+  const STORAGE_KEY = 'family-retirement-simulator:v1.01:scenario';
   const THEME_STORAGE_KEY = 'retirement-simulator-theme';
   // Read-only fallbacks so scenarios saved under earlier versions carry over
   // on first load (they migrate to schema v6 automatically).
@@ -1601,19 +1741,21 @@
   }
   function buildIncomeSegments(scenario) {
     const people = scenario.people;
-    const base = [['workNet', '#C8C8C8', 'Work income']];
+    const styles = getComputedStyle(document.documentElement);
+    const colour = token => styles.getPropertyValue(token).trim();
+    const base = [['workNet', colour('--chart-work'), 'Work income']];
     if (ukPensionsIncluded(scenario)) {
       base.push(['ukStateNet', '#C99A45', statePensionLabel(scenario)]);
     }
-    base.push(['agePensionNet', '#7E4794', 'Aust. Aged Pension']);
+    base.push(['agePensionNet', colour('--chart-pension'), 'Aust. Aged Pension']);
     if ((scenario.otherIncomes ?? []).length) {
       base.push(['otherIncomeNet', '#E38A56', 'Other income']);
     }
     const sourceMeta = {
-      p0Super: ['person0Super', '#0B81A2', `${people[0].name} super drawdown`],
-      p1Super: ['person1Super', '#59A89C', `${people[1].name} super drawdown`],
-      savings: ['savingsDraw', '#7F8F98', 'Savings drawdown'],
-      cash: ['cashDraw', '#9FB0C0', 'Cash drawdown']
+      p0Super: ['person0Super', colour('--chart-super-1'), `${people[0].name} super drawdown`],
+      p1Super: ['person1Super', colour('--chart-super-2'), `${people[1].name} super drawdown`],
+      savings: ['savingsDraw', colour('--chart-pot'), 'Savings drawdown'],
+      cash: ['cashDraw', colour('--chart-label'), 'Cash drawdown']
     };
     const discretionary = [];
     scenario.household.drawdownPriority.forEach(tier => {
@@ -1791,6 +1933,28 @@
         ${numberField('Interest rate %', 'savings.interestPct', scenario.savings.interestPct, 'min="0" max="30" step="0.1"')}
         ${ownerField('Owner', 'savings.owner', scenario.savings.owner, scenario.people)}
       </fieldset>`;
+  }
+
+  function lumpSourceOptions(selected, scenario) {
+    const people = scenario.people;
+    return [
+      ['automatic', 'Automatic - household drawdown order'],
+      ['cash', 'Cash'], ['savings', 'Savings'],
+      ['p0Super', `${people[0].name} super`], ['p1Super', `${people[1].name} super`],
+      ...scenario.shareholdings.map(item => [`share:${item.id}`, item.symbol || 'Shareholding']),
+      ...(scenario.otherAssets ?? []).map(item => [`asset:${item.id}`, item.label || 'Other asset'])
+    ].map(([value, label]) => `<option value="${value}"${selected === value ? ' selected' : ''}>${escapeHtml(label)}</option>`).join('');
+  }
+
+  function renderLumpSums(scenario) {
+    $('#lumpSumList').innerHTML = (scenario.lumpSumWithdrawals ?? []).map((item, index) => `
+      <div class="lump-item">
+        ${moneyField('Amount', `lumpSumWithdrawals.${index}.amount`, item.amount)}
+        <label><span class="k">Reason</span><input data-path="lumpSumWithdrawals.${index}.reason" value="${escapeHtml(item.reason)}"></label>
+        ${numberField('Year', `lumpSumWithdrawals.${index}.year`, item.year, `min="${scenario.startYear}" max="${scenario.startYear + scenario.household.modelEndAge - scenario.people[0].age}" step="1"`)}
+        <label><span class="k">Fund from</span><select data-path="lumpSumWithdrawals.${index}.source">${lumpSourceOptions(item.source, scenario)}</select></label>
+        <button type="button" class="remove-lump-sum" data-index="${index}">Remove</button>
+      </div>`).join('') || '<p class="sub">No planned lump-sum withdrawals.</p>';
   }
 
   function shareholdingFields(holding, index, people) {
@@ -2169,7 +2333,7 @@
 
   function prepareChart() {
     const width = Math.max(320, chart.clientWidth || 900);
-    const height = 330;
+    const height = Math.max(330, chart.clientHeight || 396);
     const dpr = Math.max(1, window.devicePixelRatio || 1);
     chart.width = Math.round(width * dpr);
     chart.height = Math.round(height * dpr);
@@ -2198,19 +2362,44 @@
     }
   }
 
+  function drawSurvivalRibbon(ctx, rows, scenario, xScale, top) {
+    if (!scenario.household.showSurvival) return;
+    const people = scenario.people.filter(person => String(person.name || '').trim());
+    ctx.save();
+    ctx.font = '9px Segoe UI, sans-serif';
+    people.forEach((person, lane) => {
+      const y = top + lane * 16;
+      ctx.fillStyle = 'rgba(159,176,192,.14)';
+      const start = xScale(0), end = xScale(rows.length - 1);
+      ctx.fillRect(start, y, Math.max(1, end - start), 14);
+      ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--chart-label').trim() || '#9FB0C0';
+      ctx.textAlign = 'left'; ctx.fillText(person.name, start + 4, y + 10);
+      const milestones = core.survivalMilestones(person.age, person.age + rows.length - 1);
+      [0.8, 0.5, 0.2, 0.05].forEach(probability => {
+        if (!Number.isInteger(milestones[probability])) return;
+        const index = Math.max(0, milestones[probability] - person.age);
+        const xx = xScale(Math.min(rows.length - 1, index));
+        ctx.fillRect(xx, y + 2, 1, 12);
+        ctx.fillText(`${Math.round(probability * 100)}%`, xx + 2, y + 10);
+      });
+    });
+    ctx.restore();
+  }
+
   function drawIncomeChart(rows, scenario) {
     const { ctx, width, height } = prepareChart();
-    const pads = { left: 54, right: 18, top: 18, bottom: 34 };
+    const pads = { left: 54, right: 18, top: 18, bottom: scenario.household.showSurvival ? 70 : 34 };
     const plotWidth = width - pads.left - pads.right;
     const plotHeight = height - pads.top - pads.bottom;
     const endFactor = displayFactor(rows.at(-1));
     const maximum = Math.max(
       scenario.household.targetAfterTax * endFactor,
       (scenario.household.annualBudget ?? 0) * endFactor,
-      ...rows.map(row => row.totalIncome * displayFactor(row))
+      ...rows.map(row => (row.totalIncome + (row.lumpSumTotal || 0)) * displayFactor(row))
     ) * 1.12 || 1;
     chartState.balance = null;
     const step = plotWidth / Math.max(1, rows.length);
+    const x = index => pads.left + index * step + step / 2;
     const barWidth = Math.max(3, Math.min(24, step * 0.72));
     const y = value => height - pads.bottom - value / maximum * plotHeight;
     chartState.segments = [];
@@ -2244,6 +2433,18 @@
           value
         });
       });
+      const lumpGap = 10;
+      const lumpValue = Math.max(0, row.lumpSumTotal || 0) * factor;
+      if (lumpValue > 0) {
+        const blockHeight = Math.max(3, lumpValue / maximum * plotHeight);
+        const blockBottom = y(cumulative) - lumpGap;
+        const blockTop = blockBottom - blockHeight;
+        ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--chart-lump').trim();
+        ctx.fillRect(barX, blockTop, barWidth, blockHeight);
+        chartState.segments.push({ x: barX, y: blockTop, width: barWidth,
+          height: blockHeight, rowIndex, year: row.year, ages: row.ages,
+          key: 'lumpSum', label: 'Lump sum withdrawal', value: lumpValue });
+      }
       if (rowIndex % 5 === 0 || rowIndex === rows.length - 1) {
         ctx.fillStyle = '#9FB0C0';
         ctx.font = '10px Segoe UI, sans-serif';
@@ -2293,6 +2494,7 @@
     ).join('') +
       `<span><i style="background:${TARGET_COLOUR}"></i>Preferred Retirement Income</span>` +
       `<span><i style="background:${BUDGET_COLOUR}"></i>Essential Annual Budget</span>`;
+    drawSurvivalRibbon(ctx, rows, scenario, x, height - 36);
     chart.setAttribute(
       'aria-label',
       'Income funding sources chart. Salary and UK pensions form the base, then the chosen drawdown order. Use arrow keys to inspect chart segments.'
@@ -2315,7 +2517,7 @@
 
   function drawBalanceChart(rows, scenario) {
     const { ctx, width, height } = prepareChart();
-    const pads = { left: 54, right: 18, top: 18, bottom: 42 };
+    const pads = { left: 54, right: 18, top: 18, bottom: scenario.household.showSurvival ? 70 : 42 };
     const plotWidth = width - pads.left - pads.right;
     const plotHeight = height - pads.top - pads.bottom;
     const maximum = Math.max(1, ...rows.map(row => row.totalAssets * displayFactor(row))) * 1.08;
@@ -2350,18 +2552,7 @@
       ctx.stroke();
     });
 
-    if (scenario.household.showSurvival) {
-      const bandTop = height - 18;
-      const gradient = ctx.createLinearGradient(pads.left, 0, width - pads.right, 0);
-      gradient.addColorStop(0, 'rgba(200,200,200,.42)');
-      gradient.addColorStop(1, 'rgba(200,200,200,.04)');
-      ctx.fillStyle = gradient;
-      ctx.fillRect(pads.left, bandTop, plotWidth, 7);
-      ctx.fillStyle = '#9FB0C0';
-      ctx.font = '9px Segoe UI, sans-serif';
-      ctx.textAlign = 'left';
-      ctx.fillText('Illustrative chance Person 1 is alive', pads.left, height - 4);
-    }
+    drawSurvivalRibbon(ctx, rows, scenario, x, height - 36);
 
     drawBalanceEventMarkers(
       ctx,
@@ -2381,6 +2572,10 @@
     // segment.value is already display-adjusted (built in drawIncomeChart);
     // the row totals below need the same factor applied.
     const factor = displayFactor(row);
+    const lumpDetails = segment.key === 'lumpSum'
+      ? row.events.filter(event => event.type === 'lump-sum').map(event =>
+          `<span>${escapeHtml(event.reason)} · requested ${escapeHtml(core.lumpSourceLabel(event.requestedSource, currentScenario.people))} · actual ${escapeHtml(core.sourceSummary(event.drawsBySource, currentScenario.people))}</span>`).join('')
+      : '';
     tooltip.innerHTML = `
       <strong>${escapeHtml(segment.label)}</strong>
       <span>${row.year} · ages ${row.ages[0]} and ${row.ages[1]}</span>
@@ -2389,7 +2584,7 @@
       <span>Target: ${core.formatMoney(row.target * factor, 'AUD')}</span>
       <span>${row.shortfall > 1
         ? `Shortfall: ${core.formatMoney(row.shortfall * factor, 'AUD')}`
-        : 'Target met'}</span>`;
+        : 'Target met'}</span>${lumpDetails}`;
     tooltip.style.left = `${Math.min(point.x + 12, Math.max(8, chart.clientWidth - 260))}px`;
     tooltip.style.top = `${Math.max(8, point.y + 12)}px`;
     tooltip.hidden = false;
@@ -2685,6 +2880,7 @@
     renderReturnAssumptions(currentScenario);
     renderPeople(currentScenario.people);
     renderCashAndSavings(currentScenario);
+    renderLumpSums(currentScenario);
     renderShareholdings(currentScenario.shareholdings, currentScenario.people);
     renderUkPensions(currentScenario.people, currentScenario.assumptions);
     renderOtherItems(currentScenario);
@@ -2701,6 +2897,17 @@
         core.makeShareholding(scenario.shareholdings.length)
       ]
     };
+  }
+
+  function addLumpSum(scenario) {
+    return { ...scenario, lumpSumWithdrawals: [...(scenario.lumpSumWithdrawals ?? []), {
+      id: globalThis.crypto?.randomUUID?.() ?? `lump-${Date.now()}`,
+      amount: 0, reason: '', year: scenario.startYear, source: 'automatic'
+    }] };
+  }
+
+  function removeLumpSum(scenario, index) {
+    return { ...scenario, lumpSumWithdrawals: scenario.lumpSumWithdrawals.filter((_, i) => i !== index) };
   }
 
   function removeShareholding(scenario, index) {
@@ -2956,6 +3163,12 @@
     showValidation(core.validateScenario(currentScenario));
   });
 
+  $('#addLumpSum').addEventListener('click', () => {
+    currentScenario = addLumpSum(currentScenario);
+    renderScenario(currentScenario);
+    $('#lumpSumSection').open = true;
+  });
+
   $('#addOtherIncome').addEventListener('click', () => {
     currentScenario = {
       ...currentScenario,
@@ -2983,6 +3196,12 @@
   });
 
   $('#controls').addEventListener('click', event => {
+    const lumpButton = event.target.closest('.remove-lump-sum');
+    if (lumpButton) {
+      currentScenario = removeLumpSum(currentScenario, Number(lumpButton.dataset.index));
+      renderScenario(currentScenario);
+      return;
+    }
     const removeButton = event.target.closest('.remove-other');
     if (!removeButton) return;
     const kind = removeButton.dataset.kind;
@@ -3214,7 +3433,7 @@
     if (!splitter) return;
     const KEY = 'retirementSimSplitWidth';
     const saved = parseInt(window.__safeStorage.getItem(KEY), 10);
-    if (saved >= 280 && saved <= 720) {
+    if (saved >= 320 && saved <= window.innerWidth * .4) {
       document.documentElement.style.setProperty('--left-w', saved + 'px');
     }
     let dragging = false;
@@ -3227,7 +3446,7 @@
     });
     splitter.addEventListener('pointermove', event => {
       if (!dragging) return;
-      const width = Math.min(720, Math.max(280, Math.round(event.clientX)));
+      const width = Math.min(window.innerWidth * .4, Math.max(320, Math.round(event.clientX)));
       document.documentElement.style.setProperty('--left-w', width + 'px');
       clearTimeout(renderTimer);
       renderTimer = setTimeout(() => {
@@ -3244,6 +3463,42 @@
     };
     splitter.addEventListener('pointerup', stop);
     splitter.addEventListener('pointercancel', stop);
+  })();
+
+  (function initChartTableSplitter() {
+    const splitter = document.getElementById('chartTableSplitter');
+    if (!splitter) return;
+    const KEY = 'family-retirement-simulator:chart-height';
+    const DEFAULT = 396;
+    const clamp = value => Math.min(600, Math.max(280, Math.round(value)));
+    const apply = value => {
+      const height = clamp(value);
+      document.documentElement.style.setProperty('--chart-h', `${height}px`);
+      splitter.setAttribute('aria-valuenow', String(height));
+      window.__safeStorage.setItem(KEY, String(height));
+      if (currentProjection) renderDashboard(currentProjection, currentScenario);
+    };
+    const saved = Number(window.__safeStorage.getItem(KEY));
+    apply(Number.isFinite(saved) && saved ? saved : DEFAULT);
+    let dragging = false;
+    let originY = 0;
+    let originHeight = DEFAULT;
+    splitter.addEventListener('pointerdown', event => {
+      dragging = true; originY = event.clientY;
+      originHeight = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--chart-h'), 10) || DEFAULT;
+      splitter.classList.add('dragging'); splitter.setPointerCapture(event.pointerId); event.preventDefault();
+    });
+    splitter.addEventListener('pointermove', event => { if (dragging) apply(originHeight + event.clientY - originY); });
+    const stop = () => { dragging = false; splitter.classList.remove('dragging'); };
+    splitter.addEventListener('pointerup', stop); splitter.addEventListener('pointercancel', stop);
+    splitter.addEventListener('dblclick', () => apply(DEFAULT));
+    splitter.addEventListener('keydown', event => {
+      const current = parseInt(splitter.getAttribute('aria-valuenow'), 10) || DEFAULT;
+      if (event.key === 'Home') { event.preventDefault(); apply(DEFAULT); }
+      if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
+        event.preventDefault(); apply(current + (event.key === 'ArrowDown' ? 10 : -10));
+      }
+    });
   })();
 
   renderSources();

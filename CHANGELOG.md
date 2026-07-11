@@ -2,6 +2,17 @@
 
 This changelog summarizes public, non-personal milestones. Early development used many private prototype snapshots; those files are intentionally not reproduced in the public repository.
 
+## 1.01 - 2026-07-12
+
+- Added repeatable lump-sum withdrawals with amount, reason, year and funding-source priority.
+- Kept lump sums outside annual income while reducing assets and recording actual funding in the Event column and chart tooltip.
+- Added schema 7 migration so v1.00 scenarios continue to import.
+- Defaulted the combined pension editor to Australian Defined Benefit mode.
+- Renamed **Cash and savings** to **Cash & Savings** and made every control section independently collapsible.
+- Compacted the header, widened the default desktop controls panel and added a locally remembered chart/table splitter.
+- Added theme-aware chart colours, floating lump-sum blocks and shared one- or two-person illustrative survival ribbons.
+- Monte Carlo v0.5 continues to reject unsupported populated cash flows explicitly rather than silently omit them; follow progress in [issue #1](https://github.com/dcaddick/retirement-simulator/issues/1).
+
 ## 1.00 - 2026-07-10
 
 - Consolidated the project into one canonical public repository.

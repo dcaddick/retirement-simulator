@@ -21,6 +21,14 @@ Each projection row represents one year. At a high level the simulator:
 9. Flags a shortfall when available income and configured drawdown sources cannot cover the Essential Annual Budget.
 10. Converts nominal results to today's dollars when that display mode is selected.
 
+### Lump-sum withdrawals
+
+Lump-sum withdrawals are one-off spending for items such as a car, holiday or family assistance. They reduce the selected assets in the nominated year, do not count as retirement income and do not satisfy the annual income target. An explicit liquid source is used first; any remainder follows the household drawdown order. The Event column records the reason, amount and sources actually used.
+
+### Illustrative survival ribbon
+
+The chart ribbon uses an illustrative Gompertz curve (`A = 5.55e-6`, `G = 0.11`) to mark the ages at which each entered person's probability crosses 80%, 50%, 20% and 5%. It provides visual planning context only and is not a personalised actuarial estimate.
+
 The application contains a more detailed step-by-step explanation and shows the dated rates used by the active scenario.
 
 ## Main modelling areas
