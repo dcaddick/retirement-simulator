@@ -90,7 +90,7 @@ Add this v1.00 bullet:
 Run:
 
 ```powershell
-rg -n "retirement-monte-carlo\.html" .
+rg -n "retirement-monte-carlo\.html" . --glob '!docs/superpowers/**'
 ```
 
 Expected: no matches.

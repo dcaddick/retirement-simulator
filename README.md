@@ -26,7 +26,7 @@ No server, account or build step is required.
 1. Clone or download the repository.
 2. Open `retirement-simulator.html` in a modern browser.
 3. Start with the fictional sample, create a new scenario or import your own JSON file.
-4. Optionally export the scenario and import it into `retirement-monte-carlo.html`.
+4. Optionally export the scenario and import it into `retirement-monte-carlo-v0.5.html`.
 
 Scenario data stays in the browser's local storage unless you explicitly import or export a file. Both pages include a locally remembered light/dark theme control.
 

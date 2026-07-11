@@ -21,6 +21,7 @@ This changelog summarizes public, non-personal milestones. Early development use
 - Updated Medicare low-income thresholds for 2025–26, checked 10 July 2026.
 - Added CSP coverage to the experimental Monte Carlo page.
 - Added GitHub Actions enforcement for both regression suites.
+- Renamed the experimental companion entry point to `retirement-monte-carlo-v0.5.html` so its maturity cannot be confused with the deterministic v1.00 simulator.
 
 ## Deterministic simulator 0.99
 

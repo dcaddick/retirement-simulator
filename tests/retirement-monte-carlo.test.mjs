@@ -3,7 +3,7 @@ import { readFile } from 'node:fs/promises';
 import vm from 'node:vm';
 
 const html = await readFile(
-  new URL('../retirement-monte-carlo.html', import.meta.url),
+  new URL('../retirement-monte-carlo-v0.5.html', import.meta.url),
   'utf8'
 );
 
