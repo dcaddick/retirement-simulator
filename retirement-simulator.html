@@ -1993,7 +1993,10 @@
   }
 
   function renderLumpSums(scenario) {
-    $('#lumpSumList').innerHTML = (scenario.lumpSumWithdrawals ?? []).map((item, index) => `
+    const latestFirst = (scenario.lumpSumWithdrawals ?? [])
+      .map((item, index) => ({ item, index }))
+      .sort((a, b) => b.item.year - a.item.year || a.index - b.index);
+    $('#lumpSumList').innerHTML = latestFirst.map(({ item, index }) => `
       <div class="lump-item${item.enabled === false ? ' disabled' : ''}" data-lump-index="${index}">
         <div class="lump-grid">
           ${moneyField('Amount', `lumpSumWithdrawals.${index}.amount`, item.amount)}

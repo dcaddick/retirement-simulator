@@ -106,6 +106,8 @@ check('age labels use conventional multiples of five', html.includes('row.ages[0
 check('lump editor uses compact grid and enabled toggle',
   html.includes('class="lump-grid"') && html.includes('Intended Year') &&
   html.includes('Include &amp; calculate on chart'));
+check('lump editor displays latest intended year first',
+  html.includes('.sort((a, b) => b.item.year - a.item.year || a.index - b.index)'));
 check('table height splitter is accessible and persistent',
   html.includes('id="tableHeightSplitter"') &&
   html.includes('family-retirement-simulator:table-height'));

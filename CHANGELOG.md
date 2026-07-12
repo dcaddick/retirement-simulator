@@ -5,7 +5,7 @@ This changelog summarizes public, non-personal milestones. Early development use
 ## 1.02 - 2026-07-12
 
 - Reduced chart tooltips to the selected year, household ages, source and essential amount context.
-- Compacted each lump-sum editor into a 2x2 layout and added an **Include & calculate on chart** toggle so plans can be retained without affecting the model.
+- Compacted each lump-sum editor into a 2x2 layout, ordered entries from latest year backwards, and added an **Include & calculate on chart** toggle so plans can be retained without affecting the model.
 - Added an independently resizable, locally remembered projection-table height while keeping the chart height unchanged.
 - Preserved the active view, open sections, focus and panel/table scroll positions during live modelling changes.
 - Fixed the desktop controls panel height and widened its responsive layout for iPad portrait and landscape use.
