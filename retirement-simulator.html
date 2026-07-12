@@ -4,7 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src https://api.frankfurter.app https://stooq.com; base-uri 'none'; form-action 'none'" />
-<title>Family Retirement Income Simulator v1.01</title>
+<title>Family Retirement Income Simulator v1.02</title>
 <style>
   :root{
     --bg:#0f1720; --panel:#18232f; --panel2:#1e2c3a; --line:#2b3d4f;
@@ -22,18 +22,18 @@
   /* v0.98c: author display rules (e.g. label{display:flex}) override the UA's
      [hidden]{display:none}, which left "hidden" rows visible. Restore hidden. */
   [hidden]{display:none!important}
-  body{margin:0;background:var(--bg);color:var(--text);font:14px/1.5 -apple-system,Segoe UI,Roboto,sans-serif}
+  body{margin:0;min-height:100vh;min-height:100dvh;display:grid;grid-template-rows:auto auto minmax(0,1fr) auto;background:var(--bg);color:var(--text);font:14px/1.5 -apple-system,Segoe UI,Roboto,sans-serif}
   header{padding:12px 22px;border-bottom:1px solid var(--line)}
   .header-row{display:flex;align-items:center;gap:18px}
   .header-actions{display:flex;gap:7px;flex-wrap:wrap;margin-left:auto;padding-left:18px;border-left:1px solid var(--line)}
   .header-meta{max-width:620px;margin:-1px 0 0 auto;text-align:right}
   h1{margin:0;font-size:19px}
   .sub{color:var(--muted);font-size:12.5px;margin-top:3px}
-  .wrap{display:grid;grid-template-columns:var(--left-w,24vw) 6px 1fr;min-height:calc(100vh - 62px)}
+  .wrap{display:grid;grid-template-columns:var(--left-w,24vw) 6px 1fr;min-height:0;height:100%}
   #splitter{cursor:col-resize;background:var(--line);opacity:.6;transition:opacity .15s;touch-action:none}
   #splitter:hover,#splitter.dragging{opacity:1;background:var(--accent, #0B81A2)}
-  .controls{padding:14px 16px;border-right:1px solid var(--line);overflow-y:auto;max-height:calc(100vh - 62px)}
-  .stage{padding:14px 18px;overflow-x:hidden}
+  .controls{padding:14px 16px;border-right:1px solid var(--line);overflow-y:auto;min-height:0;height:100%;max-height:none}
+  .stage{padding:14px 18px;overflow-x:hidden;overflow-y:auto;min-height:0;height:100%}
   .group{margin-bottom:13px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
   .group h3{margin:0 0 8px;font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--accent)}
   summary.group-toggle{cursor:pointer;list-style:none;display:flex;align-items:center;gap:6px}
@@ -66,6 +66,12 @@
   .section-heading h3{margin-bottom:0}
   .shareholding{border-top:1px solid var(--line);padding:7px 0}
   .other-item,.lump-item{border-top:1px solid var(--line);padding:7px 0}
+  .lump-item.disabled{opacity:.58}
+  .lump-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px 12px}
+  .lump-grid label{display:grid;grid-template-columns:1fr;align-content:start;margin:0}
+  .lump-grid input:not([type=checkbox]),.lump-grid select{width:100%;min-width:0;text-align:left}
+  .lump-footer{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:8px}
+  .lump-footer label{justify-content:flex-start;margin:0}
   .other-item:first-child{border-top:0}
   .shareholding summary{display:grid;grid-template-columns:1fr auto auto auto;gap:8px;cursor:pointer;color:var(--muted);font-size:11.5px}
   .shareholding-fields{padding:8px 0 2px}
@@ -100,7 +106,9 @@
   .legend i{display:inline-block;width:11px;height:11px;border-radius:2px;margin-right:5px;vertical-align:-1px}
   .chart-table-splitter{height:9px;margin:5px 0 1px;cursor:row-resize;border-radius:5px;background:linear-gradient(transparent 3px,var(--line) 3px,var(--line) 6px,transparent 6px);touch-action:none}
   .chart-table-splitter:hover,.chart-table-splitter.dragging{background:linear-gradient(transparent 3px,var(--accent) 3px,var(--accent) 6px,transparent 6px)}
-  .tblwrap{margin-top:5px;border:1px solid var(--line);border-radius:10px;overflow:auto;max-height:224px}
+  .tblwrap{margin-top:5px;height:var(--table-h,320px);max-height:none;border:1px solid var(--line);border-radius:10px;overflow:auto}
+  .table-height-splitter{position:relative;height:12px;margin:1px 0 4px;cursor:row-resize;border-radius:6px;background:linear-gradient(transparent 4px,var(--line) 4px,var(--line) 7px,transparent 7px);touch-action:none}
+  .table-height-splitter:hover,.table-height-splitter.dragging{background:linear-gradient(transparent 4px,var(--accent) 4px,var(--accent) 7px,transparent 7px)}
   table{border-collapse:collapse;width:100%;font-size:11px;font-variant-numeric:tabular-nums}
   th,td{padding:4px 7px;text-align:right;white-space:nowrap;border-bottom:1px solid var(--line)}
   th{position:sticky;top:0;background:var(--panel2);color:var(--muted);font-weight:500;z-index:1}
@@ -115,35 +123,45 @@
   .assumptions ol{padding-left:18px}
   .assumptions ol li{margin-bottom:5px}
   .note b{color:var(--warn)}
-  .disclaimer-banner{background:rgba(255,107,107,.14);color:var(--bad);font-weight:700;text-align:center;padding:10px 18px;font-size:13.5px;letter-spacing:.01em;border:0}
+  .disclaimer-banner{background:rgba(255,107,107,.14);color:var(--bad);font-weight:700;text-align:center;padding:10px max(18px,env(safe-area-inset-right)) 10px max(18px,env(safe-area-inset-left));font-size:13.5px;letter-spacing:.01em;border:0}
+  .disclaimer-banner.top{padding-top:max(10px,env(safe-area-inset-top))}
+  .disclaimer-banner.bottom{padding-bottom:max(10px,env(safe-area-inset-bottom))}
   .disclaimer-banner.top{border-bottom:2px solid var(--bad)}
   .disclaimer-banner.bottom{border-top:2px solid var(--bad)}
   button:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visible,canvas:focus-visible{outline:2px solid #F0C571;outline-offset:2px}
   [aria-invalid="true"]{border-color:var(--bad)!important;box-shadow:0 0 0 1px var(--bad)}
   .field-error{color:var(--bad);font-size:11px}
-  @media (max-width:1000px){
-    .wrap{grid-template-columns:var(--left-w,340px) 6px minmax(0,1fr)}
+  @media (max-width:1200px){
+    .wrap{grid-template-columns:clamp(320px,var(--left-w,340px),38vw) 6px minmax(0,1fr)}
     .controls,.stage{padding:12px}
   }
   @media (max-width:800px){
+    body{display:block;min-height:100vh}
     .wrap{display:block}
     #splitter{display:none}
     .controls{max-height:none;overflow:visible;border-right:0;border-bottom:1px solid var(--line)}
-    .stage{overflow:visible}
+    .stage{height:auto;overflow:visible}
     .people-split,.two{grid-template-columns:1fr}
     .people-split>fieldset+fieldset{border-left:0;border-top:1px solid var(--line);margin-top:12px;padding-top:12px}
     .kpis{grid-template-columns:repeat(2,minmax(0,1fr))}
-    .tblwrap{max-width:100%;overflow-x:auto}
+    .tblwrap{height:auto;max-height:360px;max-width:100%;overflow:auto}
     canvas{height:330px}
-    .chart-table-splitter{display:none}
+    .chart-table-splitter,.table-height-splitter{display:none}
   }
   @media (max-width:480px){
     .kpis{grid-template-columns:1fr}
     header{padding:14px}
     .group{border-radius:8px}
     .shareholding summary{grid-template-columns:1fr auto}
+    .lump-grid{grid-template-columns:1fr}
   }
   @media (max-width:760px){.header-row{align-items:flex-start;flex-wrap:wrap}.header-actions{margin-left:0;padding-left:0;border-left:0}.header-meta{max-width:none;margin-top:5px;text-align:left}}
+  @media (pointer:coarse){
+    button{min-height:44px}
+    input:not([type=checkbox]):not([type=file]),select{min-height:44px;font-size:16px}
+    input[type=checkbox]{width:22px;height:22px}
+    .chart-table-splitter,.table-height-splitter{height:44px;background:linear-gradient(transparent 20px,var(--line) 20px,var(--line) 24px,transparent 24px)}
+  }
   @media (prefers-reduced-motion:reduce){
     *,*::before,*::after{scroll-behavior:auto!important;transition-duration:.01ms!important;animation-duration:.01ms!important}
   }
@@ -153,7 +171,7 @@
 <div class="disclaimer-banner top" role="note">Local, reproducible retirement-risk analysis. Estimate only; not financial or tax advice.</div>
 <header>
   <div class="header-row">
-  <h1>Family Retirement Income Simulator <span class="version">v1.01</span></h1>
+  <h1>Family Retirement Income Simulator <span class="version">v1.02</span></h1>
   <nav class="header-actions" aria-label="Scenario actions">
     <button type="button" id="newScenario">New</button>
     <button type="button" id="resetSample">Reset sample</button>
@@ -294,6 +312,7 @@
       </label>
     </div>
     <div class="tblwrap"><table id="tbl"></table></div>
+    <div id="tableHeightSplitter" class="table-height-splitter" role="separator" aria-label="Resize projection table" aria-orientation="horizontal" aria-valuemin="180" aria-valuemax="700" tabindex="0"></div>
     <div class="supporting-notes">
       <p class="note"><b>Return assumptions.</b> Accumulation and retirement-phase returns are estimated net returns after fees and tax. A higher retirement-phase return may represent the tax advantage of pension-phase earnings; it does not imply a different underlying investment portfolio.</p>
       <details class="assumptions">
@@ -368,7 +387,7 @@
       </details>
     </div>
     <div class="note">
-      <b>v1.01.</b> Fictional Australian couple sample data is stored locally on this device and can be imported or exported as JSON. Calculations are transparent estimates and are not financial or tax advice. The Display toggle switches the whole dashboard &mdash; table, chart and headline figures &mdash; between today&rsquo;s dollars and nominal (future) dollars, except the CSHC estimate which stays in today&rsquo;s dollars against its fixed threshold. Numeric inputs recalculate live as you type; the &ldquo;Recalculated&rdquo; stamp above the table confirms each run. See &ldquo;How each year is calculated&rdquo; below the projection table for the exact maths.
+      <b>v1.02.</b> Fictional Australian couple sample data is stored locally on this device and can be imported or exported as JSON. Calculations are transparent estimates and are not financial or tax advice. The Display toggle switches the whole dashboard &mdash; table, chart and headline figures &mdash; between today&rsquo;s dollars and nominal (future) dollars, except the CSHC estimate which stays in today&rsquo;s dollars against its fixed threshold. Numeric inputs recalculate live as you type without moving your modelling position; the &ldquo;Recalculated&rdquo; stamp above the table confirms each run.
     </div>
   </div>
 </div>
@@ -423,7 +442,7 @@
 <script id="simulator-core">
 (function () {
   'use strict';
-  const SCHEMA_VERSION = 7;
+  const SCHEMA_VERSION = 8;
   const VALID_OWNERS = new Set(['p0', 'p1', 'joint']);
   const DRAWDOWN_SOURCES = new Set(['p0Super', 'p1Super', 'cash', 'savings']);
   const OTHER_CURRENCIES = new Set(['AUD', 'GBP', 'USD']);
@@ -635,8 +654,8 @@
       savings: { amount: 60000, interestPct: 4.5, owner: 'p1' },
       shareholdings: [],
       lumpSumWithdrawals: [
-        { id: 'sample-lump-car', amount: 20000, reason: 'New car', year: startYear + 3, source: 'automatic' },
-        { id: 'sample-lump-holiday', amount: 50000, reason: 'European holiday', year: startYear + 5, source: 'automatic' }
+        { id: 'sample-lump-car', amount: 20000, reason: 'New car', year: startYear + 3, source: 'automatic', enabled: true },
+        { id: 'sample-lump-holiday', amount: 50000, reason: 'European holiday', year: startYear + 5, source: 'automatic', enabled: true }
       ],
       otherIncomes: [],
       otherAssets: [],
@@ -798,6 +817,12 @@
         lumpSumWithdrawals: Array.isArray(current.lumpSumWithdrawals)
           ? current.lumpSumWithdrawals : []
       };
+    }
+    if (current.schemaVersion === 7) {
+      current = { ...current, schemaVersion: 8,
+        lumpSumWithdrawals: (current.lumpSumWithdrawals ?? []).map(item => ({
+          ...item, enabled: item.enabled !== false
+        })) };
     }
     if (current.schemaVersion !== SCHEMA_VERSION) {
       throw new Error(`Unsupported schema version: ${raw.schemaVersion}.`);
@@ -1188,7 +1213,7 @@
 
     const lumpSumDrawsNominal = { p0Super: 0, p1Super: 0, cash: 0, savings: 0 };
     let lumpSumTotalNominal = 0;
-    (scenario.lumpSumWithdrawals ?? []).filter(item => item.year === year)
+    (scenario.lumpSumWithdrawals ?? []).filter(item => item.enabled !== false && item.year === year)
       .forEach(withdrawal => {
         const requestedNominal = withdrawal.amount * inflationFactor;
         const named = liquidateNamedSource(state, withdrawal.source, requestedNominal, inflationFactor);
@@ -1602,6 +1627,7 @@
       add('lumpSumWithdrawals', 'Lump-sum withdrawals must be a list.');
     } else scenario.lumpSumWithdrawals.forEach((item, index) => {
       const base = `lumpSumWithdrawals.${index}`;
+      if (item.enabled === false) return;
       if (!(Number.isFinite(item.amount) && item.amount > 0)) add(`${base}.amount`, 'Enter an amount greater than zero.');
       if (!String(item.reason ?? '').trim()) add(`${base}.reason`, 'Enter a reason.');
       if (!Number.isInteger(item.year) || item.year < scenario.startYear || item.year > horizonEnd) add(`${base}.year`, 'Choose a year inside the model horizon.');
@@ -1625,6 +1651,19 @@
     }));
   }
 
+  function chartTooltipLines(segment, row, scenario) {
+    const context = `${row.year} · ages ${row.ages[0]} and ${row.ages[1]}`;
+    if (segment.key === 'lumpSum') {
+      const detail = row.events.filter(event => event.type === 'lump-sum')
+        .map(event => `${formatMoney(event.amount)} for ${event.reason} from ${sourceSummary(event.drawsBySource, scenario.people)}`)
+        .join(' · ');
+      return [context, detail];
+    }
+    const factor = segment.displayFactor ?? 1;
+    return [context,
+      `${formatMoney(segment.value)} this year from ${segment.label}, contributing to total ${formatMoney(row.totalIncome * factor)}`];
+  }
+
   globalThis.RetirementSimulatorCore = { SCHEMA_VERSION };
   Object.assign(globalThis.RetirementSimulatorCore, {
     makeSampleScenario,
@@ -1633,6 +1672,7 @@
     survivalMilestones,
     lumpSourceLabel,
     sourceSummary,
+    chartTooltipLines,
     validateScenario,
     parseMoney,
     formatMoney,
@@ -1687,10 +1727,10 @@
   'use strict';
 
   const core = globalThis.RetirementSimulatorCore;
-  const STORAGE_KEY = 'family-retirement-simulator:v1.01:scenario';
+  const STORAGE_KEY = 'family-retirement-simulator:v1.02:scenario';
   const THEME_STORAGE_KEY = 'retirement-simulator-theme';
   // Read-only fallbacks so scenarios saved under earlier versions carry over
-  // on first load (they migrate to schema v6 automatically).
+  // on first load (they migrate to the current schema automatically).
   const LEGACY_STORAGE_KEYS = [
     'family-retirement-simulator:v0.99:scenario',
     'family-retirement-simulator:v0.98:scenario',
@@ -1698,6 +1738,7 @@
   ];
   let currentScenario = null;
   let currentProjection = null;
+  let pendingUiContext = null;
   let saveTimer = null;
   let view = 'income';
   // v0.99: display mode applies to the whole dashboard - table, charts, and
@@ -1730,9 +1771,7 @@
 
   function initialiseTheme() {
     const saved = window.__safeStorage.getItem(THEME_STORAGE_KEY);
-    const preferred = window.matchMedia?.('(prefers-color-scheme: light)').matches
-      ? 'light' : 'dark';
-    applyTheme(saved || preferred);
+    applyTheme(saved || 'dark');
   }
   const chart = $('#chart');
   // v0.98: gbpAud of exactly 1 means the amounts are already AUD (e.g. an
@@ -1955,12 +1994,17 @@
 
   function renderLumpSums(scenario) {
     $('#lumpSumList').innerHTML = (scenario.lumpSumWithdrawals ?? []).map((item, index) => `
-      <div class="lump-item">
-        ${moneyField('Amount', `lumpSumWithdrawals.${index}.amount`, item.amount)}
-        <label><span class="k">Reason</span><input data-path="lumpSumWithdrawals.${index}.reason" value="${escapeHtml(item.reason)}"></label>
-        ${numberField('Year', `lumpSumWithdrawals.${index}.year`, item.year, `min="${scenario.startYear}" max="${scenario.startYear + scenario.household.modelEndAge - scenario.people[0].age}" step="1"`)}
-        <label><span class="k">Fund from</span><select data-path="lumpSumWithdrawals.${index}.source">${lumpSourceOptions(item.source, scenario)}</select></label>
-        <button type="button" class="remove-lump-sum" data-index="${index}">Remove</button>
+      <div class="lump-item${item.enabled === false ? ' disabled' : ''}" data-lump-index="${index}">
+        <div class="lump-grid">
+          ${moneyField('Amount', `lumpSumWithdrawals.${index}.amount`, item.amount)}
+          <label><span class="k">Reason</span><input data-path="lumpSumWithdrawals.${index}.reason" value="${escapeHtml(item.reason)}"></label>
+          ${numberField('Intended Year', `lumpSumWithdrawals.${index}.year`, item.year, `min="${scenario.startYear}" max="${scenario.startYear + scenario.household.modelEndAge - scenario.people[0].age}" step="1"`)}
+          <label><span class="k">Fund from</span><select data-path="lumpSumWithdrawals.${index}.source">${lumpSourceOptions(item.source, scenario)}</select></label>
+        </div>
+        <div class="lump-footer">
+          <label><input type="checkbox" data-path="lumpSumWithdrawals.${index}.enabled"${item.enabled !== false ? ' checked' : ''}><span class="k">Include &amp; calculate on chart</span></label>
+          <button type="button" class="remove-lump-sum" data-index="${index}">Remove</button>
+        </div>
       </div>`).join('') || '<p class="sub">No planned lump-sum withdrawals.</p>';
   }
 
@@ -2369,13 +2413,24 @@
     }
   }
 
+  function roundedRectPath(ctx, x, y, width, height, radius) {
+    const r = Math.min(radius, width / 2, height / 2);
+    ctx.beginPath(); ctx.moveTo(x + r, y); ctx.lineTo(x + width - r, y);
+    ctx.quadraticCurveTo(x + width, y, x + width, y + r);
+    ctx.lineTo(x + width, y + height - r);
+    ctx.quadraticCurveTo(x + width, y + height, x + width - r, y + height);
+    ctx.lineTo(x + r, y + height); ctx.quadraticCurveTo(x, y + height, x, y + height - r);
+    ctx.lineTo(x, y + r); ctx.quadraticCurveTo(x, y, x + r, y); ctx.closePath();
+  }
+
   function drawSurvivalRibbon(ctx, rows, scenario, xScale, top) {
     if (!scenario.household.showSurvival) return;
     const person = scenario.people[0];
     ctx.save();
     const start = xScale(0), end = xScale(rows.length - 1);
     ctx.fillStyle = 'rgba(235,238,240,.78)';
-    ctx.fillRect(start, top, Math.max(1, end - start), 22);
+    roundedRectPath(ctx, start, top, Math.max(1, end - start), 22, 6);
+    ctx.fill();
     ctx.fillStyle = '#263746';
     ctx.font = '10px Segoe UI, sans-serif';
     ctx.textAlign = 'left';
@@ -2385,8 +2440,10 @@
       if (!Number.isInteger(milestones[probability])) return;
       const xx = xScale(milestones[probability] - person.age);
       ctx.fillRect(xx, top + 8, 1, 14);
-      ctx.textAlign = 'center';
-      ctx.fillText(`${Math.round(probability * 100)}%`, xx, top + 9);
+      const nearStart = xx - start < 18;
+      const nearEnd = end - xx < 18;
+      ctx.textAlign = nearStart ? 'left' : nearEnd ? 'right' : 'center';
+      ctx.fillText(`${Math.round(probability * 100)}%`, xx + (nearStart ? 3 : nearEnd ? -3 : 0), top + 9);
     });
     ctx.restore();
   }
@@ -2435,7 +2492,8 @@
           ages: row.ages,
           key,
           label,
-          value
+          value,
+          displayFactor: factor
         });
       });
       const lumpGap = 10;
@@ -2448,7 +2506,7 @@
         ctx.fillRect(barX, blockTop, barWidth, blockHeight);
         chartState.segments.push({ x: barX, y: blockTop, width: barWidth,
           height: blockHeight, rowIndex, year: row.year, ages: row.ages,
-          key: 'lumpSum', label: 'Lump sum withdrawal', value: lumpValue });
+          key: 'lumpSum', label: 'Lump sum withdrawal', value: lumpValue, displayFactor: factor });
       }
       if (row.ages[0] % 5 === 0) {
         ctx.fillStyle = '#9FB0C0';
@@ -2574,22 +2632,8 @@
 
   function showChartTooltip(segment, row, point) {
     const tooltip = $('#chartTooltip');
-    // segment.value is already display-adjusted (built in drawIncomeChart);
-    // the row totals below need the same factor applied.
-    const factor = displayFactor(row);
-    const lumpDetails = segment.key === 'lumpSum'
-      ? row.events.filter(event => event.type === 'lump-sum').map(event =>
-          `<span>${escapeHtml(event.reason)} · requested ${escapeHtml(core.lumpSourceLabel(event.requestedSource, currentScenario.people))} · actual ${escapeHtml(core.sourceSummary(event.drawsBySource, currentScenario.people))}</span>`).join('')
-      : '';
-    tooltip.innerHTML = `
-      <strong>${escapeHtml(segment.label)}</strong>
-      <span>${row.year} · ages ${row.ages[0]} and ${row.ages[1]}</span>
-      <span>${core.formatMoney(segment.value, 'AUD')} per year</span>
-      <span>Total: ${core.formatMoney(row.totalIncome * factor, 'AUD')}</span>
-      <span>Target: ${core.formatMoney(row.target * factor, 'AUD')}</span>
-      <span>${row.shortfall > 1
-        ? `Shortfall: ${core.formatMoney(row.shortfall * factor, 'AUD')}`
-        : 'Target met'}</span>${lumpDetails}`;
+    const lines = core.chartTooltipLines(segment, row, currentScenario);
+    tooltip.innerHTML = lines.map(line => `<span>${escapeHtml(line)}</span>`).join('');
     tooltip.style.left = `${Math.min(point.x + 12, Math.max(8, chart.clientWidth - 260))}px`;
     tooltip.style.top = `${Math.max(8, point.y + 12)}px`;
     tooltip.hidden = false;
@@ -2763,7 +2807,59 @@
       : 'Table values in today’s (2026) dollars. ABP min is taken from the post-growth nominal balance, so the amount shown here is that draw deflated to 2026 dollars.';
   }
 
+  function captureUiContext() {
+    const controls = $('#controls'), stage = document.querySelector('.stage');
+    const table = document.querySelector('.tblwrap'), active = document.activeElement;
+    const canSelectText = active instanceof HTMLTextAreaElement ||
+      (active instanceof HTMLInputElement && ['text', 'search', 'url', 'tel', 'password'].includes(active.type));
+    return {
+      view,
+      windowTop: window.scrollY,
+      controlsTop: controls?.scrollTop ?? 0,
+      stageTop: stage?.scrollTop ?? 0,
+      tableTop: table?.scrollTop ?? 0,
+      tableLeft: table?.scrollLeft ?? 0,
+      sections: Object.fromEntries([...document.querySelectorAll('#controls details[id]')]
+        .map(element => [element.id, element.open])),
+      focusId: active?.id || null,
+      focusPath: active?.dataset?.path || null,
+      selection: canSelectText
+        ? [active.selectionStart, active.selectionEnd] : null
+    };
+  }
+
+  function restoreUiContext(context) {
+    if (!context) return;
+    requestAnimationFrame(() => {
+      view = context.view;
+      [...$('#tabs').children].forEach(button =>
+        button.classList.toggle('on', button.dataset.v === view));
+      Object.entries(context.sections).forEach(([id, open]) => {
+        const element = document.getElementById(id); if (element) element.open = open;
+      });
+      const controls = $('#controls'), stage = document.querySelector('.stage');
+      const table = document.querySelector('.tblwrap');
+      if (controls) controls.scrollTop = context.controlsTop;
+      if (stage) stage.scrollTop = context.stageTop;
+      if (table) { table.scrollTop = context.tableTop; table.scrollLeft = context.tableLeft; }
+      window.scrollTo(0, context.windowTop);
+      const focusTarget = context.focusId ? document.getElementById(context.focusId)
+        : context.focusPath ? [...document.querySelectorAll('[data-path]')]
+          .find(element => element.dataset.path === context.focusPath) : null;
+      if (focusTarget) {
+        focusTarget.focus({ preventScroll: true });
+        const canSelectText = focusTarget instanceof HTMLTextAreaElement ||
+          (focusTarget instanceof HTMLInputElement && ['text', 'search', 'url', 'tel', 'password'].includes(focusTarget.type));
+        if (context.selection && canSelectText) {
+          focusTarget.setSelectionRange(context.selection[0], context.selection[1]);
+        }
+      }
+    });
+  }
+
   function renderDashboard(result, scenario) {
+    const uiContext = pendingUiContext ?? captureUiContext();
+    pendingUiContext = null;
     currentProjection = result;
     renderKpis(result, scenario);
     renderProjectionTable(result.rows, scenario.people, scenario);
@@ -2795,6 +2891,7 @@
     ].join('');
     if (view === 'income') drawIncomeChart(result.rows, scenario);
     else drawBalanceChart(result.rows, scenario);
+    restoreUiContext(uiContext);
   }
 
   function recalculateAndRender() {
@@ -2880,6 +2977,7 @@
   }
 
   function renderScenario(scenario) {
+    pendingUiContext = captureUiContext();
     currentScenario = structuredClone(scenario);
     $('#scenarioName').value = currentScenario.scenarioName;
     renderReturnAssumptions(currentScenario);
@@ -2907,7 +3005,7 @@
   function addLumpSum(scenario) {
     return { ...scenario, lumpSumWithdrawals: [...(scenario.lumpSumWithdrawals ?? []), {
       id: globalThis.crypto?.randomUUID?.() ?? `lump-${Date.now()}`,
-      amount: 0, reason: '', year: scenario.startYear, source: 'automatic'
+      amount: 0, reason: '', year: scenario.startYear, source: 'automatic', enabled: true
     }] };
   }
 
@@ -3077,6 +3175,9 @@
 
   $('#controls').addEventListener('change', event => {
     if (event.target.matches('.holding-csv')) return;
+    if (event.target.dataset.path?.endsWith('.enabled')) {
+      event.target.closest('.lump-item')?.classList.toggle('disabled', !event.target.checked);
+    }
     if (event.target.matches('#pensionType')) {
       const dbMode = event.target.value === 'defined-benefit';
       currentScenario = setPathImmutable(
@@ -3499,6 +3600,39 @@
     splitter.addEventListener('dblclick', () => apply(DEFAULT));
     splitter.addEventListener('keydown', event => {
       const current = parseInt(splitter.getAttribute('aria-valuenow'), 10) || DEFAULT;
+      if (event.key === 'Home') { event.preventDefault(); apply(DEFAULT); }
+      if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
+        event.preventDefault(); apply(current + (event.key === 'ArrowDown' ? 10 : -10));
+      }
+    });
+  })();
+
+  (function initTableHeightSplitter() {
+    const splitter = document.getElementById('tableHeightSplitter');
+    if (!splitter) return;
+    const KEY = 'family-retirement-simulator:table-height';
+    const DEFAULT = 320;
+    const clamp = value => Math.min(700, Math.max(180, Math.round(value)));
+    const apply = value => {
+      const height = clamp(value);
+      document.documentElement.style.setProperty('--table-h', `${height}px`);
+      splitter.setAttribute('aria-valuenow', String(height));
+      window.__safeStorage.setItem(KEY, String(height));
+    };
+    const saved = Number(window.__safeStorage.getItem(KEY));
+    apply(Number.isFinite(saved) && saved ? saved : DEFAULT);
+    let dragging = false, originY = 0, originHeight = DEFAULT;
+    splitter.addEventListener('pointerdown', event => {
+      dragging = true; originY = event.clientY;
+      originHeight = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--table-h'), 10) || DEFAULT;
+      splitter.classList.add('dragging'); splitter.setPointerCapture(event.pointerId); event.preventDefault();
+    });
+    splitter.addEventListener('pointermove', event => { if (dragging) apply(originHeight + event.clientY - originY); });
+    const stop = () => { dragging = false; splitter.classList.remove('dragging'); };
+    splitter.addEventListener('pointerup', stop); splitter.addEventListener('pointercancel', stop);
+    splitter.addEventListener('dblclick', () => apply(DEFAULT));
+    splitter.addEventListener('keydown', event => {
+      const current = Number(splitter.getAttribute('aria-valuenow')) || DEFAULT;
       if (event.key === 'Home') { event.preventDefault(); apply(DEFAULT); }
       if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
         event.preventDefault(); apply(current + (event.key === 'ArrowDown' ? 10 : -10));

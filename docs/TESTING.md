@@ -32,6 +32,13 @@ Automated tests do not replace a real-browser pass. For user-interface changes, 
 - Treasury/manual inflation changes and both real-return readouts;
 - manual share pricing and explicitly selected US Stooq lookup;
 - collapse/expand behavior for every left-panel section after People.
+- both chart/table and table-height splitters, including persistence after reload;
+- lump-sum include/exclude toggles, concise tooltips and Event-column updates;
+- preservation of active tab, open sections, focus and panel/table scroll positions after recalculation.
+
+### iPad Safari release check
+
+Before release, open the local HTML file in current iPadOS Safari (not only the Files preview) and check portrait and landscape at the common 820x1180, 1024x1366, 1180x820 and 1366x1024 CSS viewports. Confirm touch targets, independent panel scrolling, both splitters, chart inspection, form fields, safe-area banners and horizontal table scrolling. Desktop emulation is useful for regression coverage but does not replace one real-device pass.
 
 ## Modelling-change checklist
 

@@ -2,6 +2,17 @@
 
 This changelog summarizes public, non-personal milestones. Early development used many private prototype snapshots; those files are intentionally not reproduced in the public repository.
 
+## 1.02 - 2026-07-12
+
+- Reduced chart tooltips to the selected year, household ages, source and essential amount context.
+- Compacted each lump-sum editor into a 2x2 layout and added an **Include & calculate on chart** toggle so plans can be retained without affecting the model.
+- Added an independently resizable, locally remembered projection-table height while keeping the chart height unchanged.
+- Preserved the active view, open sections, focus and panel/table scroll positions during live modelling changes.
+- Fixed the desktop controls panel height and widened its responsive layout for iPad portrait and landscape use.
+- Refined the single Person 1 survival ribbon and kept its probability labels inside the chart horizon.
+- Added schema 8 migration; the Monte Carlo adapter accepts disabled lump sums but continues to reject active unsupported cash flows explicitly.
+- Made dark theme the fresh-install default and refreshed the public screenshot in that theme.
+
 ## 1.01 - 2026-07-12
 
 - Added repeatable lump-sum withdrawals with amount, reason, year and funding-source priority.

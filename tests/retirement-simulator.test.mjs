@@ -32,7 +32,7 @@ vm.runInContext(extract('simulator-core'), context, { filename: 'simulator-core.
 const core = context.RetirementSimulatorCore;
 
 console.log('\nschema + sample');
-check('schema version is 7', core.SCHEMA_VERSION === 7);
+check('schema version is 8', core.SCHEMA_VERSION === 8);
 const sample = core.makeSampleScenario();
 check('sample validates', core.validateScenario(sample).length === 0,
   JSON.stringify(core.validateScenario(sample)[0] ?? null));
@@ -53,7 +53,7 @@ check('sample includes two relative-year demo lump sums',
   sample.lumpSumWithdrawals.length === 2 &&
   sample.lumpSumWithdrawals[0].reason === 'New car' && sample.lumpSumWithdrawals[0].amount === 20000 && sample.lumpSumWithdrawals[0].year === sample.startYear + 3 &&
   sample.lumpSumWithdrawals[1].reason === 'European holiday' && sample.lumpSumWithdrawals[1].amount === 50000 && sample.lumpSumWithdrawals[1].year === sample.startYear + 5 &&
-  sample.lumpSumWithdrawals.every(item => item.source === 'automatic'));
+  sample.lumpSumWithdrawals.every(item => item.source === 'automatic' && item.enabled === true));
 check('sample distinguishes preferred income from essential budget',
   sample.household.targetAfterTax === 80000 && sample.household.annualBudget === 70000);
 check('sample uses the approved Treasury inflation default',
@@ -66,9 +66,9 @@ check('return assumptions are explained below the table',
 check('assumptions and methodology moved out of the controls panel',
   html.indexOf('<summary>Model assumptions and sources</summary>') > html.indexOf('<div class="tblwrap">') &&
   html.indexOf('id="methodologySection"') > html.indexOf('<div class="tblwrap">'));
-check('v1.01 document version is consistent',
-  html.includes('<title>Family Retirement Income Simulator v1.01</title>') &&
-  html.includes('<span class="version">v1.01</span>'));
+check('v1.02 document version is consistent',
+  html.includes('<title>Family Retirement Income Simulator v1.02</title>') &&
+  html.includes('<span class="version">v1.02</span>'));
 check('returns and inflation share a dedicated upper controls block',
   html.indexOf('id="returnAssumptions"') < html.indexOf('id="peopleFields"') &&
   html.includes('Estimated net returns after fees and tax'));
@@ -103,6 +103,24 @@ check('all section headings use one accent colour',
 check('real return meaning is explained', html.includes('Nominal return minus inflation'));
 check('single Mercer-style survival label is present', html.includes('Chance of living to each age'));
 check('age labels use conventional multiples of five', html.includes('row.ages[0] % 5 === 0'));
+check('lump editor uses compact grid and enabled toggle',
+  html.includes('class="lump-grid"') && html.includes('Intended Year') &&
+  html.includes('Include &amp; calculate on chart'));
+check('table height splitter is accessible and persistent',
+  html.includes('id="tableHeightSplitter"') &&
+  html.includes('family-retirement-simulator:table-height'));
+check('desktop workspace uses viewport grid and independent scrolling',
+  html.includes('grid-template-rows:auto auto minmax(0,1fr) auto') &&
+  html.includes('.controls{padding:14px 16px') && html.includes('max-height:none'));
+check('rerenders preserve modelling context',
+  html.includes('function captureUiContext()') && html.includes('function restoreUiContext(context)'));
+check('focus restoration selects text-capable inputs only',
+  html.includes("['text', 'search', 'url', 'tel', 'password'].includes(focusTarget.type)"));
+check('fresh installs default to dark theme', html.includes("applyTheme(saved || 'dark')"));
+check('iPad widths retain a usable controls column',
+  html.includes('@media (max-width:1200px)') &&
+  html.includes('clamp(320px,var(--left-w,340px),38vw)'));
+check('survival ribbon uses Safari-safe rounded path', html.includes('function roundedRectPath('));
 
 console.log('\nreal-return readouts');
 check('real return uses nominal less inflation', core.realReturnPct(7, 2.5) === 4.5);
@@ -222,6 +240,28 @@ check('explicit source falls back through household order',
   JSON.stringify(lumpRow.lumpSumDraws));
 check('lump sum is recorded in Event data', lumpRow.events.some(event =>
   event.type === 'lump-sum' && event.label.includes('New car') && event.label.includes('Cash') && event.label.includes('Savings')));
+const lumpTooltip = core.chartTooltipLines(
+  { key: 'lumpSum', value: 25000, label: 'Lump sum withdrawal', displayFactor: 1 }, lumpRow, withLump);
+check('lump tooltip contains only context and essential funding sentence',
+  lumpTooltip.length === 2 && lumpTooltip[1] === '$25,000 for New car from Cash + Savings');
+const normalTooltip = core.chartTooltipLines(
+  { key: 'person1Super', value: 17475, label: 'Jane super drawdown', displayFactor: 1 },
+  { ...lumpRow, totalIncome: 80000 }, withLump);
+check('normal tooltip contains only source contribution sentence',
+  normalTooltip.length === 2 && normalTooltip[1] === '$17,475 this year from Jane super drawdown, contributing to total $80,000');
+check('tooltip markup removes target and per-year noise',
+  !html.includes('Target met</span>') && !html.includes('per year</span>'));
+const disabledLump = structuredClone(withLump);
+disabledLump.lumpSumWithdrawals[0].enabled = false;
+const disabledRow = core.projectScenario(disabledLump).rows[0];
+check('disabled lump sum stays saved but is excluded from modelling',
+  disabledLump.lumpSumWithdrawals.length === 1 &&
+  disabledRow.lumpSumTotal === 0 &&
+  disabledRow.events.every(event => event.type !== 'lump-sum'));
+disabledLump.lumpSumWithdrawals[0].amount = 0;
+disabledLump.lumpSumWithdrawals[0].reason = '';
+check('disabled lump sum does not block validation', core.validateScenario(disabledLump).length === 0,
+  JSON.stringify(core.validateScenario(disabledLump)));
 const assetFunded = structuredClone(withLump);
 assetFunded.cash.amount = 0;
 assetFunded.savings.amount = 0;
@@ -260,7 +300,7 @@ v5.people[1].ukPrivateAmountGbp = 20000;
 v5.people[1].ukPrivateTakeAge = 66;
 v5.people[1].ukPrivateType = 'lump';
 const migrated = core.migrateScenario(structuredClone(v5));
-check('migrates to v7', migrated.schemaVersion === 7);
+check('migrates to v8', migrated.schemaVersion === 8);
 check('annuity becomes other income', migrated.otherIncomes.length === 1 &&
   migrated.otherIncomes[0].amount === 5000 && migrated.otherIncomes[0].currency === 'GBP');
 check('lump becomes other asset with disposal year',
@@ -275,7 +315,14 @@ core.projectScenario(migrated);
 console.log('  ok   migrated scenario projects without error');
 passed += 1;
 
-console.log('\nmigration v1 -> v7 (full chain)');
+const schema7 = structuredClone(sample);
+schema7.schemaVersion = 7;
+schema7.lumpSumWithdrawals.forEach(item => delete item.enabled);
+const migrated8 = core.migrateScenario(schema7);
+check('schema 7 lump sums migrate enabled',
+  migrated8.schemaVersion === 8 && migrated8.lumpSumWithdrawals.every(item => item.enabled === true));
+
+console.log('\nmigration v1 -> v8 (full chain)');
 const v1 = structuredClone(v5);
 v1.schemaVersion = 1;
 delete v1.lumpSumWithdrawals;
@@ -283,7 +330,7 @@ delete v1.household.annualBudget;
 v1.people = v1.people.map(({ superAccessAge, superAccessPct, ukStateIndexation, ...rest }) => rest);
 delete v1.assumptions.ukPensionsEnabled;
 const chained = core.migrateScenario(structuredClone(v1));
-check('v1 chains to v7', chained.schemaVersion === 7);
+check('v1 chains to v8', chained.schemaVersion === 8);
 check('migration adds empty lump sums', Array.isArray(chained.lumpSumWithdrawals) && chained.lumpSumWithdrawals.length === 0);
 check('chained validates', core.validateScenario(chained).length === 0,
   JSON.stringify(core.validateScenario(chained)[0] ?? null));
