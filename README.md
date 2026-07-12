@@ -9,6 +9,12 @@ The repository contains two self-contained browser tools:
 
 > **Estimate only. Not financial, tax, legal or investment advice.** The models are simplified, assumptions become stale, and results are not predictions.
 
+## Download
+
+[**Download Retirement Simulator**](https://github.com/dcaddick/retirement-simulator/releases/latest/download/retirement-simulator.html)
+
+Single HTML file · no installation · opens locally in a modern browser.
+
 ![Retirement Income Simulator v1.02 in its default dark theme, showing the fictional John and Jane sample, planned lump sums and survival ribbon](docs/assets/retirement-simulator-v1.02.png)
 
 *The deterministic v1.02 simulator combines editable household assumptions, optional planned lump-sum spending, inspectable charts and a resizable year-by-year projection.*
