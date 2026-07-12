@@ -710,7 +710,7 @@
   }
 
   function adaptV1ScenarioForExperimentalMonteCarlo(scenario) {
-    if (![6, 7, 8].includes(scenario.schemaVersion)) return scenario;
+    if (![6, 7, 8, 9].includes(scenario.schemaVersion)) return scenario;
     if ((scenario.otherIncomes ?? []).length || (scenario.otherAssets ?? []).length) {
       throw new Error('Monte Carlo v0.5 cannot yet model populated Other income or Other assets. Remove them from a fictional copy before importing.');
     }

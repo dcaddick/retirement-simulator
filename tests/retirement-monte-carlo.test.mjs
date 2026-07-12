@@ -84,6 +84,23 @@ assert.throws(
   'unsupported v1.00 cash flows should be rejected rather than silently omitted'
 );
 
+const activeSchema9 = structuredClone(v1Scenario);
+activeSchema9.schemaVersion = 9;
+activeSchema9.lumpSumWithdrawals = [
+  { id: 'test-lump', amount: 100000, reason: 'Holiday', month: 6, year: 2032, source: 'automatic', enabled: true }
+];
+assert.throws(
+  () => simulator.importScenario(JSON.stringify(activeSchema9)),
+  /cannot yet model lump-sum withdrawals/,
+  'schema 9 active lump sums should remain explicitly unsupported'
+);
+const disabledSchema9 = structuredClone(activeSchema9);
+disabledSchema9.lumpSumWithdrawals[0].enabled = false;
+const adaptedSchema9 = simulator.importScenario(JSON.stringify(disabledSchema9));
+assert.equal(adaptedSchema9.schemaVersion, 3);
+assert.ok(!('lumpSumWithdrawals' in adaptedSchema9),
+  'schema 9 disabled lump sums should be discarded by the adapter');
+
 const monteCarloCoreScript = scripts.find(script =>
   script.includes('RetirementMonteCarloCore')
 );

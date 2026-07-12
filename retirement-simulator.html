@@ -4,7 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src https://api.frankfurter.app https://stooq.com; base-uri 'none'; form-action 'none'" />
-<title>Family Retirement Income Simulator v1.02</title>
+<title>Family Retirement Income Simulator v1.03</title>
 <style>
   :root{
     --bg:#0f1720; --panel:#18232f; --panel2:#1e2c3a; --line:#2b3d4f;
@@ -66,12 +66,22 @@
   .section-heading h3{margin-bottom:0}
   .shareholding{border-top:1px solid var(--line);padding:7px 0}
   .other-item,.lump-item{border-top:1px solid var(--line);padding:7px 0}
-  .lump-item.disabled{opacity:.58}
+  .lump-summary{display:grid;grid-template-columns:44px minmax(48px,auto) minmax(45px,1fr) minmax(62px,auto) 44px;align-items:center;gap:2px}
+  .lump-chevron,.lump-summary-enabled{min-width:44px;min-height:44px;display:grid;place-items:center}
+  .lump-chevron{padding:0;background:transparent;border-color:transparent;font-size:19px;transition:transform .15s ease}
+  .lump-chevron[aria-expanded="true"]{transform:rotate(90deg)}
+  .lump-summary-enabled{margin:0;cursor:pointer}
+  .lump-summary-amount{font-variant-numeric:tabular-nums;font-weight:700}
+  .lump-summary-reason{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .lump-summary-date{font-variant-numeric:tabular-nums;white-space:nowrap;color:var(--muted)}
+  .lump-item.disabled .lump-summary{opacity:.58}
+  .lump-item.disabled .lump-summary-enabled{opacity:1}
   .lump-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px 12px}
   .lump-grid label{display:grid;grid-template-columns:1fr;align-content:start;margin:0}
   .lump-grid input:not([type=checkbox]),.lump-grid select{width:100%;min-width:0;text-align:left}
   .lump-footer{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:8px}
   .lump-footer label{justify-content:flex-start;margin:0}
+  .lump-editor{padding:6px 0 2px}
   .other-item:first-child{border-top:0}
   .shareholding summary{display:grid;grid-template-columns:1fr auto auto auto;gap:8px;cursor:pointer;color:var(--muted);font-size:11.5px}
   .shareholding-fields{padding:8px 0 2px}
@@ -171,7 +181,7 @@
 <div class="disclaimer-banner top" role="note">Local, reproducible retirement-risk analysis. Estimate only; not financial or tax advice.</div>
 <header>
   <div class="header-row">
-  <h1>Family Retirement Income Simulator <span class="version">v1.02</span></h1>
+  <h1>Family Retirement Income Simulator <span class="version">v1.03</span></h1>
   <nav class="header-actions" aria-label="Scenario actions">
     <button type="button" id="newScenario">New</button>
     <button type="button" id="resetSample">Reset sample</button>
@@ -387,7 +397,7 @@
       </details>
     </div>
     <div class="note">
-      <b>v1.02.</b> Fictional Australian couple sample data is stored locally on this device and can be imported or exported as JSON. Calculations are transparent estimates and are not financial or tax advice. The Display toggle switches the whole dashboard &mdash; table, chart and headline figures &mdash; between today&rsquo;s dollars and nominal (future) dollars, except the CSHC estimate which stays in today&rsquo;s dollars against its fixed threshold. Numeric inputs recalculate live as you type without moving your modelling position; the &ldquo;Recalculated&rdquo; stamp above the table confirms each run.
+      <b>v1.03.</b> Fictional Australian couple sample data is stored locally on this device and can be imported or exported as JSON. Calculations are transparent estimates and are not financial or tax advice. The Display toggle switches the whole dashboard &mdash; table, chart and headline figures &mdash; between today&rsquo;s dollars and nominal (future) dollars, except the CSHC estimate which stays in today&rsquo;s dollars against its fixed threshold. Numeric inputs recalculate live as you type without moving your modelling position; the &ldquo;Recalculated&rdquo; stamp above the table confirms each run.
     </div>
   </div>
 </div>
@@ -442,7 +452,7 @@
 <script id="simulator-core">
 (function () {
   'use strict';
-  const SCHEMA_VERSION = 8;
+  const SCHEMA_VERSION = 9;
   const VALID_OWNERS = new Set(['p0', 'p1', 'joint']);
   const DRAWDOWN_SOURCES = new Set(['p0Super', 'p1Super', 'cash', 'savings']);
   const OTHER_CURRENCIES = new Set(['AUD', 'GBP', 'USD']);
@@ -654,8 +664,8 @@
       savings: { amount: 60000, interestPct: 4.5, owner: 'p1' },
       shareholdings: [],
       lumpSumWithdrawals: [
-        { id: 'sample-lump-car', amount: 20000, reason: 'New car', year: startYear + 3, source: 'automatic', enabled: true },
-        { id: 'sample-lump-holiday', amount: 50000, reason: 'European holiday', year: startYear + 5, source: 'automatic', enabled: true }
+        { id: 'sample-lump-car', amount: 20000, reason: 'New car', month: 3, year: startYear + 3, source: 'automatic', enabled: true },
+        { id: 'sample-lump-holiday', amount: 50000, reason: 'European holiday', month: 6, year: startYear + 5, source: 'automatic', enabled: true }
       ],
       otherIncomes: [],
       otherAssets: [],
@@ -822,6 +832,12 @@
       current = { ...current, schemaVersion: 8,
         lumpSumWithdrawals: (current.lumpSumWithdrawals ?? []).map(item => ({
           ...item, enabled: item.enabled !== false
+        })) };
+    }
+    if (current.schemaVersion === 8) {
+      current = { ...current, schemaVersion: 9,
+        lumpSumWithdrawals: (current.lumpSumWithdrawals ?? []).map(item => ({
+          ...item, month: 1
         })) };
     }
     if (current.schemaVersion !== SCHEMA_VERSION) {
@@ -1630,6 +1646,7 @@
       if (item.enabled === false) return;
       if (!(Number.isFinite(item.amount) && item.amount > 0)) add(`${base}.amount`, 'Enter an amount greater than zero.');
       if (!String(item.reason ?? '').trim()) add(`${base}.reason`, 'Enter a reason.');
+      if (!Number.isInteger(item.month) || item.month < 1 || item.month > 12) add(`${base}.month`, 'Choose a valid intended month.');
       if (!Number.isInteger(item.year) || item.year < scenario.startYear || item.year > horizonEnd) add(`${base}.year`, 'Choose a year inside the model horizon.');
       if (!validLumpSources.has(item.source)) add(`${base}.source`, 'Choose a valid funding source.');
     });
@@ -1727,11 +1744,12 @@
   'use strict';
 
   const core = globalThis.RetirementSimulatorCore;
-  const STORAGE_KEY = 'family-retirement-simulator:v1.02:scenario';
+  const STORAGE_KEY = 'family-retirement-simulator:v1.03:scenario';
   const THEME_STORAGE_KEY = 'retirement-simulator-theme';
   // Read-only fallbacks so scenarios saved under earlier versions carry over
   // on first load (they migrate to the current schema automatically).
   const LEGACY_STORAGE_KEYS = [
+    'family-retirement-simulator:v1.02:scenario',
     'family-retirement-simulator:v0.99:scenario',
     'family-retirement-simulator:v0.98:scenario',
     'family-retirement-simulator:v0.97:scenario'
@@ -1992,23 +2010,63 @@
     ].map(([value, label]) => `<option value="${value}"${selected === value ? ' selected' : ''}>${escapeHtml(label)}</option>`).join('');
   }
 
+  const expandedLumpIds = new Set();
+  const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+  function compactMoney(value) {
+    const amount = Number(value) || 0;
+    if (Math.abs(amount) >= 1000000) return `$${(amount / 1000000).toFixed(amount % 1000000 ? 1 : 0)}M`;
+    if (Math.abs(amount) >= 1000) return `$${(amount / 1000).toFixed(amount % 1000 ? 1 : 0)}K`;
+    return formatMoney(amount);
+  }
+
+  function lumpDateLabel(item) {
+    return `${MONTH_NAMES[item.month - 1] ?? 'Jan'} ${item.year}`;
+  }
+
+  function lumpIsComplete(item) {
+    return Number(item.amount) > 0 && Boolean(String(item.reason ?? '').trim()) &&
+      Number.isInteger(item.year) && Number.isInteger(item.month) &&
+      item.month >= 1 && item.month <= 12 && Boolean(item.source);
+  }
+
+  function monthOptions(selected) {
+    return MONTH_NAMES.map((label, index) =>
+      `<option value="${index + 1}"${selected === index + 1 ? ' selected' : ''}>${label}</option>`
+    ).join('');
+  }
+
   function renderLumpSums(scenario) {
     const latestFirst = (scenario.lumpSumWithdrawals ?? [])
       .map((item, index) => ({ item, index }))
       .sort((a, b) => b.item.year - a.item.year || a.index - b.index);
-    $('#lumpSumList').innerHTML = latestFirst.map(({ item, index }) => `
-      <div class="lump-item${item.enabled === false ? ' disabled' : ''}" data-lump-index="${index}">
-        <div class="lump-grid">
+    $('#lumpSumList').innerHTML = latestFirst.map(({ item, index }) => {
+      const expanded = expandedLumpIds.has(item.id) || !lumpIsComplete(item);
+      const editorId = `lump-editor-${item.id}`;
+      const accessibleReason = item.reason || 'lump sum';
+      return `
+      <div class="lump-item${item.enabled === false ? ' disabled' : ''}" data-lump-index="${index}" data-lump-id="${escapeHtml(item.id)}">
+        <div class="lump-summary">
+          <button type="button" class="lump-chevron" data-lump-id="${escapeHtml(item.id)}" aria-expanded="${expanded}" aria-controls="${escapeHtml(editorId)}" aria-label="${expanded ? 'Collapse' : 'Edit'} ${escapeHtml(accessibleReason)}">›</button>
+          <span class="lump-summary-amount">${escapeHtml(compactMoney(item.amount))}</span>
+          <span class="lump-summary-reason" title="${escapeHtml(accessibleReason)}">${escapeHtml(accessibleReason)}</span>
+          <span class="lump-summary-date">${escapeHtml(lumpDateLabel(item))}</span>
+          <label class="lump-summary-enabled" title="Include ${escapeHtml(accessibleReason)} in modelling"><input type="checkbox" data-path="lumpSumWithdrawals.${index}.enabled" aria-label="Include ${escapeHtml(accessibleReason)} in modelling"${item.enabled !== false ? ' checked' : ''}></label>
+        </div>
+        <div class="lump-editor" id="${escapeHtml(editorId)}"${expanded ? '' : ' hidden'}>
+          <div class="lump-grid">
           ${moneyField('Amount', `lumpSumWithdrawals.${index}.amount`, item.amount)}
           <label><span class="k">Reason</span><input data-path="lumpSumWithdrawals.${index}.reason" value="${escapeHtml(item.reason)}"></label>
-          ${numberField('Intended Year', `lumpSumWithdrawals.${index}.year`, item.year, `min="${scenario.startYear}" max="${scenario.startYear + scenario.household.modelEndAge - scenario.people[0].age}" step="1"`)}
+          <label><span class="k">Intended Date</span><span class="two"><select data-path="lumpSumWithdrawals.${index}.month" data-value-type="number" aria-label="Intended month">${monthOptions(item.month)}</select><input type="number" data-path="lumpSumWithdrawals.${index}.year" data-value-type="number" aria-label="Intended year" value="${item.year}" min="${scenario.startYear}" max="${scenario.startYear + scenario.household.modelEndAge - scenario.people[0].age}" step="1"></span></label>
           <label><span class="k">Fund from</span><select data-path="lumpSumWithdrawals.${index}.source">${lumpSourceOptions(item.source, scenario)}</select></label>
+          </div>
+          <div class="lump-footer">
+            <label><input type="checkbox" data-path="lumpSumWithdrawals.${index}.enabled"${item.enabled !== false ? ' checked' : ''}><span class="k">Include &amp; calculate on chart</span></label>
+            <button type="button" class="remove-lump-sum" data-index="${index}">Remove</button>
+          </div>
         </div>
-        <div class="lump-footer">
-          <label><input type="checkbox" data-path="lumpSumWithdrawals.${index}.enabled"${item.enabled !== false ? ' checked' : ''}><span class="k">Include &amp; calculate on chart</span></label>
-          <button type="button" class="remove-lump-sum" data-index="${index}">Remove</button>
-        </div>
-      </div>`).join('') || '<p class="sub">No planned lump-sum withdrawals.</p>';
+      </div>`;
+    }).join('') || '<p class="sub">No planned lump-sum withdrawals.</p>';
   }
 
   function shareholdingFields(holding, index, people) {
@@ -3006,9 +3064,11 @@
   }
 
   function addLumpSum(scenario) {
+    const now = new Date();
     return { ...scenario, lumpSumWithdrawals: [...(scenario.lumpSumWithdrawals ?? []), {
       id: globalThis.crypto?.randomUUID?.() ?? `lump-${Date.now()}`,
-      amount: 0, reason: '', year: scenario.startYear, source: 'automatic', enabled: true
+      amount: 0, reason: '', month: scenario.startYear === now.getFullYear() ? now.getMonth() + 1 : 1,
+      year: scenario.startYear, source: 'automatic', enabled: true
     }] };
   }
 
@@ -3179,7 +3239,11 @@
   $('#controls').addEventListener('change', event => {
     if (event.target.matches('.holding-csv')) return;
     if (event.target.dataset.path?.endsWith('.enabled')) {
-      event.target.closest('.lump-item')?.classList.toggle('disabled', !event.target.checked);
+      const item = event.target.closest('.lump-item');
+      item?.classList.toggle('disabled', !event.target.checked);
+      item?.querySelectorAll('input[data-path$=".enabled"]').forEach(control => {
+        control.checked = event.target.checked;
+      });
     }
     if (event.target.matches('#pensionType')) {
       const dbMode = event.target.value === 'defined-benefit';
@@ -3274,6 +3338,7 @@
 
   $('#addLumpSum').addEventListener('click', () => {
     currentScenario = addLumpSum(currentScenario);
+    expandedLumpIds.add(currentScenario.lumpSumWithdrawals.at(-1).id);
     renderScenario(currentScenario);
     $('#lumpSumSection').open = true;
   });
@@ -3305,6 +3370,14 @@
   });
 
   $('#controls').addEventListener('click', event => {
+    const chevron = event.target.closest('.lump-chevron');
+    if (chevron) {
+      const id = chevron.dataset.lumpId;
+      expandedLumpIds.has(id) ? expandedLumpIds.delete(id) : expandedLumpIds.add(id);
+      renderLumpSums(currentScenario);
+      bindMoneyInputs();
+      return;
+    }
     const lumpButton = event.target.closest('.remove-lump-sum');
     if (lumpButton) {
       currentScenario = removeLumpSum(currentScenario, Number(lumpButton.dataset.index));

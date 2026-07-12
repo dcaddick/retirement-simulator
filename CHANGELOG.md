@@ -2,6 +2,14 @@
 
 This changelog summarizes public, non-personal milestones. Early development used many private prototype snapshots; those files are intentionally not reproduced in the public repository.
 
+## 1.03 - 2026-07-12
+
+- Collapsed completed lump sums into aligned modelling rows showing chevron, abbreviated amount, reason, intended month/year and an include checkbox.
+- Kept the modelling checkbox available in the collapsed row; disabled plans remain visible with subdued styling.
+- Added chevron expansion for editing funding details or removing an entry, while new incomplete entries open automatically.
+- Added intended month planning and schema 9 migration. Existing year-only lump sums migrate to January; financial calculations remain annual.
+- Extended Monte Carlo v0.5 compatibility handling to schema 9 while continuing to reject active unsupported lump sums explicitly.
+
 ## 1.02 - 2026-07-12
 
 - Reduced chart tooltips to the selected year, household ages, source and essential amount context.

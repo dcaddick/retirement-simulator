@@ -32,12 +32,14 @@ vm.runInContext(extract('simulator-core'), context, { filename: 'simulator-core.
 const core = context.RetirementSimulatorCore;
 
 console.log('\nschema + sample');
-check('schema version is 8', core.SCHEMA_VERSION === 8);
+check('schema version is 9', core.SCHEMA_VERSION === 9);
 const sample = core.makeSampleScenario();
 check('sample validates', core.validateScenario(sample).length === 0,
   JSON.stringify(core.validateScenario(sample)[0] ?? null));
 check('sample has otherIncomes/otherAssets arrays',
   Array.isArray(sample.otherIncomes) && Array.isArray(sample.otherAssets));
+check('sample lump sums include valid intended months',
+  sample.lumpSumWithdrawals.every(item => Number.isInteger(item.month) && item.month >= 1 && item.month <= 12));
 check('sample people have no ukPrivate fields',
   sample.people.every(p => !('ukPrivateAmountGbp' in p)));
 check('v1.01 fictional couple sample is installed',
@@ -66,9 +68,9 @@ check('return assumptions are explained below the table',
 check('assumptions and methodology moved out of the controls panel',
   html.indexOf('<summary>Model assumptions and sources</summary>') > html.indexOf('<div class="tblwrap">') &&
   html.indexOf('id="methodologySection"') > html.indexOf('<div class="tblwrap">'));
-check('v1.02 document version is consistent',
-  html.includes('<title>Family Retirement Income Simulator v1.02</title>') &&
-  html.includes('<span class="version">v1.02</span>'));
+check('v1.03 document version is consistent',
+  html.includes('<title>Family Retirement Income Simulator v1.03</title>') &&
+  html.includes('<span class="version">v1.03</span>'));
 check('returns and inflation share a dedicated upper controls block',
   html.indexOf('id="returnAssumptions"') < html.indexOf('id="peopleFields"') &&
   html.includes('Estimated net returns after fees and tax'));
@@ -103,9 +105,23 @@ check('all section headings use one accent colour',
 check('real return meaning is explained', html.includes('Nominal return minus inflation'));
 check('single Mercer-style survival label is present', html.includes('Chance of living to each age'));
 check('age labels use conventional multiples of five', html.includes('row.ages[0] % 5 === 0'));
-check('lump editor uses compact grid and enabled toggle',
-  html.includes('class="lump-grid"') && html.includes('Intended Year') &&
+check('lump sums render an aligned collapsible summary',
+  html.includes('class="lump-summary"') && html.includes('class="lump-chevron"') &&
+  html.includes('class="lump-summary-amount"') && html.includes('class="lump-summary-date"'));
+check('lump chevron is accessible',
+  html.includes('aria-expanded="${expanded}"') && html.includes('aria-controls="${escapeHtml(editorId)}"'));
+check('collapsed checkbox remains a direct modelling control',
+  html.includes('class="lump-summary-enabled"') && html.includes('Include ${escapeHtml(accessibleReason)} in modelling'));
+check('open lump IDs survive rerenders', html.includes('expandedLumpIds'));
+check('lump editor uses month and year intended date controls',
+  html.includes('Intended Date') && html.includes('aria-label="Intended month"') &&
   html.includes('Include &amp; calculate on chart'));
+check('lump summaries use fixed aligned columns',
+  html.includes('grid-template-columns:44px minmax(48px,auto) minmax(45px,1fr) minmax(62px,auto) 44px'));
+check('lump reason truncates before key values',
+  html.includes('.lump-summary-reason{') && html.includes('text-overflow:ellipsis'));
+check('lump controls retain iPad touch targets',
+  html.includes('.lump-chevron,.lump-summary-enabled{min-width:44px;min-height:44px'));
 check('lump editor displays latest intended year first',
   html.includes('.sort((a, b) => b.item.year - a.item.year || a.index - b.index)'));
 check('table height splitter is accessible and persistent',
@@ -234,7 +250,7 @@ withLump.cash.amount = 10000;
 withLump.savings.amount = 30000;
 withLump.household.targetAfterTax = 0;
 withLump.household.annualBudget = 0;
-withLump.lumpSumWithdrawals = [{ id: 'l1', amount: 25000, reason: 'New car', year: withLump.startYear, source: 'cash' }];
+withLump.lumpSumWithdrawals = [{ id: 'l1', amount: 25000, reason: 'New car', month: 1, year: withLump.startYear, source: 'cash' }];
 const lumpRow = core.projectScenario(withLump).rows[0];
 check('lump sum is excluded from income', lumpRow.totalIncome === 0);
 check('explicit source falls back through household order',
@@ -268,7 +284,7 @@ const assetFunded = structuredClone(withLump);
 assetFunded.cash.amount = 0;
 assetFunded.savings.amount = 0;
 assetFunded.otherAssets = [{ id: 'car-fund', label: 'Investment property', currency: 'AUD', fxToAud: 1, amount: 40000, growthPct: 0, disposalYear: assetFunded.startYear + 10 }];
-assetFunded.lumpSumWithdrawals = [{ id: 'l2', amount: 25000, reason: 'Help kids', year: assetFunded.startYear, source: 'asset:car-fund' }];
+assetFunded.lumpSumWithdrawals = [{ id: 'l2', amount: 25000, reason: 'Help kids', month: 1, year: assetFunded.startYear, source: 'asset:car-fund' }];
 const assetFundedRow = core.projectScenario(assetFunded).rows[0];
 check('named asset can fund a lump sum', assetFundedRow.lumpSumTotal === 25000 &&
   assetFundedRow.events.some(event => event.type === 'lump-sum' && event.label.includes('Investment property')),
@@ -302,7 +318,7 @@ v5.people[1].ukPrivateAmountGbp = 20000;
 v5.people[1].ukPrivateTakeAge = 66;
 v5.people[1].ukPrivateType = 'lump';
 const migrated = core.migrateScenario(structuredClone(v5));
-check('migrates to v8', migrated.schemaVersion === 8);
+check('migrates to v9', migrated.schemaVersion === 9);
 check('annuity becomes other income', migrated.otherIncomes.length === 1 &&
   migrated.otherIncomes[0].amount === 5000 && migrated.otherIncomes[0].currency === 'GBP');
 check('lump becomes other asset with disposal year',
@@ -322,9 +338,21 @@ schema7.schemaVersion = 7;
 schema7.lumpSumWithdrawals.forEach(item => delete item.enabled);
 const migrated8 = core.migrateScenario(schema7);
 check('schema 7 lump sums migrate enabled',
-  migrated8.schemaVersion === 8 && migrated8.lumpSumWithdrawals.every(item => item.enabled === true));
+  migrated8.schemaVersion === 9 && migrated8.lumpSumWithdrawals.every(item => item.enabled === true));
 
-console.log('\nmigration v1 -> v8 (full chain)');
+const schema8 = structuredClone(sample);
+schema8.schemaVersion = 8;
+schema8.lumpSumWithdrawals.forEach(item => delete item.month);
+const migrated9 = core.migrateScenario(schema8);
+check('schema 8 lump sums migrate to January',
+  migrated9.schemaVersion === 9 && migrated9.lumpSumWithdrawals.every(item => item.month === 1));
+
+const invalidMonth = structuredClone(sample);
+invalidMonth.lumpSumWithdrawals[0].month = 13;
+check('invalid lump-sum month is reported',
+  core.validateScenario(invalidMonth).some(error => error.path === 'lumpSumWithdrawals.0.month'));
+
+console.log('\nmigration v1 -> v9 (full chain)');
 const v1 = structuredClone(v5);
 v1.schemaVersion = 1;
 delete v1.lumpSumWithdrawals;
@@ -332,7 +360,7 @@ delete v1.household.annualBudget;
 v1.people = v1.people.map(({ superAccessAge, superAccessPct, ukStateIndexation, ...rest }) => rest);
 delete v1.assumptions.ukPensionsEnabled;
 const chained = core.migrateScenario(structuredClone(v1));
-check('v1 chains to v8', chained.schemaVersion === 8);
+check('v1 chains to v9', chained.schemaVersion === 9);
 check('migration adds empty lump sums', Array.isArray(chained.lumpSumWithdrawals) && chained.lumpSumWithdrawals.length === 0);
 check('chained validates', core.validateScenario(chained).length === 0,
   JSON.stringify(core.validateScenario(chained)[0] ?? null));

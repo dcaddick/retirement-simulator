@@ -15,9 +15,9 @@ The repository contains two self-contained browser tools:
 
 Single HTML file · no installation · opens locally in a modern browser.
 
-![Retirement Income Simulator v1.02 in its default dark theme, showing the fictional John and Jane sample, planned lump sums and survival ribbon](docs/assets/retirement-simulator-v1.02.png)
+![Retirement Income Simulator v1.03 in its default dark theme, showing compact planned lump sums and the fictional John and Jane sample](docs/assets/retirement-simulator-v1.03.png)
 
-*The deterministic v1.02 simulator combines editable household assumptions, optional planned lump-sum spending, inspectable charts and a resizable year-by-year projection.*
+*The deterministic v1.03 simulator combines editable household assumptions, compact toggleable lump-sum planning, inspectable charts and a resizable year-by-year projection.*
 
 ## Yours to download and use
 
@@ -53,7 +53,7 @@ The deterministic simulator models a reusable two-person household and includes:
 - salaries, retirement ages and superannuation contributions;
 - accumulation and retirement-phase super balances;
 - flexible super-access timing and ordered drawdown tiers;
-- planned one-off withdrawals that can be retained but toggled in or out of the model;
+- planned one-off withdrawals with intended month/year, compact modelling rows and include/exclude toggles;
 - cash, savings, shareholdings, other income and other assets;
 - Australian income-tax estimates, Medicare, LITO/SAPTO, Age Pension and CSHC estimates;
 - Australian defined-benefit and UK State Pension support;
