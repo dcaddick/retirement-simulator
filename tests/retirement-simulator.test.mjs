@@ -32,7 +32,7 @@ vm.runInContext(extract('simulator-core'), context, { filename: 'simulator-core.
 const core = context.RetirementSimulatorCore;
 
 console.log('\nschema + sample');
-check('schema version is 9', core.SCHEMA_VERSION === 9);
+check('schema version is 10', core.SCHEMA_VERSION === 10);
 const sample = core.makeSampleScenario();
 check('sample validates', core.validateScenario(sample).length === 0,
   JSON.stringify(core.validateScenario(sample)[0] ?? null));
@@ -42,6 +42,8 @@ check('sample lump sums include valid intended months',
   sample.lumpSumWithdrawals.every(item => Number.isInteger(item.month) && item.month >= 1 && item.month <= 12));
 check('sample people have no ukPrivate fields',
   sample.people.every(p => !('ukPrivateAmountGbp' in p)));
+check('sample salary growth defaults to zero',
+  sample.people.every(person => person.salaryGrowthPct === 0));
 check('v1.01 fictional couple sample is installed',
   sample.people[0].name === 'John' && sample.people[0].age === 63 && sample.people[0].super === 220000 &&
   sample.people[1].name === 'Jane' && sample.people[1].age === 61 && sample.people[1].super === 165000);
@@ -175,6 +177,31 @@ check('rows expose otherAssets = 0', base.rows.every(r => r.otherAssets === 0));
 check('rows expose components.otherIncomeNet = 0',
   base.rows.every(r => r.components.otherIncomeNet === 0));
 
+console.log('\nsalary growth above inflation');
+const salaryBase = structuredClone(sample);
+salaryBase.assumptions.inflationMode = 'manual';
+salaryBase.assumptions.manualInflationPct = 0;
+salaryBase.people[0].age = 60;
+salaryBase.people[0].retireAge = 63;
+salaryBase.people[0].salary = 100000;
+salaryBase.people[0].salaryGrowthPct = 10;
+salaryBase.people[1].salary = 0;
+salaryBase.people[1].salaryGrowthPct = 0;
+const salaryRows = core.projectScenario(salaryBase).rows;
+check('salary growth starts after the first model year',
+  Math.round(salaryRows[0].components.workGross) === 100000);
+check('salary growth compounds independently',
+  Math.round(salaryRows[1].components.workGross) === 110000 &&
+  Math.round(salaryRows[2].components.workGross) === 121000);
+check('salary growth stops at retirement', salaryRows[3].components.workGross === 0);
+const noGrowth = structuredClone(salaryBase);
+noGrowth.people[0].salaryGrowthPct = 0;
+const noGrowthRows = core.projectScenario(noGrowth).rows;
+check('zero salary growth preserves the entered real salary',
+  Math.round(noGrowthRows[1].components.workGross) === 100000);
+check('salary growth raises SG-supported super balance',
+  salaryRows[1].superBalances[0] > noGrowthRows[1].superBalances[0]);
+
 console.log('\nother income');
 const withIncome = structuredClone(sample);
 withIncome.otherIncomes = [
@@ -307,6 +334,11 @@ badAsset.otherAssets = [{ id: 'y', label: 'ok', currency: 'AUD', fxToAud: 1, amo
 const assetErrors = core.validateScenario(badAsset);
 check('bad asset: growth + disposal year flagged', assetErrors.length >= 2,
   JSON.stringify(assetErrors));
+const badSalaryGrowth = structuredClone(sample);
+badSalaryGrowth.people[0].salaryGrowthPct = -1;
+check('negative salary growth is rejected',
+  core.validateScenario(badSalaryGrowth)
+    .some(error => error.path === 'people.0.salaryGrowthPct'));
 
 console.log('\nmigration v5 -> v6');
 const v5 = structuredClone(sample);
@@ -320,7 +352,7 @@ v5.people[1].ukPrivateAmountGbp = 20000;
 v5.people[1].ukPrivateTakeAge = 66;
 v5.people[1].ukPrivateType = 'lump';
 const migrated = core.migrateScenario(structuredClone(v5));
-check('migrates to v9', migrated.schemaVersion === 9);
+check('migrates to v10', migrated.schemaVersion === 10);
 check('annuity becomes other income', migrated.otherIncomes.length === 1 &&
   migrated.otherIncomes[0].amount === 5000 && migrated.otherIncomes[0].currency === 'GBP');
 check('lump becomes other asset with disposal year',
@@ -340,21 +372,30 @@ schema7.schemaVersion = 7;
 schema7.lumpSumWithdrawals.forEach(item => delete item.enabled);
 const migrated8 = core.migrateScenario(schema7);
 check('schema 7 lump sums migrate enabled',
-  migrated8.schemaVersion === 9 && migrated8.lumpSumWithdrawals.every(item => item.enabled === true));
+  migrated8.schemaVersion === 10 && migrated8.lumpSumWithdrawals.every(item => item.enabled === true));
 
 const schema8 = structuredClone(sample);
 schema8.schemaVersion = 8;
 schema8.lumpSumWithdrawals.forEach(item => delete item.month);
 const migrated9 = core.migrateScenario(schema8);
-check('schema 8 lump sums migrate to January',
-  migrated9.schemaVersion === 9 && migrated9.lumpSumWithdrawals.every(item => item.month === 1));
+check('schema 8 lump sums migrate to January and salary growth defaults to zero',
+  migrated9.schemaVersion === 10 &&
+  migrated9.lumpSumWithdrawals.every(item => item.month === 1) &&
+  migrated9.people.every(person => person.salaryGrowthPct === 0));
+
+const schema9 = structuredClone(sample);
+schema9.schemaVersion = 9;
+schema9.people.forEach(person => delete person.salaryGrowthPct);
+const migrated10 = core.migrateScenario(schema9);
+check('schema 9 migrates salary growth to zero',
+  migrated10.schemaVersion === 10 && migrated10.people.every(person => person.salaryGrowthPct === 0));
 
 const invalidMonth = structuredClone(sample);
 invalidMonth.lumpSumWithdrawals[0].month = 13;
 check('invalid lump-sum month is reported',
   core.validateScenario(invalidMonth).some(error => error.path === 'lumpSumWithdrawals.0.month'));
 
-console.log('\nmigration v1 -> v9 (full chain)');
+console.log('\nmigration v1 -> v10 (full chain)');
 const v1 = structuredClone(v5);
 v1.schemaVersion = 1;
 delete v1.lumpSumWithdrawals;
@@ -362,7 +403,7 @@ delete v1.household.annualBudget;
 v1.people = v1.people.map(({ superAccessAge, superAccessPct, ukStateIndexation, ...rest }) => rest);
 delete v1.assumptions.ukPensionsEnabled;
 const chained = core.migrateScenario(structuredClone(v1));
-check('v1 chains to v9', chained.schemaVersion === 9);
+check('v1 chains to v10', chained.schemaVersion === 10);
 check('migration adds empty lump sums', Array.isArray(chained.lumpSumWithdrawals) && chained.lumpSumWithdrawals.length === 0);
 check('chained validates', core.validateScenario(chained).length === 0,
   JSON.stringify(core.validateScenario(chained)[0] ?? null));

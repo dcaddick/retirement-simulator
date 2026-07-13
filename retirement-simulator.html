@@ -452,7 +452,7 @@
 <script id="simulator-core">
 (function () {
   'use strict';
-  const SCHEMA_VERSION = 9;
+  const SCHEMA_VERSION = 10;
   const VALID_OWNERS = new Set(['p0', 'p1', 'joint']);
   const DRAWDOWN_SOURCES = new Set(['p0Super', 'p1Super', 'cash', 'savings']);
   const OTHER_CURRENCIES = new Set(['AUD', 'GBP', 'USD']);
@@ -636,6 +636,7 @@
           superAccessAge: 65,
           superAccessPct: 100,
           salary: 85000,
+          salaryGrowthPct: 0,
           sgPct: 12,
           accumulationReturnPct: 5.5,
           retirementReturnPct: 6.5,
@@ -652,6 +653,7 @@
           superAccessAge: 65,
           superAccessPct: 100,
           salary: 45000,
+          salaryGrowthPct: 0,
           sgPct: 12,
           accumulationReturnPct: 5.5,
           retirementReturnPct: 6.5,
@@ -839,6 +841,17 @@
         lumpSumWithdrawals: (current.lumpSumWithdrawals ?? []).map(item => ({
           ...item, month: 1
         })) };
+    }
+    if (current.schemaVersion === 9) {
+      const migrated = structuredClone(current);
+      migrated.schemaVersion = 10;
+      migrated.people = migrated.people.map(person => ({
+        ...person,
+        salaryGrowthPct: Number.isFinite(person.salaryGrowthPct)
+          ? person.salaryGrowthPct
+          : 0
+      }));
+      current = migrated;
     }
     if (current.schemaVersion !== SCHEMA_VERSION) {
       throw new Error(`Unsupported schema version: ${raw.schemaVersion}.`);
@@ -1187,7 +1200,14 @@
       }
 
       const working = ages[index] < person.retireAge;
-      const salary = working ? person.salary * inflationFactor : 0;
+      const yearsElapsed = year - scenario.startYear;
+      const salaryGrowthFactor = Math.pow(
+        1 + (person.salaryGrowthPct ?? 0) / 100,
+        yearsElapsed
+      );
+      const salary = working
+        ? person.salary * inflationFactor * salaryGrowthFactor
+        : 0;
       salaries[index] = salary;
 
       state.superRetire[index] *= 1 + person.retirementReturnPct / 100;
@@ -1424,6 +1444,8 @@
       minRates: [0, 1].map(index =>
         mandatoryDraws[index] > 0 ? minDrawRate(ages[index]) : 0),
       components: {
+        workGross:
+          salaries.reduce((sum, value) => sum + value, 0) / inflationFactor,
         workNet:
           salaries.reduce((sum, value) => sum + value, 0) *
           taxableNetRatio / inflationFactor,
@@ -1487,6 +1509,10 @@
         }
         if (!finiteNonNegative(person.super)) {
           add(`people.${index}.super`, 'Super must be zero or greater.');
+        }
+        if (!finiteNonNegative(person.salaryGrowthPct)) {
+          add(`people.${index}.salaryGrowthPct`,
+            'Salary growth above inflation must be zero or greater.');
         }
         if (!finiteNonNegative(person.retireAge) || person.retireAge < person.age) {
           add(`people.${index}.retireAge`, 'Retirement age cannot be below current age.');
@@ -1918,6 +1944,8 @@
       ${moneyField('Super now', `${path}.super`, person.super)}
       ${numberField('Retire age', `${path}.retireAge`, person.retireAge, 'min="0" max="120"')}
       ${moneyField('Salary', `${path}.salary`, person.salary)}
+      ${numberField('Salary growth above inflation %', `${path}.salaryGrowthPct`,
+        person.salaryGrowthPct ?? 0, 'min="0" step="0.1"')}
       ${numberField('SG %', `${path}.sgPct`, person.sgPct, 'min="0" max="30" step="0.1"')}
       ${numberField('Super access age', `${path}.superAccessAge`, person.superAccessAge, 'min="0" max="120"')}
       ${numberField('Super access %', `${path}.superAccessPct`, person.superAccessPct, 'min="0" max="100" step="1"')}
