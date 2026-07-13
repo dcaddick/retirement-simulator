@@ -101,6 +101,22 @@ assert.equal(adaptedSchema9.schemaVersion, 3);
 assert.ok(!('lumpSumWithdrawals' in adaptedSchema9),
   'schema 9 disabled lump sums should be discarded by the adapter');
 
+const activeSchema10 = structuredClone(disabledSchema9);
+activeSchema10.schemaVersion = 10;
+activeSchema10.people[0].salaryGrowthPct = 1;
+activeSchema10.people[1].salaryGrowthPct = 0;
+assert.throws(
+  () => simulator.importScenario(JSON.stringify(activeSchema10)),
+  /cannot yet model above-inflation salary growth/,
+  'schema 10 active salary growth should be explicitly unsupported'
+);
+const zeroGrowthSchema10 = structuredClone(activeSchema10);
+zeroGrowthSchema10.people.forEach(person => { person.salaryGrowthPct = 0; });
+const adaptedSchema10 = simulator.importScenario(JSON.stringify(zeroGrowthSchema10));
+assert.equal(adaptedSchema10.schemaVersion, 3);
+assert.ok(adaptedSchema10.people.every(person => !('salaryGrowthPct' in person)),
+  'schema 10 zero salary growth should be removed by the adapter');
+
 const monteCarloCoreScript = scripts.find(script =>
   script.includes('RetirementMonteCarloCore')
 );
