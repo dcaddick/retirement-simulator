@@ -15,6 +15,17 @@ The Monte Carlo suite checks imported-scenario handling, risk-mode behaviour, de
 
 The repository workflow at `.github/workflows/test.yml` runs both commands with Node 20 for pull requests and pushes to `main`.
 
+## Archived release comparison
+
+The stable production entry point is `retirement-simulator.html`. Exact sanitized public snapshots are retained under `archive/`. To compare earlier interactions, open:
+
+```text
+archive/retirement-simulator-v1.0.1.html
+archive/retirement-simulator-v1.0.2.html
+```
+
+For the lump-sum regression, use fictional demo values, disable **Include Aged Pension estimate**, add a withdrawal and confirm no script-error banner appears. CI verifies each archived file against its release-tag Git blob.
+
 ## Browser verification
 
 Automated tests do not replace a real-browser pass. For user-interface changes, verify at least:
@@ -35,6 +46,9 @@ Automated tests do not replace a real-browser pass. For user-interface changes, 
 - both chart/table and table-height splitters, including persistence after reload;
 - lump-sum include/exclude toggles, concise tooltips and Event-column updates;
 - preservation of active tab, open sections, focus and panel/table scroll positions after recalculation.
+- per-person salary growth at 0% and a positive percentage, including retirement cutoff;
+- UK State Pension tooltips in today's and nominal dollars, showing after-tax allocation and gross value;
+- disabling the Age Pension estimate and then adding a lump-sum withdrawal without a script error.
 
 ### iPad Safari release check
 

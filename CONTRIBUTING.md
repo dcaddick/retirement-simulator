@@ -44,6 +44,7 @@ Keep changes focused and reviewable. Before opening a pull request:
 3. Check import/export, charts, responsive layout and error reporting when relevant.
 4. Run a privacy scan over the changed files.
 5. Update documentation and the changelog when behaviour changes.
+6. Before replacing the deterministic production build, preserve the outgoing sanitized `retirement-simulator.html` under `archive/retirement-simulator-vX.Y.Z.html`, verify it against its tag or release asset, and update `archive/README.md`. Never archive personal scenarios or screenshots.
 
 GitHub Actions runs both `.mjs` suites for pull requests and pushes to `main`. A contribution is not ready to merge while that workflow is failing, even if the change appears unrelated to the model.
 

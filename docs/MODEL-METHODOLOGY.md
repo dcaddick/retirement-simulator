@@ -39,6 +39,10 @@ The model separates accumulation and retirement-phase balances, accepts separate
 
 The interface displays a simple real-return spread calculated as nominal return minus inflation. Under the Treasury schedule it shows the long-run spread against 2.5% and, when different, the near-term spread against the modelled calendar-year rate. This readout is an assumption aid, not a forecast of purchasing-power returns.
 
+### Salary growth above inflation
+
+Each person's entered salary is indexed by the selected inflation path while they remain employed. The optional salary-growth-above-inflation percentage then compounds independently from the second model year: `salary × inflation factor × (1 + growth rate)^years elapsed`. The default is 0%, and no salary is included from the person's retirement age onward. The projected salary flows through SG contributions, taxable income, Age Pension income assessment and household drawdown requirements.
+
 ### Drawdown
 
 Guaranteed income and mandatory minimum payments are counted before discretionary top-ups. Users configure ordered drawdown tiers; a tier can split a draw between two sources.
@@ -54,6 +58,8 @@ Cash, savings, shareholdings, other income and other assets are simplified. Timi
 ### Foreign pensions and currency
 
 Australian defined-benefit income is the primary pension-entry path and uses AUD with fixed or CPI-linked indexation. UK State Pension is a secondary path with GBP/AUD conversion, frozen-uprating comparison and a simplified UPP tax deduction. Cross-border tax treatment and indexation can be complex; the model uses approximations rather than jurisdiction-specific advice.
+
+The projection table reports UK State Pension gross. The income chart remains an after-tax chart and allocates estimated household tax proportionally across charted taxable sources. Its UK State Pension tooltip therefore shows both the after-tax household allocation and gross pension value; that allocation is not a source-specific pension tax calculation.
 
 ## Today's dollars and nominal dollars
 

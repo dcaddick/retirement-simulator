@@ -2,6 +2,13 @@
 
 This changelog summarizes public, non-personal milestones. Early development used many private prototype snapshots; those files are intentionally not reproduced in the public repository.
 
+## Unreleased
+
+- Fixed the v1.03 lump-sum summary renderer so adding a withdrawal after changing the Age Pension setting no longer raises `formatMoney is not defined` ([#2](https://github.com/dcaddick/retirement-simulator/issues/2)).
+- Added optional compounded salary growth above inflation for each person, defaulting to 0%, with schema 10 migration and explicit Monte Carlo compatibility handling ([#3](https://github.com/dcaddick/retirement-simulator/issues/3)).
+- Clarified UK State Pension chart tooltips with both the after-tax household allocation and gross pension value; the projection table remains gross.
+- Added exact sanitized v1.0.1 and v1.0.2 executable snapshots under `archive/` for public regression testing and comparison.
+
 ## 1.03 - 2026-07-12
 
 - Collapsed completed lump sums into aligned modelling rows showing chevron, abbreviated amount, reason, intended month/year and an include checkbox.

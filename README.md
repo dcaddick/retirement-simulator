@@ -44,6 +44,8 @@ No server, account or build step is required.
 3. Start with the fictional sample, create a new scenario or import your own JSON file.
 4. Optionally export the scenario and import it into `retirement-monte-carlo-v0.5.html`.
 
+The stable live filename is always `retirement-simulator.html`. Exact sanitized public releases are also retained under [`archive/`](archive/) for regression testing and comparison.
+
 Scenario data stays in the browser's local storage unless you explicitly import or export a file. Both pages include a locally remembered light/dark theme control.
 
 ## Retirement Simulator
@@ -57,6 +59,7 @@ The deterministic simulator models a reusable two-person household and includes:
 - cash, savings, shareholdings, other income and other assets;
 - Australian income-tax estimates, Medicare, LITO/SAPTO, Age Pension and CSHC estimates;
 - Australian defined-benefit and UK State Pension support;
+- optional per-person salary growth above inflation, defaulting to 0%;
 - account-based pension minimum drawdowns;
 - Preferred Retirement Income, Essential Annual Budget and surplus banking;
 - today's-dollar and nominal-dollar views;
@@ -104,7 +107,7 @@ The suites exercise core calculations, schema migration, validation, CSP/market 
 
 ## Project history
 
-The original work evolved through many private prototypes. The public repository keeps the current tools and a sanitized [changelog](CHANGELOG.md), rather than publishing personal scenarios, internal handovers or duplicated historical source files.
+The original work evolved through many private prototypes. The public repository keeps the current tools, a sanitized [changelog](CHANGELOG.md), and exact sanitized production snapshots under [`archive/`](archive/) so technically capable users can compare and test older public iterations. Personal scenarios and private development artifacts are never archived here.
 
 ## Contributing
 
