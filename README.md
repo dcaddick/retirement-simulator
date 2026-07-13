@@ -17,7 +17,7 @@ Single HTML file · no installation · opens locally in a modern browser.
 
 ![Retirement Income Simulator v1.03 in its default dark theme, showing compact planned lump sums and the fictional John and Jane sample](docs/assets/retirement-simulator-v1.03.png)
 
-*The deterministic v1.03 simulator combines editable household assumptions, compact toggleable lump-sum planning, inspectable charts and a resizable year-by-year projection.*
+*The deterministic v1.04 simulator combines editable household assumptions, per-person salary progression, compact toggleable lump-sum planning, inspectable charts and a resizable year-by-year projection.*
 
 ## Yours to download and use
 

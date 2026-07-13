@@ -4,7 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src https://api.frankfurter.app https://stooq.com; base-uri 'none'; form-action 'none'" />
-<title>Family Retirement Income Simulator v1.04</title>
+<title>Family Retirement Income Simulator v1.03</title>
 <style>
   :root{
     --bg:#0f1720; --panel:#18232f; --panel2:#1e2c3a; --line:#2b3d4f;
@@ -181,7 +181,7 @@
 <div class="disclaimer-banner top" role="note">Local, reproducible retirement-risk analysis. Estimate only; not financial or tax advice.</div>
 <header>
   <div class="header-row">
-  <h1>Family Retirement Income Simulator <span class="version">v1.04</span></h1>
+  <h1>Family Retirement Income Simulator <span class="version">v1.03</span></h1>
   <nav class="header-actions" aria-label="Scenario actions">
     <button type="button" id="newScenario">New</button>
     <button type="button" id="resetSample">Reset sample</button>
@@ -365,9 +365,8 @@
             <li><b>Super access.</b> If a person reaches their super access age this year,
               the selected percentage of their whole balance moves to the ABP
               (retirement/drawdown) phase. This happens before growth.</li>
-            <li><b>Salary.</b> If still working: salary &times; inflation factor &times;
-              optional compounded growth above inflation (0% by default), plus SG
-              contributions (salary &times; SG% &times; 0.85 after contributions tax)
+            <li><b>Salary.</b> If still working: salary &times; inflation factor, plus
+              SG contributions (salary &times; SG% &times; 0.85 after contributions tax)
               into accumulation super.</li>
             <li><b>Investment growth.</b> The full year&rsquo;s estimated net return after fees and tax is applied:
               accumulation balance &times; (1 + accumulation return), ABP balance
@@ -398,7 +397,7 @@
       </details>
     </div>
     <div class="note">
-      <b>v1.04.</b> Fictional Australian couple sample data is stored locally on this device and can be imported or exported as JSON. Calculations are transparent estimates and are not financial or tax advice. The Display toggle switches the whole dashboard &mdash; table, chart and headline figures &mdash; between today&rsquo;s dollars and nominal (future) dollars, except the CSHC estimate which stays in today&rsquo;s dollars against its fixed threshold. Numeric inputs recalculate live as you type without moving your modelling position; the &ldquo;Recalculated&rdquo; stamp above the table confirms each run.
+      <b>v1.03.</b> Fictional Australian couple sample data is stored locally on this device and can be imported or exported as JSON. Calculations are transparent estimates and are not financial or tax advice. The Display toggle switches the whole dashboard &mdash; table, chart and headline figures &mdash; between today&rsquo;s dollars and nominal (future) dollars, except the CSHC estimate which stays in today&rsquo;s dollars against its fixed threshold. Numeric inputs recalculate live as you type without moving your modelling position; the &ldquo;Recalculated&rdquo; stamp above the table confirms each run.
     </div>
   </div>
 </div>
@@ -453,7 +452,7 @@
 <script id="simulator-core">
 (function () {
   'use strict';
-  const SCHEMA_VERSION = 10;
+  const SCHEMA_VERSION = 9;
   const VALID_OWNERS = new Set(['p0', 'p1', 'joint']);
   const DRAWDOWN_SOURCES = new Set(['p0Super', 'p1Super', 'cash', 'savings']);
   const OTHER_CURRENCIES = new Set(['AUD', 'GBP', 'USD']);
@@ -637,7 +636,6 @@
           superAccessAge: 65,
           superAccessPct: 100,
           salary: 85000,
-          salaryGrowthPct: 0,
           sgPct: 12,
           accumulationReturnPct: 5.5,
           retirementReturnPct: 6.5,
@@ -654,7 +652,6 @@
           superAccessAge: 65,
           superAccessPct: 100,
           salary: 45000,
-          salaryGrowthPct: 0,
           sgPct: 12,
           accumulationReturnPct: 5.5,
           retirementReturnPct: 6.5,
@@ -842,17 +839,6 @@
         lumpSumWithdrawals: (current.lumpSumWithdrawals ?? []).map(item => ({
           ...item, month: 1
         })) };
-    }
-    if (current.schemaVersion === 9) {
-      const migrated = structuredClone(current);
-      migrated.schemaVersion = 10;
-      migrated.people = migrated.people.map(person => ({
-        ...person,
-        salaryGrowthPct: Number.isFinite(person.salaryGrowthPct)
-          ? person.salaryGrowthPct
-          : 0
-      }));
-      current = migrated;
     }
     if (current.schemaVersion !== SCHEMA_VERSION) {
       throw new Error(`Unsupported schema version: ${raw.schemaVersion}.`);
@@ -1201,14 +1187,7 @@
       }
 
       const working = ages[index] < person.retireAge;
-      const yearsElapsed = year - scenario.startYear;
-      const salaryGrowthFactor = Math.pow(
-        1 + (person.salaryGrowthPct ?? 0) / 100,
-        yearsElapsed
-      );
-      const salary = working
-        ? person.salary * inflationFactor * salaryGrowthFactor
-        : 0;
+      const salary = working ? person.salary * inflationFactor : 0;
       salaries[index] = salary;
 
       state.superRetire[index] *= 1 + person.retirementReturnPct / 100;
@@ -1445,8 +1424,6 @@
       minRates: [0, 1].map(index =>
         mandatoryDraws[index] > 0 ? minDrawRate(ages[index]) : 0),
       components: {
-        workGross:
-          salaries.reduce((sum, value) => sum + value, 0) / inflationFactor,
         workNet:
           salaries.reduce((sum, value) => sum + value, 0) *
           taxableNetRatio / inflationFactor,
@@ -1510,10 +1487,6 @@
         }
         if (!finiteNonNegative(person.super)) {
           add(`people.${index}.super`, 'Super must be zero or greater.');
-        }
-        if (!finiteNonNegative(person.salaryGrowthPct)) {
-          add(`people.${index}.salaryGrowthPct`,
-            'Salary growth above inflation must be zero or greater.');
         }
         if (!finiteNonNegative(person.retireAge) || person.retireAge < person.age) {
           add(`people.${index}.retireAge`, 'Retirement age cannot be below current age.');
@@ -1703,14 +1676,6 @@
         .join(' · ');
       return [context, detail];
     }
-    if (segment.key === 'ukStateNet') {
-      const factor = segment.displayFactor ?? 1;
-      return [
-        context,
-        `${formatMoney(segment.value)} after estimated household tax allocation`,
-        `${formatMoney((row.components?.ukStateGross ?? 0) * factor)} gross ${segment.label}`
-      ];
-    }
     const factor = segment.displayFactor ?? 1;
     return [context,
       `${formatMoney(segment.value)} this year from ${segment.label}, contributing to total ${formatMoney(row.totalIncome * factor)}`];
@@ -1779,12 +1744,11 @@
   'use strict';
 
   const core = globalThis.RetirementSimulatorCore;
-  const STORAGE_KEY = 'family-retirement-simulator:v1.04:scenario';
+  const STORAGE_KEY = 'family-retirement-simulator:v1.03:scenario';
   const THEME_STORAGE_KEY = 'retirement-simulator-theme';
   // Read-only fallbacks so scenarios saved under earlier versions carry over
   // on first load (they migrate to the current schema automatically).
   const LEGACY_STORAGE_KEYS = [
-    'family-retirement-simulator:v1.03:scenario',
     'family-retirement-simulator:v1.02:scenario',
     'family-retirement-simulator:v0.99:scenario',
     'family-retirement-simulator:v0.98:scenario',
@@ -1954,8 +1918,6 @@
       ${moneyField('Super now', `${path}.super`, person.super)}
       ${numberField('Retire age', `${path}.retireAge`, person.retireAge, 'min="0" max="120"')}
       ${moneyField('Salary', `${path}.salary`, person.salary)}
-      ${numberField('Salary growth above inflation %', `${path}.salaryGrowthPct`,
-        person.salaryGrowthPct ?? 0, 'min="0" step="0.1"')}
       ${numberField('SG %', `${path}.sgPct`, person.sgPct, 'min="0" max="30" step="0.1"')}
       ${numberField('Super access age', `${path}.superAccessAge`, person.superAccessAge, 'min="0" max="120"')}
       ${numberField('Super access %', `${path}.superAccessPct`, person.superAccessPct, 'min="0" max="100" step="1"')}
@@ -2055,7 +2017,7 @@
     const amount = Number(value) || 0;
     if (Math.abs(amount) >= 1000000) return `$${(amount / 1000000).toFixed(amount % 1000000 ? 1 : 0)}M`;
     if (Math.abs(amount) >= 1000) return `$${(amount / 1000).toFixed(amount % 1000 ? 1 : 0)}K`;
-    return core.formatMoney(amount);
+    return formatMoney(amount);
   }
 
   function lumpDateLabel(item) {

@@ -70,9 +70,11 @@ check('return assumptions are explained below the table',
 check('assumptions and methodology moved out of the controls panel',
   html.indexOf('<summary>Model assumptions and sources</summary>') > html.indexOf('<div class="tblwrap">') &&
   html.indexOf('id="methodologySection"') > html.indexOf('<div class="tblwrap">'));
-check('v1.03 document version is consistent',
-  html.includes('<title>Family Retirement Income Simulator v1.03</title>') &&
-  html.includes('<span class="version">v1.03</span>'));
+check('v1.04 document version is consistent',
+  html.includes('<title>Family Retirement Income Simulator v1.04</title>') &&
+  html.includes('<span class="version">v1.04</span>') &&
+  html.includes("const STORAGE_KEY = 'family-retirement-simulator:v1.04:scenario'") &&
+  html.includes("'family-retirement-simulator:v1.03:scenario'"));
 check('returns and inflation share a dedicated upper controls block',
   html.indexOf('id="returnAssumptions"') < html.indexOf('id="peopleFields"') &&
   html.includes('Estimated net returns after fees and tax'));
