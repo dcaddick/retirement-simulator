@@ -1,14 +1,14 @@
 ---
-title: Lump-sum regression fix and release archive design
+title: Simulator regression fixes and release archive design
 date: 2026-07-13
 status: approved-design
 ---
 
-# Lump-sum Regression Fix and Release Archive Design
+# Simulator Regression Fixes and Release Archive Design
 
 ## Goal
 
-Fix issue #2, which raises `ReferenceError: formatMoney is not defined` when a lump-sum withdrawal is added after the Age Pension estimate is disabled, and establish a public archive of sanitized deterministic simulator releases for repeatable cross-version testing.
+Fix issue #2, which raises `ReferenceError: formatMoney is not defined` when a lump-sum withdrawal is added after the Age Pension estimate is disabled; clarify the UK State Pension chart tooltip's gross-versus-after-tax values; and establish a public archive of sanitized deterministic simulator releases for repeatable cross-version testing.
 
 ## Version and filename model
 
@@ -55,11 +55,26 @@ The comparison identifies the first affected release and captures the actual fai
 
 The implementation makes the smallest source correction supported by the reproduced stack. The expected failure is an out-of-scope money formatter reference; if confirmed, the UI path must call the formatter through its exported core namespace. No calculation, schema, layout, or modelling behavior changes are in scope.
 
+## UK State Pension tooltip clarification
+
+The projection table remains unchanged and continues to show `UK State Pension (gross)`. The chart remains an after-tax income chart so its stacked total stays comparable with the household's after-tax retirement-income target.
+
+When a UK State Pension chart segment is inspected, its tooltip shows both:
+
+```text
+$40,172 after estimated household tax allocation
+$45,809 gross UK State Pension
+```
+
+The values are calculated from the existing `ukStateNet` and `ukStateGross` row components using the active display mode. The wording deliberately describes an estimated household tax allocation rather than implying that the pension independently generated the allocated tax.
+
+No tax calculation changes are included. The apparent late-model decline is a minor attribution edge case: the chart applies a household-wide taxable-net ratio that includes total household tax, including tax associated with interest or gains, across the charted taxable-income sources. It is not modelled as nominal tax-bracket creep because taxable income is deflated before the tax thresholds are applied.
+
 ## Test coverage
 
-The repository gains a durable sanitized interaction regression test for the toggle-then-add sequence. It must fail against every affected archived release and pass against the corrected production file. Existing deterministic and Monte Carlo Node suites must continue to pass.
+The repository gains a durable sanitized interaction regression test for the toggle-then-add sequence. It must fail against every affected archived release and pass against the corrected production file. A focused tooltip check verifies that the UK State Pension tooltip reports both the display-adjusted `ukStateNet` and `ukStateGross` values with the approved labels. Existing deterministic and Monte Carlo Node suites must continue to pass.
 
-A real-browser verification repeats the interaction against v1.0.1, v1.0.2, the pre-fix v1.03 state, and corrected v1.03. Screenshots are unnecessary; test output must not include personal data.
+A real-browser verification repeats the lump-sum interaction against v1.0.1, v1.0.2, the pre-fix v1.03 state, and corrected v1.03, then checks the clarified pension tooltip in both today's-dollar and nominal display modes. Screenshots are unnecessary; test output must not include personal data.
 
 ## Documentation and contributor workflow
 
