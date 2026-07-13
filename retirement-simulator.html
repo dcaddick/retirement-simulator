@@ -1702,6 +1702,14 @@
         .join(' · ');
       return [context, detail];
     }
+    if (segment.key === 'ukStateNet') {
+      const factor = segment.displayFactor ?? 1;
+      return [
+        context,
+        `${formatMoney(segment.value)} after estimated household tax allocation`,
+        `${formatMoney((row.components?.ukStateGross ?? 0) * factor)} gross ${segment.label}`
+      ];
+    }
     const factor = segment.displayFactor ?? 1;
     return [context,
       `${formatMoney(segment.value)} this year from ${segment.label}, contributing to total ${formatMoney(row.totalIncome * factor)}`];

@@ -296,6 +296,22 @@ const normalTooltip = core.chartTooltipLines(
   { ...lumpRow, totalIncome: 80000 }, withLump);
 check('normal tooltip contains only source contribution sentence',
   normalTooltip.length === 2 && normalTooltip[1] === '$17,475 this year from Jane super drawdown, contributing to total $80,000');
+const pensionTooltip = core.chartTooltipLines(
+  { key: 'ukStateNet', value: 40172, label: 'UK State Pension', displayFactor: 1 },
+  { ...lumpRow, year: 2062, ages: [100, 101], totalIncome: 199349,
+    components: { ...lumpRow.components, ukStateGross: 45809 } },
+  withLump);
+check('UK pension tooltip distinguishes allocated net from gross',
+  pensionTooltip[1] === '$40,172 after estimated household tax allocation' &&
+  pensionTooltip[2] === '$45,809 gross UK State Pension',
+  JSON.stringify(pensionTooltip));
+const nominalPensionTooltip = core.chartTooltipLines(
+  { key: 'ukStateNet', value: 80344, label: 'UK State Pension', displayFactor: 2 },
+  { ...lumpRow, components: { ...lumpRow.components, ukStateGross: 45809 } },
+  withLump);
+check('nominal UK pension tooltip applies the display factor to gross',
+  nominalPensionTooltip[2] === '$91,618 gross UK State Pension',
+  JSON.stringify(nominalPensionTooltip));
 check('tooltip markup removes target and per-year noise',
   !html.includes('Target met</span>') && !html.includes('per year</span>'));
 const disabledLump = structuredClone(withLump);
