@@ -13,8 +13,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: 20
+      - name: Verify archived v1.0.1 source
+        run: test "$(git hash-object archive/retirement-simulator-v1.0.1.html)" = "$(git rev-parse v1.0.1:retirement-simulator.html)"
+      - name: Verify archived v1.0.2 source
+        run: test "$(git hash-object archive/retirement-simulator-v1.0.2.html)" = "$(git rev-parse v1.0.2:retirement-simulator.html)"
       - run: node tests/retirement-simulator.test.mjs
       - run: node tests/retirement-monte-carlo.test.mjs
