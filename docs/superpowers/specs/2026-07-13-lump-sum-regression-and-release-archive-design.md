@@ -8,7 +8,7 @@ status: approved-design
 
 ## Goal
 
-Fix issue #2, which raises `ReferenceError: formatMoney is not defined` when a lump-sum withdrawal is added after the Age Pension estimate is disabled; clarify the UK State Pension chart tooltip's gross-versus-after-tax values; and establish a public archive of sanitized deterministic simulator releases for repeatable cross-version testing.
+Fix issue #2, which raises `ReferenceError: formatMoney is not defined` when a lump-sum withdrawal is added after the Age Pension estimate is disabled; implement issue #3's optional per-person salary growth above inflation; clarify the UK State Pension chart tooltip's gross-versus-after-tax values; and establish a public archive of sanitized deterministic simulator releases for repeatable cross-version testing.
 
 ## Version and filename model
 
@@ -70,9 +70,25 @@ The values are calculated from the existing `ukStateNet` and `ukStateGross` row 
 
 No tax calculation changes are included. The apparent late-model decline is a minor attribution edge case: the chart applies a household-wide taxable-net ratio that includes total household tax, including tax associated with interest or gains, across the charted taxable-income sources. It is not modelled as nominal tax-bracket creep because taxable income is deflated before the tax thresholds are applied.
 
+## Per-person salary growth above inflation
+
+Each person gains a `Salary growth above inflation %` input corresponding to issue #3. The stored value defaults to `0`, preserving current results and keeping the simulator neutral unless a user explicitly models above-inflation progression.
+
+For working model year `n`, where the starting year is `n = 0`:
+
+```text
+salary = entered salary
+  × cumulative inflation factor
+  × (1 + salary growth percentage / 100) ^ n
+```
+
+The starting model year therefore uses the entered salary without an increment. Growth compounds from each subsequent year and stops when that person reaches their retirement age. The projected salary continues through the existing calculation paths for SG contributions, taxable income, estimated tax, Age Pension income assessment, chart values, table values and household drawdown requirements.
+
+The field is independent for each person. Scenario schema 9 advances to schema 10; migration supplies `0` for existing scenarios. Validation accepts a finite non-negative percentage. Help text and methodology distinguish ordinary inflation indexing from this optional real salary-growth assumption. The Monte Carlo schema adapter must retain its existing compatibility behavior after the schema advance.
+
 ## Test coverage
 
-The repository gains a durable sanitized interaction regression test for the toggle-then-add sequence. It must fail against every affected archived release and pass against the corrected production file. A focused tooltip check verifies that the UK State Pension tooltip reports both the display-adjusted `ukStateNet` and `ukStateGross` values with the approved labels. Existing deterministic and Monte Carlo Node suites must continue to pass.
+The repository gains a durable sanitized interaction regression test for the toggle-then-add sequence. It must fail against every affected archived release and pass against the corrected production file. A focused tooltip check verifies that the UK State Pension tooltip reports both the display-adjusted `ukStateNet` and `ukStateGross` values with the approved labels. Salary tests verify zero-growth compatibility, compounded positive growth, different values per person, downstream SG effects and the retirement cutoff. Existing deterministic and Monte Carlo Node suites must continue to pass.
 
 A real-browser verification repeats the lump-sum interaction against v1.0.1, v1.0.2, the pre-fix v1.03 state, and corrected v1.03, then checks the clarified pension tooltip in both today's-dollar and nominal display modes. Screenshots are unnecessary; test output must not include personal data.
 
@@ -90,4 +106,4 @@ This intentionally supersedes the earlier policy of relying only on Git history 
 
 ## Delivery
 
-Work occurs on `codex/fix-issue-2-archives`, based on the local v1.03 implementation branch. The completed change is committed, pushed, and opened as a pull request linked to issue #2. Creating a v1.03 release, replacing `origin/main`, or publishing a release asset is outside this change and requires separate approval.
+Work occurs on `codex/fix-issue-2-archives`, based on the local v1.03 implementation branch. The completed change is committed, pushed, and opened as a pull request linked to issues #2 and #3. Creating a v1.03 release, replacing `origin/main`, or publishing a release asset is outside this change and requires separate approval.
