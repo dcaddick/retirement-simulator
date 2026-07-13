@@ -124,6 +124,8 @@ check('lump controls retain iPad touch targets',
   html.includes('.lump-chevron,.lump-summary-enabled{min-width:44px;min-height:44px'));
 check('lump editor displays latest intended year first',
   html.includes('.sort((a, b) => b.item.year - a.item.year || a.index - b.index)'));
+check('compact lump-sum formatter uses the exported core formatter',
+  /function compactMoney\([^)]+\)\s*\{[\s\S]*?return core\.formatMoney\(amount\);[\s\S]*?\}/.test(html));
 check('table height splitter is accessible and persistent',
   html.includes('id="tableHeightSplitter"') &&
   html.includes('family-retirement-simulator:table-height'));

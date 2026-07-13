@@ -2017,7 +2017,7 @@
     const amount = Number(value) || 0;
     if (Math.abs(amount) >= 1000000) return `$${(amount / 1000000).toFixed(amount % 1000000 ? 1 : 0)}M`;
     if (Math.abs(amount) >= 1000) return `$${(amount / 1000).toFixed(amount % 1000 ? 1 : 0)}K`;
-    return formatMoney(amount);
+    return core.formatMoney(amount);
   }
 
   function lumpDateLabel(item) {
