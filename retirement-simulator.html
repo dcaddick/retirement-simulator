@@ -1511,6 +1511,22 @@
         if (!finiteNonNegative(person.super)) {
           add(`people.${index}.super`, 'Super must be zero or greater.');
         }
+        if (!finiteNonNegative(person.salary)) {
+          add(`people.${index}.salary`, 'Salary must be zero or greater.');
+        }
+        if (!Number.isFinite(person.sgPct) || person.sgPct < 0 || person.sgPct > 30) {
+          add(`people.${index}.sgPct`, 'SG % must be between 0 and 30.');
+        }
+        if (!Number.isFinite(person.accumulationReturnPct) ||
+            person.accumulationReturnPct < -20 || person.accumulationReturnPct > 30) {
+          add(`people.${index}.accumulationReturnPct`,
+            'Accumulation return % must be between -20 and 30.');
+        }
+        if (!Number.isFinite(person.retirementReturnPct) ||
+            person.retirementReturnPct < -20 || person.retirementReturnPct > 30) {
+          add(`people.${index}.retirementReturnPct`,
+            'Retirement return % must be between -20 and 30.');
+        }
         if (!finiteNonNegative(person.salaryGrowthPct)) {
           add(`people.${index}.salaryGrowthPct`,
             'Salary growth above inflation must be zero or greater.');
@@ -1661,6 +1677,13 @@
     }
     if (!['treasury', 'manual'].includes(scenario.assumptions?.inflationMode)) {
       add('assumptions.inflationMode', 'Inflation mode must be Treasury or manual.');
+    }
+    if (scenario.assumptions?.inflationMode === 'manual' &&
+        (!Number.isFinite(scenario.assumptions.manualInflationPct) ||
+          scenario.assumptions.manualInflationPct < 0 ||
+          scenario.assumptions.manualInflationPct > 20)) {
+      add('assumptions.manualInflationPct',
+        'Manual inflation % must be between 0 and 20.');
     }
     const horizonEnd = scenario.startYear + scenario.household.modelEndAge - scenario.people[0].age;
     const validLumpSources = new Set(['automatic', ...DRAWDOWN_SOURCES,

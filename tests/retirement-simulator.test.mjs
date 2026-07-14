@@ -362,6 +362,54 @@ check('negative salary growth is rejected',
   core.validateScenario(badSalaryGrowth)
     .some(error => error.path === 'people.0.salaryGrowthPct'));
 
+function validationPathsFor(path, values, prepare = scenario => scenario) {
+  return values.map(value => {
+    const scenario = prepare(structuredClone(sample));
+    const parts = path.split('.');
+    let target = scenario;
+    for (const part of parts.slice(0, -1)) target = target[part];
+    target[parts.at(-1)] = value;
+    return core.validateScenario(scenario).map(error => error.path);
+  });
+}
+
+check('salary rejects malformed values',
+  validationPathsFor('people.0.salary', [-1, 'abc', NaN, Infinity])
+    .every(paths => paths.includes('people.0.salary')));
+check('SG rejects malformed and out-of-range values',
+  validationPathsFor('people.0.sgPct', [-1, 31, null, NaN])
+    .every(paths => paths.includes('people.0.sgPct')));
+check('accumulation return rejects malformed and out-of-range values',
+  validationPathsFor('people.0.accumulationReturnPct', [-21, 31, null, NaN])
+    .every(paths => paths.includes('people.0.accumulationReturnPct')));
+check('retirement return rejects malformed and out-of-range values',
+  validationPathsFor('people.0.retirementReturnPct', [-21, 31, undefined, Infinity])
+    .every(paths => paths.includes('people.0.retirementReturnPct')));
+check('manual inflation rejects malformed and out-of-range values',
+  validationPathsFor('assumptions.manualInflationPct', [-1, 21, 'x', NaN], scenario => {
+    scenario.assumptions.inflationMode = 'manual';
+    return scenario;
+  }).every(paths => paths.includes('assumptions.manualInflationPct')));
+
+const validBoundaries = structuredClone(sample);
+validBoundaries.people[0].salary = 0;
+validBoundaries.people[0].sgPct = 0;
+validBoundaries.people[0].accumulationReturnPct = -20;
+validBoundaries.people[0].retirementReturnPct = 30;
+validBoundaries.people[1].sgPct = 30;
+validBoundaries.people[1].accumulationReturnPct = 30;
+validBoundaries.people[1].retirementReturnPct = -20;
+validBoundaries.assumptions.inflationMode = 'manual';
+validBoundaries.assumptions.manualInflationPct = 20;
+check('critical numeric boundaries validate', core.validateScenario(validBoundaries).length === 0,
+  JSON.stringify(core.validateScenario(validBoundaries)));
+
+const treasuryUnused = structuredClone(sample);
+delete treasuryUnused.assumptions.manualInflationPct;
+check('Treasury mode ignores unused manual inflation',
+  !core.validateScenario(treasuryUnused)
+    .some(error => error.path === 'assumptions.manualInflationPct'));
+
 console.log('\nmigration v5 -> v6');
 const v5 = structuredClone(sample);
 v5.schemaVersion = 5;
