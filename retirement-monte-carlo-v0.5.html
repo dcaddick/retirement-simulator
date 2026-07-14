@@ -710,9 +710,17 @@
   }
 
   function adaptV1ScenarioForExperimentalMonteCarlo(scenario) {
-    if (![6, 7, 8, 9, 10].includes(scenario.schemaVersion)) return scenario;
+    if (![6, 7, 8, 9, 10, 11].includes(scenario.schemaVersion)) return scenario;
     if (scenario.people?.some(person => Number(person.salaryGrowthPct) > 0)) {
       throw new Error('Monte Carlo v0.5 cannot yet model above-inflation salary growth. Set it to 0% in a fictional copy before importing.');
+    }
+    const activeShareReturns = (scenario.shareholdings ?? []).some(holding =>
+      Number(holding.priceGrowthPct) !== 0 ||
+      Number(holding.dividendYieldPct) !== 0 ||
+      Number(holding.frankedPct) !== 0 ||
+      holding.frankingEligible === true);
+    if (activeShareReturns) {
+      throw new Error('Monte Carlo v0.5 cannot yet model v1.06 share price growth, dividends or franking. Set those fields to zero/off in a fictional copy before importing.');
     }
     if ((scenario.otherIncomes ?? []).length || (scenario.otherAssets ?? []).length) {
       throw new Error('Monte Carlo v0.5 cannot yet model populated Other income or Other assets. Remove them from a fictional copy before importing.');
@@ -740,6 +748,13 @@
     delete adapted.otherIncomes;
     delete adapted.otherAssets;
     delete adapted.lumpSumWithdrawals;
+    adapted.shareholdings = (adapted.shareholdings ?? []).map(holding => {
+      const {
+        priceGrowthPct, dividendYieldPct, frankedPct,
+        companyTaxRatePct, frankingEligible, ...supported
+      } = holding;
+      return supported;
+    });
     return adapted;
   }
 

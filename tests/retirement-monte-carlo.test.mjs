@@ -117,6 +117,33 @@ assert.equal(adaptedSchema10.schemaVersion, 3);
 assert.ok(adaptedSchema10.people.every(person => !('salaryGrowthPct' in person)),
   'schema 10 zero salary growth should be removed by the adapter');
 
+const activeSchema11 = structuredClone(v1Scenario);
+activeSchema11.schemaVersion = 11;
+activeSchema11.people.forEach(person => { person.salaryGrowthPct = 0; });
+activeSchema11.shareholdings = [{
+  id: 'growth-share', symbol: 'BHP', quantity: 100,
+  quoteCurrency: 'AUD', quoteMarket: 'manual', price: 40, fxToAud: 1,
+  owner: 'joint', costBaseAud: 3000, cgtDiscountEligible: true,
+  saleYear: activeSchema11.startYear + 10, saleMonth: 1,
+  priceGrowthPct: 3, dividendYieldPct: 4, frankedPct: 100,
+  companyTaxRatePct: 30, frankingEligible: true
+}];
+assert.throws(
+  () => simulator.importScenario(JSON.stringify(activeSchema11)),
+  /cannot yet model v1\.06 share price growth, dividends or franking/i);
+
+const inertSchema11 = structuredClone(activeSchema11);
+Object.assign(inertSchema11.shareholdings[0], {
+  priceGrowthPct: 0, dividendYieldPct: 0, frankedPct: 0,
+  companyTaxRatePct: 30, frankingEligible: false
+});
+const adaptedSchema11 = simulator.importScenario(JSON.stringify(inertSchema11));
+assert.equal(adaptedSchema11.schemaVersion, 3);
+for (const key of ['priceGrowthPct', 'dividendYieldPct', 'frankedPct',
+  'companyTaxRatePct', 'frankingEligible']) {
+  assert.ok(!(key in adaptedSchema11.shareholdings[0]), `${key} should be stripped`);
+}
+
 const monteCarloCoreScript = scripts.find(script =>
   script.includes('RetirementMonteCarloCore')
 );
