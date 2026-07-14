@@ -1602,14 +1602,16 @@
       ukState.reduce((sum, value) => sum + value, 0) / inflationFactor +
       (otherTaxableNominal + otherNonTaxableNominal) / inflationFactor +
       deemedIncome(assessableAssetsReal);
-    const bothAgePensionAge = ages.every(age => age >= 67);
-    const agePensionReal = scenario.household.includeAgePension && bothAgePensionAge
-      ? agePensionCouple({
-          assets: assessableAssetsReal + otherAssetsReal,
-          assessableIncome: agePensionIncomeReal
-        })
-      : 0;
+    const agePension = agePensionForAges({
+      ages,
+      assets: assessableAssetsReal + otherAssetsReal,
+      assessableIncome: agePensionIncomeReal,
+      included: scenario.household.includeAgePension
+    });
+    const agePensionReal = agePension.household;
     const agePensionNominal = agePensionReal * inflationFactor;
+    const agePensionByPersonNominal = agePension.byPerson.map(
+      value => value * inflationFactor);
 
     const mandatoryDraws = [0, 0];
     if (scenario.household.applyMinimumDrawdown) {
@@ -1628,7 +1630,7 @@
     const baseTaxableNominal = [0, 1].map(index =>
       salaries[index] +
       ukState[index] * (1 - uppRate) +
-      agePensionNominal / 2 +
+      agePensionByPersonNominal[index] +
       otherTaxableByPerson[index] +
       interestByPerson[index]
     );

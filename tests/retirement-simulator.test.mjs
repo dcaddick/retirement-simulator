@@ -593,6 +593,90 @@ check('younger partner super remains exempt until age 67',
     superBalances: [100000, 200000], ages: [67, 67]
   }) === 300000);
 
+function makeAgeGapScenario(ages = [66, 64]) {
+  const scenario = structuredClone(sample);
+  scenario.startYear = 2026;
+  scenario.people.forEach((person, index) => {
+    person.age = ages[index];
+    person.retireAge = Math.max(person.retireAge, ages[index]);
+    person.salary = 0;
+    person.super = 0;
+    person.ukStateAnnualGbp = 0;
+  });
+  scenario.cash.amount = 0;
+  scenario.savings.amount = 0;
+  scenario.shareholdings = [];
+  scenario.lumpSumWithdrawals = [];
+  scenario.otherIncomes = [];
+  scenario.otherAssets = [];
+  scenario.household.targetAfterTax = 0;
+  scenario.household.annualBudget = 0;
+  scenario.household.modelEndAge = 70;
+  scenario.household.applyMinimumDrawdown = false;
+  scenario.household.includeAgePension = true;
+  scenario.assumptions.inflationMode = 'manual';
+  scenario.assumptions.manualInflationPct = 0;
+  return scenario;
+}
+
+const ageGapRows = core.projectScenario(makeAgeGapScenario()).rows;
+const maximumCouplePension = core.SERVICES_AUSTRALIA_2026
+  .agePensionMaxCoupleAnnual;
+check('age-gap projection starts at zero',
+  ageGapRows[0].ages[0] === 66 && ageGapRows[0].ages[1] === 64 &&
+  ageGapRows[0].components.agePensionNet === 0);
+check('age-gap projection pays half when one partner reaches 67',
+  ageGapRows[1].ages[0] === 67 && ageGapRows[1].ages[1] === 65 &&
+  Math.abs(ageGapRows[1].components.agePensionNet -
+    maximumCouplePension / 2) < 0.01);
+check('age-gap projection pays full when both partners reach 67',
+  ageGapRows[3].ages[0] === 69 && ageGapRows[3].ages[1] === 67 &&
+  Math.abs(ageGapRows[3].components.agePensionNet -
+    maximumCouplePension) < 0.01);
+
+const reversedAgeGap = core.projectScenario(
+  makeAgeGapScenario([66, 67])).rows[0];
+check('age-gap projection is independent of person order',
+  Math.abs(reversedAgeGap.components.agePensionNet -
+    maximumCouplePension / 2) < 0.01);
+
+const disabledAgeGap = makeAgeGapScenario([67, 67]);
+disabledAgeGap.household.includeAgePension = false;
+check('disabled Age Pension remains zero in projection',
+  core.projectScenario(disabledAgeGap).rows[0].components.agePensionNet === 0);
+
+const taperedInputs = {
+  assets: core.SERVICES_AUSTRALIA_2026.homeownerAssetFreeArea + 100000,
+  assessableIncome: core.SERVICES_AUSTRALIA_2026.incomeFreeAreaCoupleAnnual + 1000
+};
+const taperedOneEligible = core.agePensionForAges({
+  ages: [67, 66], ...taperedInputs, included: true
+});
+check('combined means tests run before the one-eligible multiplier',
+  taperedOneEligible.household ===
+    core.agePensionCouple(taperedInputs) / 2);
+
+const taxedAgeGap = makeAgeGapScenario([67, 66]);
+taxedAgeGap.otherIncomes = [{
+  id: 'age-gap-tax', label: 'Taxable income', currency: 'AUD', fxToAud: 1,
+  amount: 40000, taxable: true, owner: 'p0'
+}];
+const taxedAgeGapRow = core.projectScenario(taxedAgeGap).rows[0];
+const expectedPension = core.agePensionForAges({
+  ages: [67, 66], assets: 0, assessableIncome: 40000, included: true
+}).household;
+const expectedEligibleTax = core.projectionNetTax({
+  taxableNominal: 40000 + expectedPension,
+  rebateNominal: 40000 + expectedPension,
+  inflationFactor: 1,
+  year: 2026,
+  seniorEligible: true
+});
+check('one-eligible pension is taxed only to the eligible person',
+  Math.abs(taxedAgeGapRow.taxLedger[0].baseTax.beforeFrankingNominal -
+    expectedEligibleTax) < 0.01 &&
+  taxedAgeGapRow.taxLedger[1].baseTax.beforeFrankingNominal === 0);
+
 console.log('\nprojection tax basis');
 const projectionNetTax = core.projectionNetTax ?? (() => NaN);
 const taxNow = projectionNetTax({
