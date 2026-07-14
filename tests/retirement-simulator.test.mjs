@@ -540,6 +540,59 @@ check('income at free area leaves pension unchanged',
 check('income above free area tapers at 50 cents combined',
   core.agePensionIncomeRate(freeArea + 1000) === maximumPension - 500);
 
+console.log('\nAge Pension age-gap eligibility');
+const pensionInputs = { assets: 0, assessableIncome: 0 };
+const fullCouplePension = core.agePensionCouple(pensionInputs);
+
+check('Age Pension eligibility helper is exported',
+  typeof core.agePensionForAges === 'function');
+
+if (typeof core.agePensionForAges === 'function') {
+  const neitherEligible = core.agePensionForAges({
+    ages: [66, 66], ...pensionInputs, included: true
+  });
+  const person0Eligible = core.agePensionForAges({
+    ages: [67, 66], ...pensionInputs, included: true
+  });
+  const person1Eligible = core.agePensionForAges({
+    ages: [66, 67], ...pensionInputs, included: true
+  });
+  const bothEligible = core.agePensionForAges({
+    ages: [67, 67], ...pensionInputs, included: true
+  });
+  const switchedOff = core.agePensionForAges({
+    ages: [67, 67], ...pensionInputs, included: false
+  });
+
+  check('neither eligible produces zero',
+    neitherEligible.household === 0 &&
+    neitherEligible.byPerson.every(value => value === 0));
+  check('Person 1 receives one partnered share',
+    person0Eligible.household === fullCouplePension / 2 &&
+    person0Eligible.byPerson[0] === fullCouplePension / 2 &&
+    person0Eligible.byPerson[1] === 0);
+  check('Person 2 receives one partnered share',
+    person1Eligible.household === fullCouplePension / 2 &&
+    person1Eligible.byPerson[0] === 0 &&
+    person1Eligible.byPerson[1] === fullCouplePension / 2);
+  check('both eligible receive the combined couple rate',
+    bothEligible.household === fullCouplePension &&
+    bothEligible.byPerson.every(value => value === fullCouplePension / 2));
+  check('Age Pension switch remains authoritative',
+    switchedOff.household === 0 &&
+    switchedOff.byPerson.every(value => value === 0));
+}
+
+check('younger partner super remains exempt until age 67',
+  core.assessableFinancialAssets({
+    cash: 0, savings: 0, shareholdings: [],
+    superBalances: [100000, 200000], ages: [67, 66]
+  }) === 100000 &&
+  core.assessableFinancialAssets({
+    cash: 0, savings: 0, shareholdings: [],
+    superBalances: [100000, 200000], ages: [67, 67]
+  }) === 300000);
+
 console.log('\nprojection tax basis');
 const projectionNetTax = core.projectionNetTax ?? (() => NaN);
 const taxNow = projectionNetTax({

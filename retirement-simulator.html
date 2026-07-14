@@ -632,6 +632,24 @@
     );
   }
 
+  function agePensionForAges({
+    ages, assets, assessableIncome, included = true
+  }) {
+    const eligible = ages.map(age => age >= 67);
+    const eligibleCount = eligible.filter(Boolean).length;
+    if (!included || eligibleCount === 0) {
+      return { eligibleCount, household: 0, byPerson: [0, 0] };
+    }
+    const household = agePensionCouple({ assets, assessableIncome }) *
+      eligibleCount / 2;
+    return {
+      eligibleCount,
+      household,
+      byPerson: eligible.map(isEligible =>
+        isEligible ? household / eligibleCount : 0)
+    };
+  }
+
   function cshcEstimate({ adjustedTaxableIncome, accountBasedPensionBalance }) {
     const deemedAbpIncome = deemedIncome(accountBasedPensionBalance);
     const assessedIncome = adjustedTaxableIncome + deemedAbpIncome;
@@ -2130,6 +2148,7 @@
     agePensionAssetsRate,
     agePensionIncomeRate,
     agePensionCouple,
+    agePensionForAges,
     cshcEstimate,
     assessableFinancialAssets,
     makeProjectionState,
