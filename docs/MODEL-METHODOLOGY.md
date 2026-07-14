@@ -12,14 +12,15 @@ Each projection row represents one year. At a high level the simulator:
 
 1. Applies any scheduled transition from accumulation super to retirement/drawdown phase.
 2. Adds employment income and after-contributions-tax superannuation contributions for people still working.
-3. Applies the user-entered estimated net nominal investment returns after fees and tax.
-4. Applies account-based pension minimum drawdowns when enabled.
-5. Adds pensions and other configured income.
-6. Estimates household income tax and relevant offsets.
-7. Uses the configured drawdown priorities to fill any remaining income target.
-8. Banks income above the Essential Annual Budget into savings.
-9. Flags a shortfall when available income and configured drawdown sources cannot cover the Essential Annual Budget.
-10. Converts nominal results to today's dollars when that display mode is selected.
+3. Applies the user-entered estimated net nominal super returns and annual nominal share-price growth.
+4. Records scheduled or named share sales, dividends and capital results using the holding-period exposure for that year.
+5. Applies account-based pension minimum drawdowns when enabled.
+6. Adds pensions and other configured income.
+7. Nets capital losses per person before discounts, then estimates income tax, franking offsets and CGT.
+8. Funds CGT as an asset expense, then uses the configured drawdown priorities to fill any remaining income target.
+9. Banks income above the Essential Annual Budget into savings.
+10. Flags a shortfall when available income and configured drawdown sources cannot cover the Essential Annual Budget.
+11. Converts nominal results to today's dollars when that display mode is selected.
 
 ### Lump-sum withdrawals
 
@@ -55,11 +56,15 @@ Income-tax brackets and LITO use the legislated fixed nominal schedule: the 2026
 
 The normal Age Pension income test uses a 50-cent combined couple reduction for each dollar above the couple free area (25 cents for each partner). The model still requires both partners to have reached Age Pension age; that separate limitation remains under deferred review.
 
+Taxable Other income follows its selected owner (`Person 1`, `Person 2` or `Joint 50/50`). Non-taxable Other income remains a household cash flow. Share dividends and franking credits follow the holding owner on the same basis. Franking eligibility is an explicit user assumption: the simulator does not automate holding-period, related-payment or other integrity rules. Refundable franking offsets can therefore produce an estimated tax refund in a low-tax year.
+
+Capital gains and losses are tracked per person. Current-year and carried losses are applied to non-discount gains first and discount-eligible gains second; the 50% discount is applied only to the remaining eligible gain. Opening losses begin at zero because the interface does not collect pre-existing tax losses. CGT is funded from savings first and then the configured household tiers. Share-sale proceeds and CGT-funding draws remain asset movements and never count as retirement income.
+
 Medicare low-income thresholds are the legislated 2025–26 amounts checked on 10 July 2026: ordinary individual $28,011 lower/$35,013 upper and SAPTO $44,268 lower/$55,335 upper. Rules and thresholds change and must be reviewed against current authoritative sources before relying on them.
 
 ### Assets and other income
 
-Cash, savings, shareholdings, other income and other assets are simplified. Timing is annual. Share prices are manual and remain static: they do not grow and produce no dividend or franking-credit income. Capital losses are discarded rather than offset or carried forward, and disposal tax may be excluded for generic other assets. The optional Stooq integration is explicitly limited to US-listed symbols and always appends Stooq's `.us` market suffix; Australian and other holdings use manual prices.
+Cash, savings, shareholdings, other income and other assets are simplified. Timing is annual. Each holding's nominal share-price growth is applied at the start of the projected year, before dividends and share sales; cost base does not grow with market price. The cash dividend yield excludes price growth, so their simple derived sum is the expected total-return assumption before tax effects. Dividends use the number of months held during the year. Generic Other assets remain outside the CGT model. The optional Stooq integration is explicitly limited to US-listed symbols and always appends Stooq's `.us` market suffix; Australian and other holdings use manual prices.
 
 ### Foreign pensions and currency
 
@@ -75,7 +80,7 @@ Calculations run using nominal values. Today's-dollar views divide future nomina
 
 The companion report imports a validated scenario and applies synthetic investment-return paths. Seeded runs support reproducibility, while deterministic stress cases are reported separately.
 
-Monte Carlo v0.5 accepts the standard v1.00 fictional sample and scenarios using the fields its experimental engine supports. It rejects, with a visible explanation, v1.00 imports containing populated Other income/Other assets or active Defined Benefit/UK Pension income; it does not silently discard those cash flows.
+Monte Carlo v0.5 accepts the standard fictional sample and scenarios using the fields its experimental engine supports. It rejects, with a visible explanation, imports containing populated Other income/Other assets, active Defined Benefit/UK Pension income, or active v1.06 share growth, dividend or franking assumptions; it does not silently discard those cash flows.
 
 The reported success rate is conditional on the selected model and assumptions. It is not a personal forecast. The model does not make every material retirement risk stochastic, and deterministic stresses do not alter the Monte Carlo probability denominator.
 
@@ -86,7 +91,7 @@ The maintained [Deferred Review Register](DEFERRED-REVIEW.md) records known limi
 - intra-year timing and cash-flow detail;
 - future legislative and tax changes;
 - complete TTR compliance rules;
-- detailed capital-loss carry-forward;
+- opening capital losses from before the projection;
 - aged-care and health costs;
 - property transactions and maintenance shocks;
 - stochastic inflation, foreign exchange, employment and longevity;

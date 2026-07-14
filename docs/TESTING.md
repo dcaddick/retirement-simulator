@@ -9,7 +9,7 @@ node tests/retirement-simulator.test.mjs
 node tests/retirement-monte-carlo.test.mjs
 ```
 
-The deterministic suite checks core-engine extraction, script syntax, schema migration, validation and calculation invariants across the supported household model. It also covers the archived-release baseline, safe CSV serialisation, projection-critical numeric validation, the Age Pension couple taper and mixed-basis tax calculations that produce bracket creep against fixed nominal thresholds.
+The deterministic suite checks core-engine extraction, script syntax, schema migration, validation and calculation invariants across the supported household model. It also covers the archived-release baseline, safe CSV serialisation, projection-critical numeric validation, the Age Pension couple taper, bracket creep, share growth, holding-period dividends, franking refunds, capital-loss carry-forward and CGT expense funding.
 
 The Monte Carlo suite checks imported-scenario handling, risk-mode behaviour, deterministic stress overrides and invariants that keep stress results outside the stochastic probability denominator.
 
@@ -22,6 +22,7 @@ The stable production entry point is `retirement-simulator.html`. Exact sanitize
 ```text
 archive/retirement-simulator-v1.0.1.html
 archive/retirement-simulator-v1.0.2.html
+archive/retirement-simulator-v1.0.5.html
 ```
 
 For the lump-sum regression, use fictional demo values, disable **Include Aged Pension estimate**, add a withdrawal and confirm no script-error banner appears. CI verifies each archived file against its release-tag Git blob.
@@ -50,6 +51,10 @@ Automated tests do not replace a real-browser pass. For user-interface changes, 
 - per-person salary growth at 0% and a positive percentage, including retirement cutoff;
 - UK State Pension tooltips in today's and nominal dollars, showing after-tax allocation and gross value;
 - disabling the Age Pension estimate and then adding a lump-sum withdrawal without a script error.
+- share growth/dividend/franking controls inside the existing holding chevron, including disabled eligibility and both company-tax rates;
+- Other income Tax owner allocation and the disabled selector for non-taxable income;
+- conditional Share dividends, Franking credits and CGT output, capital-loss/CGT Event details, and the Lump sum withdrawal legend item;
+- a large scheduled sale and a named partial sale, confirming CGT draws are not charted as retirement income and unfunded tax is explicit;
 
 ### iPad Safari release check
 

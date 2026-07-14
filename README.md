@@ -15,9 +15,9 @@ The repository contains two self-contained browser tools:
 
 Single HTML file · no installation · opens locally in a modern browser.
 
-![Retirement Income Simulator v1.05 in its default dark theme, with the projection chart as the main hero item](docs/assets/retirement-simulator-v1.05.png)
+![Retirement Income Simulator v1.06 in its default dark theme, with the projection chart as the main hero item](docs/assets/retirement-simulator-v1.06.png)
 
-*Shown in the default dark theme with the projection chart as the main hero item. The deterministic v1.05 simulator combines editable household assumptions, per-person salary progression, compact toggleable lump-sum planning, inspectable charts, a resizable year-by-year projection and CSV export of the visible table.*
+*Shown in the default dark theme with the projection chart as the main hero item. The deterministic v1.06 simulator combines editable household assumptions, share price growth and dividends, ownership-aware tax and franking credits, capital-loss carry-forward, compact lump-sum planning, inspectable charts and CSV export of the visible table.*
 
 ## Yours to download and use
 
@@ -57,6 +57,8 @@ The deterministic simulator models a reusable two-person household and includes:
 - flexible super-access timing and ordered drawdown tiers;
 - planned one-off withdrawals with intended month/year, compact modelling rows and include/exclude toggles;
 - cash, savings, shareholdings, other income and other assets;
+- nominal share-price growth, holding-period dividends and optional franking credits by owner;
+- per-person capital-loss netting and carry-forward, with CGT funded from assets rather than counted as retirement income;
 - Australian income-tax estimates, Medicare, LITO/SAPTO, Age Pension and CSHC estimates;
 - Australian defined-benefit and UK State Pension support;
 - optional per-person salary growth above inflation, defaulting to 0%;
@@ -78,7 +80,7 @@ It does **not** calculate a dependable personal probability of retirement succes
 
 Use it as a sensitivity and comparison tool, not a forecast or recommendation.
 
-Monte Carlo v0.5 can import the standard deterministic sample. Because its experimental engine does not yet reproduce every deterministic cash flow, it explicitly rejects imports containing active lump-sum withdrawals, populated Other income/Other assets or active Defined Benefit/UK Pension income instead of silently omitting them. Disabled lump sums may remain in the saved scenario because they do not affect the model.
+Monte Carlo v0.5 can import the standard deterministic sample. Because its experimental engine does not yet reproduce every deterministic cash flow, it explicitly rejects imports containing active lump-sum withdrawals, populated Other income/Other assets, active Defined Benefit/UK Pension income, or active v1.06 share growth/dividend/franking assumptions instead of silently omitting them. Disabled or inert fields may remain in the saved scenario because they do not affect the model.
 
 ## Privacy
 

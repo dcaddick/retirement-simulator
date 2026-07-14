@@ -2,6 +2,15 @@
 
 This changelog summarizes public, non-personal milestones. Early development used many private prototype snapshots; those files are intentionally not reproduced in the public repository.
 
+## 1.06 - 2026-07-14
+
+- Added nominal share-price growth, holding-period cash dividends and optional ownership-aware franking credits, completing the approved share-return scope ([#5](https://github.com/dcaddick/retirement-simulator/issues/5)).
+- Added per-person capital-loss ordering, same-year netting and carry-forward before the 50% CGT discount ([#9](https://github.com/dcaddick/retirement-simulator/issues/9)).
+- Added a persisted Tax owner for Other taxable income; schema-10 scenarios migrate to Joint 50/50 ([#10](https://github.com/dcaddick/retirement-simulator/issues/10)).
+- Separated CGT payment from retirement income, funding it from savings first and then the household drawdown tiers with an explicit unfunded amount ([#11](https://github.com/dcaddick/retirement-simulator/issues/11)).
+- Added conditional share-dividend, franking-credit and CGT output plus capital-loss/CGT audit events; lump-sum withdrawals now also appear in the chart legend.
+- Archived the exact outgoing v1.0.5 executable and added explicit Monte Carlo rejection for active v1.06 share-return assumptions.
+
 ## 1.05 - 2026-07-14
 
 - Added an Excel-compatible CSV export of the currently visible projection table ([#12](https://github.com/dcaddick/retirement-simulator/issues/12)).
