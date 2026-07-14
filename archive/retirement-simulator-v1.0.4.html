@@ -4,7 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src https://api.frankfurter.app https://stooq.com; base-uri 'none'; form-action 'none'" />
-<title>Family Retirement Income Simulator v1.05</title>
+<title>Family Retirement Income Simulator v1.04</title>
 <style>
   :root{
     --bg:#0f1720; --panel:#18232f; --panel2:#1e2c3a; --line:#2b3d4f;
@@ -181,7 +181,7 @@
 <div class="disclaimer-banner top" role="note">Local, reproducible retirement-risk analysis. Estimate only; not financial or tax advice.</div>
 <header>
   <div class="header-row">
-  <h1>Family Retirement Income Simulator <span class="version">v1.05</span></h1>
+  <h1>Family Retirement Income Simulator <span class="version">v1.04</span></h1>
   <nav class="header-actions" aria-label="Scenario actions">
     <button type="button" id="newScenario">New</button>
     <button type="button" id="resetSample">Reset sample</button>
@@ -398,7 +398,7 @@
       </details>
     </div>
     <div class="note">
-      <b>v1.05.</b> Fictional Australian couple sample data is stored locally on this device and can be imported or exported as JSON. Calculations are transparent estimates and are not financial or tax advice. The Display toggle switches the whole dashboard &mdash; table, chart and headline figures &mdash; between today&rsquo;s dollars and nominal (future) dollars, except the CSHC estimate which stays in today&rsquo;s dollars against its fixed threshold. Numeric inputs recalculate live as you type without moving your modelling position; the &ldquo;Recalculated&rdquo; stamp above the table confirms each run.
+      <b>v1.04.</b> Fictional Australian couple sample data is stored locally on this device and can be imported or exported as JSON. Calculations are transparent estimates and are not financial or tax advice. The Display toggle switches the whole dashboard &mdash; table, chart and headline figures &mdash; between today&rsquo;s dollars and nominal (future) dollars, except the CSHC estimate which stays in today&rsquo;s dollars against its fixed threshold. Numeric inputs recalculate live as you type without moving your modelling position; the &ldquo;Recalculated&rdquo; stamp above the table confirms each run.
     </div>
   </div>
 </div>
@@ -1779,12 +1779,11 @@
   'use strict';
 
   const core = globalThis.RetirementSimulatorCore;
-  const STORAGE_KEY = 'family-retirement-simulator:v1.05:scenario';
+  const STORAGE_KEY = 'family-retirement-simulator:v1.04:scenario';
   const THEME_STORAGE_KEY = 'retirement-simulator-theme';
   // Read-only fallbacks so scenarios saved under earlier versions carry over
   // on first load (they migrate to the current schema automatically).
   const LEGACY_STORAGE_KEYS = [
-    'family-retirement-simulator:v1.04:scenario',
     'family-retirement-simulator:v1.03:scenario',
     'family-retirement-simulator:v1.02:scenario',
     'family-retirement-simulator:v0.99:scenario',

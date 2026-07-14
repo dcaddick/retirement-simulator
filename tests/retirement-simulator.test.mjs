@@ -1,10 +1,13 @@
 // Deterministic simulator smoke test: core engine + syntax check of both script blocks.
 // Run with: node tests/retirement-simulator.test.mjs
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import vm from 'node:vm';
 
 const FILE = fileURLToPath(new URL('../retirement-simulator.html', import.meta.url));
+const ARCHIVE_104 = fileURLToPath(
+  new URL('../archive/retirement-simulator-v1.0.4.html', import.meta.url)
+);
 const html = readFileSync(FILE, 'utf8');
 
 function extract(id) {
@@ -70,11 +73,12 @@ check('return assumptions are explained below the table',
 check('assumptions and methodology moved out of the controls panel',
   html.indexOf('<summary>Model assumptions and sources</summary>') > html.indexOf('<div class="tblwrap">') &&
   html.indexOf('id="methodologySection"') > html.indexOf('<div class="tblwrap">'));
-check('v1.04 document version is consistent',
-  html.includes('<title>Family Retirement Income Simulator v1.04</title>') &&
-  html.includes('<span class="version">v1.04</span>') &&
-  html.includes("const STORAGE_KEY = 'family-retirement-simulator:v1.04:scenario'") &&
-  html.includes("'family-retirement-simulator:v1.03:scenario'"));
+check('v1.05 document version is consistent',
+  html.includes('<title>Family Retirement Income Simulator v1.05</title>') &&
+  html.includes('<span class="version">v1.05</span>') &&
+  html.includes("const STORAGE_KEY = 'family-retirement-simulator:v1.05:scenario'") &&
+  html.includes("'family-retirement-simulator:v1.04:scenario'"));
+check('outgoing v1.04 executable is archived', existsSync(ARCHIVE_104));
 check('returns and inflation share a dedicated upper controls block',
   html.indexOf('id="returnAssumptions"') < html.indexOf('id="peopleFields"') &&
   html.includes('Estimated net returns after fees and tax'));
