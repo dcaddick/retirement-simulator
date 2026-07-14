@@ -4,12 +4,12 @@ This changelog summarizes public, non-personal milestones. Early development use
 
 ## 1.05 - 2026-07-14
 
-- Added an Excel-compatible CSV export of the currently visible projection table.
-- Tidied Treasury real-return readouts and grouped the display/export table controls.
-- Rejected malformed salary, SG, return and manual-inflation values before projection.
-- Corrected the Age Pension couple income taper to 50 cents combined above the free area.
-- Restored bracket creep for fixed nominal income-tax brackets and LITO, with the policy basis documented.
-- Added a [deferred-review register](docs/DEFERRED-REVIEW.md) for material modelling limitations outside this release.
+- Added an Excel-compatible CSV export of the currently visible projection table ([#12](https://github.com/dcaddick/retirement-simulator/issues/12)).
+- Tidied Treasury real-return readouts and grouped the display/export table controls ([#13](https://github.com/dcaddick/retirement-simulator/issues/13)).
+- Rejected malformed salary, SG, return and manual-inflation values before projection ([#14](https://github.com/dcaddick/retirement-simulator/issues/14)).
+- Corrected the Age Pension couple income taper to 50 cents combined above the free area ([#15](https://github.com/dcaddick/retirement-simulator/issues/15)).
+- Restored bracket creep for fixed nominal income-tax brackets and LITO, with the policy basis documented ([#16](https://github.com/dcaddick/retirement-simulator/issues/16)).
+- Added a [deferred-review register](docs/DEFERRED-REVIEW.md) for material modelling limitations outside this release ([#17](https://github.com/dcaddick/retirement-simulator/issues/17)).
 
 ## 1.04 - 2026-07-13
 

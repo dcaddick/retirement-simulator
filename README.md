@@ -15,9 +15,9 @@ The repository contains two self-contained browser tools:
 
 Single HTML file · no installation · opens locally in a modern browser.
 
-![Retirement Income Simulator v1.05 in its default dark theme, showing the tidied returns section and table CSV export controls](docs/assets/retirement-simulator-v1.05.png)
+![Retirement Income Simulator v1.05 in its default dark theme, with the projection chart as the main hero item](docs/assets/retirement-simulator-v1.05.png)
 
-*The deterministic v1.05 simulator combines editable household assumptions, per-person salary progression, compact toggleable lump-sum planning, inspectable charts, a resizable year-by-year projection and CSV export of the visible table.*
+*Shown in the default dark theme with the projection chart as the main hero item. The deterministic v1.05 simulator combines editable household assumptions, per-person salary progression, compact toggleable lump-sum planning, inspectable charts, a resizable year-by-year projection and CSV export of the visible table.*
 
 ## Yours to download and use
 
