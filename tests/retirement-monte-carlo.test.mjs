@@ -3,7 +3,7 @@ import { readFile } from 'node:fs/promises';
 import vm from 'node:vm';
 
 const html = await readFile(
-  new URL('../retirement-monte-carlo-v0.5.html', import.meta.url),
+  new URL('../retirement-monte-carlo-v0.6.html', import.meta.url),
   'utf8'
 );
 
@@ -29,6 +29,15 @@ assert.match(
 assert.ok(
   html.includes('retirement-simulator-theme'),
   'Monte Carlo should share the locally persisted theme preference'
+);
+assert.match(html, /Family Retirement Monte Carlo Report v0\.6/,
+  'Monte Carlo title should identify v0.6');
+assert.match(html, /<span class="version">v0\.6<\/span>/,
+  'Monte Carlo heading should identify v0.6');
+assert.ok(
+  html.includes("const STORAGE_KEY = 'family-retirement-simulator:v0.6:scenario'") &&
+  html.includes("'family-retirement-simulator:v0.95:scenario'"),
+  'Monte Carlo v0.6 should retain the legacy saved-scenario fallback'
 );
 
 const scripts = [...html.matchAll(/<script[^>]*>([\s\S]*?)<\/script>/g)].map(
@@ -152,6 +161,89 @@ vm.runInContext(monteCarloCoreScript, context);
 
 const core = context.RetirementMonteCarloCore;
 const plain = value => JSON.parse(JSON.stringify(value));
+
+const monteCarloPensionInputs = { assets: 0, assessableIncome: 0 };
+const monteCarloFullPension = simulator.agePensionCouple(
+  monteCarloPensionInputs);
+assert.equal(typeof simulator.agePensionForAges, 'function');
+assert.deepEqual(
+  plain(simulator.agePensionForAges({
+    ages: [67, 66], ...monteCarloPensionInputs, included: true
+  })),
+  {
+    eligibleCount: 1,
+    household: monteCarloFullPension / 2,
+    byPerson: [monteCarloFullPension / 2, 0]
+  }
+);
+assert.deepEqual(
+  plain(simulator.agePensionForAges({
+    ages: [66, 67], ...monteCarloPensionInputs, included: true
+  }).byPerson),
+  [0, monteCarloFullPension / 2]
+);
+assert.equal(
+  simulator.agePensionForAges({
+    ages: [66, 66], ...monteCarloPensionInputs, included: true
+  }).household,
+  0
+);
+assert.equal(
+  simulator.agePensionForAges({
+    ages: [67, 67], ...monteCarloPensionInputs, included: true
+  }).household,
+  monteCarloFullPension
+);
+
+function makeMonteCarloAgeGapScenario(ages = [66, 64]) {
+  const scenario = structuredClone(monteCarloDemo);
+  scenario.startYear = 2026;
+  scenario.people.forEach((person, index) => {
+    person.age = ages[index];
+    person.retireAge = Math.max(person.retireAge, ages[index]);
+    person.salary = 0;
+    person.super = 0;
+    person.ukStateAnnualGbp = 0;
+  });
+  scenario.cash.amount = 0;
+  scenario.savings.amount = 0;
+  scenario.shareholdings = [];
+  scenario.lumpSumWithdrawals = [];
+  scenario.household.targetAfterTax = 0;
+  scenario.household.annualBudget = 0;
+  scenario.household.modelEndAge = 70;
+  scenario.household.applyMinimumDrawdown = false;
+  scenario.assumptions.manualInflationPct = 0;
+  return scenario;
+}
+
+const monteCarloAgeGapRows = simulator.projectScenario(
+  makeMonteCarloAgeGapScenario()).rows;
+assert.equal(monteCarloAgeGapRows[0].components.agePensionNet, 0);
+assert.ok(Math.abs(
+  monteCarloAgeGapRows[1].components.agePensionNet -
+  monteCarloFullPension / 2) < 0.01);
+assert.ok(Math.abs(
+  monteCarloAgeGapRows[3].components.agePensionNet -
+  monteCarloFullPension) < 0.01);
+
+const monteCarloTaxedAgeGap = makeMonteCarloAgeGapScenario([67, 66]);
+monteCarloTaxedAgeGap.people[0].retireAge = 68;
+monteCarloTaxedAgeGap.people[0].salary = 40000;
+monteCarloTaxedAgeGap.people[0].sgPct = 0;
+const monteCarloExpectedPension = simulator.agePensionForAges({
+  ages: [67, 66], assets: 0, assessableIncome: 40000, included: true
+}).household;
+const monteCarloExpectedTax = simulator.netTax({
+  taxableIncome: 40000 + monteCarloExpectedPension,
+  rebateIncome: 40000 + monteCarloExpectedPension,
+  year: 2026,
+  seniorEligible: true
+});
+const monteCarloTaxedRow = simulator.projectScenario(
+  monteCarloTaxedAgeGap).rows[0];
+assert.ok(Math.abs(monteCarloTaxedRow.tax - monteCarloExpectedTax) < 0.01,
+  'one-eligible Monte Carlo pension should be taxed only to its recipient');
 
 assert.match(html, /effectiveYear:\s*2025/, 'Medicare data should be for 2025-26');
 assert.match(html, /ordinary:\s*\{ lower: 28011, upper: 35013 \}/,
@@ -394,4 +486,4 @@ assert.ok(
   'savings interest should rise under the inflation stress but remain explicit'
 );
 
-console.log('retirement-monte-carlo-v0.5 risk-mode and stress override tests passed');
+console.log('retirement-monte-carlo-v0.6 risk-mode, age-gap and stress override tests passed');

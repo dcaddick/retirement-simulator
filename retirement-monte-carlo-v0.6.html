@@ -4,7 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src https://api.frankfurter.app https://stooq.com; base-uri 'none'; form-action 'none'" />
-<title>Family Retirement Monte Carlo Report v0.5</title>
+<title>Family Retirement Monte Carlo Report v0.6</title>
 <style>
   :root{
     --bg:#0f1720; --panel:#18232f; --panel2:#1e2c3a; --line:#2b3d4f;
@@ -148,7 +148,7 @@
 </head>
 <body>
 <header>
-  <h1>Family Retirement Monte Carlo Report <span class="version">v0.5</span></h1>
+  <h1>Family Retirement Monte Carlo Report <span class="version">v0.6</span></h1>
   <div class="sub">Local, reproducible retirement-risk analysis.</div>
   <div class="advice-warning">Estimate only; not financial or tax advice.</div>
   <nav class="scenario-actions" aria-label="Scenario actions">
@@ -339,7 +339,7 @@
     <div class="legend" id="legend"></div>
     <div class="tblwrap"><table id="tbl"></table></div>
     <div class="note">
-      <b>v0.5 experimental companion.</b> Generic two-person sample data is stored locally on this device and can be imported or exported as JSON. Calculations are transparent estimates in today&rsquo;s AUD and are not financial or tax advice.
+      <b>v0.6 experimental companion.</b> Generic two-person sample data is stored locally on this device and can be imported or exported as JSON. Calculations are transparent estimates in today&rsquo;s AUD and are not financial or tax advice.
     </div>
   </div>
 </div>
@@ -527,6 +527,24 @@
     );
   }
 
+  function agePensionForAges({
+    ages, assets, assessableIncome, included = true
+  }) {
+    const eligible = ages.map(age => age >= 67);
+    const eligibleCount = eligible.filter(Boolean).length;
+    if (!included || eligibleCount === 0) {
+      return { eligibleCount, household: 0, byPerson: [0, 0] };
+    }
+    const household = agePensionCouple({ assets, assessableIncome }) *
+      eligibleCount / 2;
+    return {
+      eligibleCount,
+      household,
+      byPerson: eligible.map(isEligible =>
+        isEligible ? household / eligibleCount : 0)
+    };
+  }
+
   function cshcEstimate({ adjustedTaxableIncome, accountBasedPensionBalance }) {
     const deemedAbpIncome = deemedIncome(accountBasedPensionBalance);
     const assessedIncome = adjustedTaxableIncome + deemedAbpIncome;
@@ -712,7 +730,7 @@
   function adaptV1ScenarioForExperimentalMonteCarlo(scenario) {
     if (![6, 7, 8, 9, 10, 11].includes(scenario.schemaVersion)) return scenario;
     if (scenario.people?.some(person => Number(person.salaryGrowthPct) > 0)) {
-      throw new Error('Monte Carlo v0.5 cannot yet model above-inflation salary growth. Set it to 0% in a fictional copy before importing.');
+      throw new Error('Monte Carlo v0.6 cannot yet model above-inflation salary growth. Set it to 0% in a fictional copy before importing.');
     }
     const activeShareReturns = (scenario.shareholdings ?? []).some(holding =>
       Number(holding.priceGrowthPct) !== 0 ||
@@ -720,18 +738,18 @@
       Number(holding.frankedPct) !== 0 ||
       holding.frankingEligible === true);
     if (activeShareReturns) {
-      throw new Error('Monte Carlo v0.5 cannot yet model v1.06 share price growth, dividends or franking. Set those fields to zero/off in a fictional copy before importing.');
+      throw new Error('Monte Carlo v0.6 cannot yet model v1.06 share price growth, dividends or franking. Set those fields to zero/off in a fictional copy before importing.');
     }
     if ((scenario.otherIncomes ?? []).length || (scenario.otherAssets ?? []).length) {
-      throw new Error('Monte Carlo v0.5 cannot yet model populated Other income or Other assets. Remove them from a fictional copy before importing.');
+      throw new Error('Monte Carlo v0.6 cannot yet model populated Other income or Other assets. Remove them from a fictional copy before importing.');
     }
     if ((scenario.lumpSumWithdrawals ?? []).some(item => item.enabled !== false)) {
-      throw new Error('Monte Carlo v0.5 cannot yet model lump-sum withdrawals. Remove them from a fictional copy before importing.');
+      throw new Error('Monte Carlo v0.6 cannot yet model lump-sum withdrawals. Remove them from a fictional copy before importing.');
     }
     const hasPensionIncome = scenario.people?.some(person =>
       Number(person.ukStateAnnualGbp) > 0);
     if (scenario.assumptions?.ukPensionsEnabled !== false && hasPensionIncome) {
-      throw new Error('Monte Carlo v0.5 cannot yet preserve v1.00 Defined Benefit/UK Pension treatment. Use a fictional copy with those pensions excluded.');
+      throw new Error('Monte Carlo v0.6 cannot yet preserve v1.00 Defined Benefit/UK Pension treatment. Use a fictional copy with those pensions excluded.');
     }
     const adapted = structuredClone(scenario);
     adapted.schemaVersion = SCHEMA_VERSION;
@@ -1177,14 +1195,16 @@
       ukState.reduce((sum, value) => sum + value, 0) / inflationFactor +
       ukPrivateAnnuity.reduce((sum, value) => sum + value, 0) / inflationFactor +
       deemedIncome(assessableAssetsReal);
-    const bothAgePensionAge = ages.every(age => age >= 67);
-    const agePensionReal = scenario.household.includeAgePension && bothAgePensionAge
-      ? agePensionCouple({
-          assets: assessableAssetsReal,
-          assessableIncome: agePensionIncomeReal
-        })
-      : 0;
+    const agePension = agePensionForAges({
+      ages,
+      assets: assessableAssetsReal,
+      assessableIncome: agePensionIncomeReal,
+      included: scenario.household.includeAgePension
+    });
+    const agePensionReal = agePension.household;
     const agePensionNominal = agePensionReal * inflationFactor;
+    const agePensionByPersonNominal = agePension.byPerson.map(
+      value => value * inflationFactor);
 
     const mandatoryDraws = [0, 0];
     if (scenario.household.applyMinimumDrawdown) {
@@ -1203,7 +1223,7 @@
     const taxableNominal = [0, 1].map(index =>
       salaries[index] +
       (ukState[index] + ukPrivateAnnuity[index]) * (1 - uppRate) +
-      agePensionNominal / 2 +
+      agePensionByPersonNominal[index] +
       interestByPerson[index] +
       discountedGainByPerson[index]
     );
@@ -1487,6 +1507,7 @@
     agePensionAssetsRate,
     agePensionIncomeRate,
     agePensionCouple,
+    agePensionForAges,
     cshcEstimate,
     assessableFinancialAssets,
     makeProjectionState,
@@ -1511,7 +1532,10 @@
   'use strict';
 
   const core = globalThis.RetirementSimulatorCore;
-  const STORAGE_KEY = 'family-retirement-simulator:v0.95:scenario';
+  const STORAGE_KEY = 'family-retirement-simulator:v0.6:scenario';
+  const LEGACY_STORAGE_KEYS = [
+    'family-retirement-simulator:v0.95:scenario'
+  ];
   const THEME_STORAGE_KEY = 'retirement-simulator-theme';
   let currentScenario = null;
   let currentProjection = null;
@@ -1897,7 +1921,9 @@
   }
 
   function loadScenario() {
-    const text = window.__safeStorage.getItem(STORAGE_KEY);
+    const text = window.__safeStorage.getItem(STORAGE_KEY) ||
+      LEGACY_STORAGE_KEYS.map(key =>
+        window.__safeStorage.getItem(key)).find(Boolean);
     if (!text) return core.makeSampleScenario();
     try {
       return core.importScenario(text);

@@ -538,6 +538,7 @@ assert.ok(Math.abs(
 const monteCarloTaxedAgeGap = makeMonteCarloAgeGapScenario([67, 66]);
 monteCarloTaxedAgeGap.people[0].retireAge = 68;
 monteCarloTaxedAgeGap.people[0].salary = 40000;
+monteCarloTaxedAgeGap.people[0].sgPct = 0;
 const monteCarloExpectedPension = simulator.agePensionForAges({
   ages: [67, 66], assets: 0, assessableIncome: 40000, included: true
 }).household;
