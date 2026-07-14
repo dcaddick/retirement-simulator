@@ -9,6 +9,7 @@ These executable snapshots are exact, sanitized public releases retained for reg
 | `retirement-simulator-v1.0.3.html` | `v1.0.3:retirement-simulator.html` | `f1536ad488d8280213efbf8a5d4c38101a1abfa4` | — |
 | `retirement-simulator-v1.0.4.html` | `516a159:retirement-simulator.html` | `53bb532fc0f767f47432e0e99d484107f027e658` | — |
 | `retirement-simulator-v1.0.5.html` | `a4f1dc1:retirement-simulator.html` | — | `F908BAF19BF0247829E368553F9D145413F177BF8D715B0A70D2677592F38F68` |
+| `retirement-simulator-v1.0.6.html` | `dc0d1f8:retirement-simulator.html` | `35f1c887d2446becad6aaa0ddd99269463a1a8eb` | `348F57E7DE1BECF86D40583E71DC96747DAA50052F350C64FFD5F3DCB03A4672` |
 
 Only public fictional sample data may be stored here. Never archive personal scenarios, balances, names, screenshots, exports or private development artifacts.
 
