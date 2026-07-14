@@ -338,6 +338,22 @@ check('dividend and franking credit follow share ownership',
   dividendFlows.cashByPerson[1] === 0 &&
   dividendFlows.frankingByPerson[0] > 25);
 
+const taxState = {
+  superRetire: [1000, 1000], cash: 300, savings: 400
+};
+const taxFunding = core.fundTaxExpense(taxState, [
+  [{ source: 'savings', weight: 1 }],
+  [{ source: 'cash', weight: 1 }],
+  [{ source: 'p0Super', weight: 1 }]
+], 900);
+check('CGT funding uses savings before the household order',
+  taxFunding.drawsBySource.savings === 400 &&
+  taxFunding.drawsBySource.cash === 300 &&
+  taxFunding.drawsBySource.p0Super === 200 &&
+  taxFunding.unfunded === 0);
+check('tax funding does not create a negative balance',
+  taxState.savings === 0 && taxState.cash === 0 && taxState.superRetire[0] === 800);
+
 const growingShares = structuredClone(sample);
 growingShares.shareholdings = [{
   ...core.makeShareholding(0), id: 'grow', symbol: 'GROW', quantity: 100,
@@ -414,6 +430,66 @@ check('ineligible holding receives cash but no franking credit',
 check('joint dividends and credits split across both tax ledgers',
   Math.abs(jointRow.taxLedger[0].frankingNominal - expectedCredit / 2) < 0.01 &&
   Math.abs(jointRow.taxLedger[1].frankingNominal - expectedCredit / 2) < 0.01);
+
+function makeCgtFundingScenario() {
+  const scenario = structuredClone(sample);
+  scenario.people.forEach(person => {
+    person.salary = 0;
+    person.super = 0;
+  });
+  scenario.cash = { amount: 0, interestPct: 0, owner: 'joint' };
+  scenario.savings = { amount: 0, interestPct: 0, owner: 'joint' };
+  scenario.lumpSumWithdrawals = [];
+  scenario.otherIncomes = [];
+  scenario.otherAssets = [];
+  scenario.household.targetAfterTax = 0;
+  scenario.household.annualBudget = 0;
+  scenario.household.includeAgePension = false;
+  scenario.shareholdings = [{
+    ...core.makeShareholding(0), id: 'cgt-source', symbol: 'CGT', owner: 'p0',
+    quantity: 100, price: 2000, costBaseAud: 1000,
+    priceGrowthPct: 0, dividendYieldPct: 0, frankedPct: 0,
+    frankingEligible: false, cgtDiscountEligible: true,
+    saleYear: scenario.startYear, saleMonth: 1
+  }];
+  return scenario;
+}
+
+const scheduledCgt = makeCgtFundingScenario();
+const saleRow = core.projectScenario(scheduledCgt).rows[0];
+const namedCgt = makeCgtFundingScenario();
+namedCgt.shareholdings[0].saleYear = namedCgt.startYear + 20;
+namedCgt.lumpSumWithdrawals = [{
+  id: 'consume-sale-proceeds', amount: 100000,
+  reason: 'Fictional asset purchase', month: 1, year: namedCgt.startYear,
+  source: 'share:cgt-source', enabled: true
+}];
+const unfundedTaxRow = core.projectScenario(namedCgt).rows[0];
+check('sale proceeds do not satisfy retirement income target',
+  saleRow.totalIncome < saleRow.shareSaleProceeds);
+check('CGT is paid from sale proceeds in savings',
+  saleRow.cgtTax > 0 && saleRow.cgtFunding.drawsBySource.savings > 0);
+check('CGT funding does not appear as income',
+  Math.abs(saleRow.totalIncome - [
+    saleRow.components.workNet,
+    saleRow.components.ukStateNet,
+    saleRow.components.otherIncomeNet,
+    saleRow.components.shareDividendNet,
+    saleRow.components.agePensionNet,
+    saleRow.components.person0Super,
+    saleRow.components.person1Super,
+    saleRow.components.potDraw
+  ].reduce((sum, value) => sum + (Number(value) || 0), 0)) < 0.01 &&
+  !Object.hasOwn(saleRow.components, 'cgtFunding') &&
+  !Object.hasOwn(saleRow.components, 'shareSaleProceeds'));
+check('unfunded CGT is explicit and balances stay non-negative',
+  unfundedTaxRow.taxFundingShortfall > 0 &&
+  [unfundedTaxRow.cash, unfundedTaxRow.savings,
+   ...unfundedTaxRow.superBalances].every(value => value >= 0));
+check('named-source sale uses the same CGT expense path',
+  unfundedTaxRow.cgtTax > 0 &&
+  unfundedTaxRow.events.some(event => event.type === 'cgt-payment') &&
+  unfundedTaxRow.lumpSumTotal === 100000);
 
 console.log('\ncurrent Medicare thresholds');
 check('Medicare data is for 2025-26', core.MEDICARE_BASE.effectiveYear === 2025);

@@ -1230,6 +1230,28 @@
     return { drawsBySource, drawn: amount - remaining, remaining };
   }
 
+  function fundTaxExpense(state, tiers, amount) {
+    const requested = Math.max(0, amount);
+    const drawsBySource = { p0Super: 0, p1Super: 0, cash: 0, savings: 0 };
+    const savingsDraw = Math.min(state.savings, requested);
+    state.savings -= savingsDraw;
+    drawsBySource.savings = savingsDraw;
+    const remaining = requested - savingsDraw;
+    if (!(remaining > 0)) return { drawsBySource, funded: requested, unfunded: 0 };
+    const fallbackTiers = tiers
+      .map(tier => tier.filter(entry => entry.source !== 'savings'))
+      .filter(tier => tier.length);
+    const fallback = drawFromTiers(state, fallbackTiers, remaining);
+    Object.keys(drawsBySource).forEach(source => {
+      drawsBySource[source] += fallback.drawsBySource[source];
+    });
+    return {
+      drawsBySource,
+      funded: savingsDraw + fallback.drawn,
+      unfunded: fallback.remaining
+    };
+  }
+
   function lumpSourceLabel(source, people) {
     if (source.startsWith('named:')) return source.slice(6);
     return ({ automatic: 'Automatic', cash: 'Cash', savings: 'Savings',
@@ -1639,6 +1661,17 @@
     const guaranteedNet =
       grossNonDividendTaxableSources - baseTaxNominal +
       dividendNetNominal + otherNonTaxableNominal;
+    const cgtFunding = fundTaxExpense(
+      state, scenario.household.drawdownPriority, cgtTaxNominal);
+    if (cgtTaxNominal > 0) {
+      events.push({
+        type: 'cgt-payment',
+        amount: cgtFunding.funded / inflationFactor,
+        unfunded: cgtFunding.unfunded / inflationFactor,
+        drawsBySource: Object.fromEntries(Object.entries(cgtFunding.drawsBySource)
+          .map(([source, value]) => [source, value / inflationFactor]))
+      });
+    }
     const mandatoryTotal =
       mandatoryDraws.reduce((sum, value) => sum + value, 0);
     const targetNominal = scenario.household.targetAfterTax * inflationFactor;
@@ -1721,7 +1754,7 @@
         cashDraw: waterfall.drawsBySource.cash / inflationFactor,
         savingsDraw: waterfall.drawsBySource.savings / inflationFactor
       },
-      tax: totalTaxNominal / inflationFactor,
+      tax: ordinaryTaxNominal / inflationFactor,
       cgtTax: cgtTaxNominal / inflationFactor,
       frankingCredits: dividendFlows.frankingTotal / inflationFactor,
       taxRefund: taxLedger.reduce(
@@ -1742,6 +1775,15 @@
       lumpSumTotal: lumpSumTotalNominal / inflationFactor,
       lumpSumDraws: Object.fromEntries(Object.entries(lumpSumDrawsNominal)
         .map(([source, amount]) => [source, amount / inflationFactor])),
+      shareSaleProceeds: saleRecords.reduce(
+        (sum, sale) => sum + sale.proceedsNominal, 0) / inflationFactor,
+      cgtFunding: {
+        drawsBySource: Object.fromEntries(Object.entries(cgtFunding.drawsBySource)
+          .map(([source, amount]) => [source, amount / inflationFactor])),
+        funded: cgtFunding.funded / inflationFactor,
+        unfunded: cgtFunding.unfunded / inflationFactor
+      },
+      taxFundingShortfall: cgtFunding.unfunded / inflationFactor,
       events: [...events],
       capitalLedger: capitalLedger.people.map(person => ({ ...person }))
     };
@@ -2080,6 +2122,7 @@
     sourceBalance,
     setSourceBalance,
     drawFromTiers,
+    fundTaxExpense,
     defaultDrawdownPriority,
     migrateScenario,
     inflationFactors,
