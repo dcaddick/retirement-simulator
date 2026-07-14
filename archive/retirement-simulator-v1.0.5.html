@@ -4,7 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src https://api.frankfurter.app https://stooq.com; base-uri 'none'; form-action 'none'" />
-<title>Family Retirement Income Simulator v1.06</title>
+<title>Family Retirement Income Simulator v1.05</title>
 <style>
   :root{
     --bg:#0f1720; --panel:#18232f; --panel2:#1e2c3a; --line:#2b3d4f;
@@ -188,7 +188,7 @@
 <div class="disclaimer-banner top" role="note">Local, reproducible retirement-risk analysis. Estimate only; not financial or tax advice.</div>
 <header>
   <div class="header-row">
-  <h1>Family Retirement Income Simulator <span class="version">v1.06</span></h1>
+  <h1>Family Retirement Income Simulator <span class="version">v1.05</span></h1>
   <nav class="header-actions" aria-label="Scenario actions">
     <button type="button" id="newScenario">New</button>
     <button type="button" id="resetSample">Reset sample</button>
@@ -410,7 +410,7 @@
       </details>
     </div>
     <div class="note">
-      <b>v1.06.</b> Fictional Australian couple sample data is stored locally on this device and can be imported or exported as JSON. Calculations are transparent estimates and are not financial or tax advice. The Display toggle switches the whole dashboard &mdash; table, chart and headline figures &mdash; between today&rsquo;s dollars and nominal (future) dollars, except the CSHC estimate which stays in today&rsquo;s dollars against its fixed threshold. Numeric inputs recalculate live as you type without moving your modelling position; the &ldquo;Recalculated&rdquo; stamp above the table confirms each run.
+      <b>v1.05.</b> Fictional Australian couple sample data is stored locally on this device and can be imported or exported as JSON. Calculations are transparent estimates and are not financial or tax advice. The Display toggle switches the whole dashboard &mdash; table, chart and headline figures &mdash; between today&rsquo;s dollars and nominal (future) dollars, except the CSHC estimate which stays in today&rsquo;s dollars against its fixed threshold. Numeric inputs recalculate live as you type without moving your modelling position; the &ldquo;Recalculated&rdquo; stamp above the table confirms each run.
     </div>
   </div>
 </div>
@@ -465,7 +465,7 @@
 <script id="simulator-core">
 (function () {
   'use strict';
-  const SCHEMA_VERSION = 11;
+  const SCHEMA_VERSION = 10;
   const VALID_OWNERS = new Set(['p0', 'p1', 'joint']);
   const DRAWDOWN_SOURCES = new Set(['p0Super', 'p1Super', 'cash', 'savings']);
   const OTHER_CURRENCIES = new Set(['AUD', 'GBP', 'USD']);
@@ -895,26 +895,6 @@
       }));
       current = migrated;
     }
-    if (current.schemaVersion === 10) {
-      const migrated = structuredClone(current);
-      migrated.schemaVersion = 11;
-      migrated.otherIncomes = (migrated.otherIncomes ?? []).map(item => ({
-        ...item,
-        owner: ['p0', 'p1', 'joint'].includes(item.owner) ? item.owner : 'joint'
-      }));
-      migrated.shareholdings = (migrated.shareholdings ?? []).map(holding => ({
-        ...holding,
-        priceGrowthPct: Number.isFinite(holding.priceGrowthPct)
-          ? holding.priceGrowthPct : 0,
-        dividendYieldPct: Number.isFinite(holding.dividendYieldPct)
-          ? holding.dividendYieldPct : 0,
-        frankedPct: Number.isFinite(holding.frankedPct) ? holding.frankedPct : 0,
-        companyTaxRatePct: [25, 30].includes(holding.companyTaxRatePct)
-          ? holding.companyTaxRatePct : 30,
-        frankingEligible: holding.frankingEligible === true
-      }));
-      current = migrated;
-    }
     if (current.schemaVersion !== SCHEMA_VERSION) {
       throw new Error(`Unsupported schema version: ${raw.schemaVersion}.`);
     }
@@ -970,12 +950,7 @@
       costBaseAud: 0,
       cgtDiscountEligible: true,
       saleYear: new Date().getFullYear() + 1,
-      saleMonth: 1,
-      priceGrowthPct: 0,
-      dividendYieldPct: 0,
-      frankedPct: 0,
-      companyTaxRatePct: 30,
-      frankingEligible: false
+      saleMonth: 1
     };
   }
 
@@ -995,8 +970,7 @@
       currency: 'AUD',
       fxToAud: 1,
       amount: 0,
-      taxable: true,
-      owner: 'joint'
+      taxable: true
     };
   }
 
@@ -1872,12 +1846,11 @@
   'use strict';
 
   const core = globalThis.RetirementSimulatorCore;
-  const STORAGE_KEY = 'family-retirement-simulator:v1.06:scenario';
+  const STORAGE_KEY = 'family-retirement-simulator:v1.05:scenario';
   const THEME_STORAGE_KEY = 'retirement-simulator-theme';
   // Read-only fallbacks so scenarios saved under earlier versions carry over
   // on first load (they migrate to the current schema automatically).
   const LEGACY_STORAGE_KEYS = [
-    'family-retirement-simulator:v1.05:scenario',
     'family-retirement-simulator:v1.04:scenario',
     'family-retirement-simulator:v1.03:scenario',
     'family-retirement-simulator:v1.02:scenario',

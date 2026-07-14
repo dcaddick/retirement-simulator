@@ -8,6 +8,9 @@ const FILE = fileURLToPath(new URL('../retirement-simulator.html', import.meta.u
 const ARCHIVE_104 = fileURLToPath(
   new URL('../archive/retirement-simulator-v1.0.4.html', import.meta.url)
 );
+const ARCHIVE_105 = fileURLToPath(
+  new URL('../archive/retirement-simulator-v1.0.5.html', import.meta.url)
+);
 const DEFERRED_REVIEW = fileURLToPath(
   new URL('../docs/DEFERRED-REVIEW.md', import.meta.url)
 );
@@ -47,7 +50,7 @@ vm.runInContext(extract('simulator-core'), context, { filename: 'simulator-core.
 const core = context.RetirementSimulatorCore;
 
 console.log('\nschema + sample');
-check('schema version is 10', core.SCHEMA_VERSION === 10);
+check('schema version is 11', core.SCHEMA_VERSION === 11);
 const sample = core.makeSampleScenario();
 check('sample validates', core.validateScenario(sample).length === 0,
   JSON.stringify(core.validateScenario(sample)[0] ?? null));
@@ -85,12 +88,37 @@ check('return assumptions are explained below the table',
 check('assumptions and methodology moved out of the controls panel',
   html.indexOf('<summary>Model assumptions and sources</summary>') > html.indexOf('<div class="tblwrap">') &&
   html.indexOf('id="methodologySection"') > html.indexOf('<div class="tblwrap">'));
-check('v1.05 document version is consistent',
-  html.includes('<title>Family Retirement Income Simulator v1.05</title>') &&
-  html.includes('<span class="version">v1.05</span>') &&
-  html.includes("const STORAGE_KEY = 'family-retirement-simulator:v1.05:scenario'") &&
-  html.includes("'family-retirement-simulator:v1.04:scenario'"));
+check('v1.06 document version is consistent',
+  html.includes('<title>Family Retirement Income Simulator v1.06</title>') &&
+  html.includes('<span class="version">v1.06</span>') &&
+  html.includes("const STORAGE_KEY = 'family-retirement-simulator:v1.06:scenario'") &&
+  html.includes("'family-retirement-simulator:v1.05:scenario'"));
 check('outgoing v1.04 executable is archived', existsSync(ARCHIVE_104));
+check('outgoing v1.0.5 executable is archived', existsSync(ARCHIVE_105));
+
+const schema10 = structuredClone(sample);
+schema10.schemaVersion = 10;
+schema10.otherIncomes = [{
+  id: 'legacy-income', label: 'Rent', currency: 'AUD', fxToAud: 1,
+  amount: 12000, taxable: true
+}];
+schema10.shareholdings = [{
+  ...core.makeShareholding(0), id: 'legacy-share', symbol: 'BHP'
+}];
+delete schema10.shareholdings[0].priceGrowthPct;
+delete schema10.shareholdings[0].dividendYieldPct;
+delete schema10.shareholdings[0].frankedPct;
+delete schema10.shareholdings[0].companyTaxRatePct;
+delete schema10.shareholdings[0].frankingEligible;
+const migrated11 = core.migrateScenario(schema10);
+check('schema 10 migrates inert v1.06 tax and share defaults',
+  migrated11.schemaVersion === 11 &&
+  migrated11.otherIncomes[0].owner === 'joint' &&
+  migrated11.shareholdings[0].priceGrowthPct === 0 &&
+  migrated11.shareholdings[0].dividendYieldPct === 0 &&
+  migrated11.shareholdings[0].frankedPct === 0 &&
+  migrated11.shareholdings[0].companyTaxRatePct === 30 &&
+  migrated11.shareholdings[0].frankingEligible === false);
 check('deferred review covers all approved out-of-scope items', [
   'AIPR-003-SHARES-STATIC',
   'AIPR-003-AP-AGEGAP',
@@ -522,7 +550,7 @@ v5.people[1].ukPrivateAmountGbp = 20000;
 v5.people[1].ukPrivateTakeAge = 66;
 v5.people[1].ukPrivateType = 'lump';
 const migrated = core.migrateScenario(structuredClone(v5));
-check('migrates to v10', migrated.schemaVersion === 10);
+check('migrates to v11', migrated.schemaVersion === 11);
 check('annuity becomes other income', migrated.otherIncomes.length === 1 &&
   migrated.otherIncomes[0].amount === 5000 && migrated.otherIncomes[0].currency === 'GBP');
 check('lump becomes other asset with disposal year',
@@ -542,14 +570,14 @@ schema7.schemaVersion = 7;
 schema7.lumpSumWithdrawals.forEach(item => delete item.enabled);
 const migrated8 = core.migrateScenario(schema7);
 check('schema 7 lump sums migrate enabled',
-  migrated8.schemaVersion === 10 && migrated8.lumpSumWithdrawals.every(item => item.enabled === true));
+  migrated8.schemaVersion === 11 && migrated8.lumpSumWithdrawals.every(item => item.enabled === true));
 
 const schema8 = structuredClone(sample);
 schema8.schemaVersion = 8;
 schema8.lumpSumWithdrawals.forEach(item => delete item.month);
 const migrated9 = core.migrateScenario(schema8);
 check('schema 8 lump sums migrate to January and salary growth defaults to zero',
-  migrated9.schemaVersion === 10 &&
+  migrated9.schemaVersion === 11 &&
   migrated9.lumpSumWithdrawals.every(item => item.month === 1) &&
   migrated9.people.every(person => person.salaryGrowthPct === 0));
 
@@ -558,14 +586,14 @@ schema9.schemaVersion = 9;
 schema9.people.forEach(person => delete person.salaryGrowthPct);
 const migrated10 = core.migrateScenario(schema9);
 check('schema 9 migrates salary growth to zero',
-  migrated10.schemaVersion === 10 && migrated10.people.every(person => person.salaryGrowthPct === 0));
+  migrated10.schemaVersion === 11 && migrated10.people.every(person => person.salaryGrowthPct === 0));
 
 const invalidMonth = structuredClone(sample);
 invalidMonth.lumpSumWithdrawals[0].month = 13;
 check('invalid lump-sum month is reported',
   core.validateScenario(invalidMonth).some(error => error.path === 'lumpSumWithdrawals.0.month'));
 
-console.log('\nmigration v1 -> v10 (full chain)');
+console.log('\nmigration v1 -> v11 (full chain)');
 const v1 = structuredClone(v5);
 v1.schemaVersion = 1;
 delete v1.lumpSumWithdrawals;
@@ -573,7 +601,7 @@ delete v1.household.annualBudget;
 v1.people = v1.people.map(({ superAccessAge, superAccessPct, ukStateIndexation, ...rest }) => rest);
 delete v1.assumptions.ukPensionsEnabled;
 const chained = core.migrateScenario(structuredClone(v1));
-check('v1 chains to v10', chained.schemaVersion === 10);
+check('v1 chains to v11', chained.schemaVersion === 11);
 check('migration adds empty lump sums', Array.isArray(chained.lumpSumWithdrawals) && chained.lumpSumWithdrawals.length === 0);
 check('chained validates', core.validateScenario(chained).length === 0,
   JSON.stringify(core.validateScenario(chained)[0] ?? null));
