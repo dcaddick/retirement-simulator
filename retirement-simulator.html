@@ -586,6 +586,23 @@
     return Math.max(0, grossReal - offsetsReal);
   }
 
+  function taxAfterFranking({
+    taxableNominal, rebateNominal, inflationFactor, year,
+    seniorEligible, frankingNominal
+  }) {
+    const beforeFrankingNominal = projectionNetTax({
+      taxableNominal, rebateNominal, inflationFactor, year, seniorEligible
+    }) * inflationFactor;
+    const netNominal = beforeFrankingNominal - frankingNominal;
+    return {
+      beforeFrankingNominal,
+      frankingNominal,
+      netNominal,
+      taxNominal: Math.max(0, netNominal),
+      refundNominal: Math.max(0, -netNominal)
+    };
+  }
+
   function deemedIncome(financialAssets) {
     const rules = SERVICES_AUSTRALIA_2026;
     const lowerBand = Math.min(financialAssets, rules.deemingThresholdCouple);
@@ -971,6 +988,38 @@
   function finishDividendExposure(holding) {
     recordDividendExposure(holding, 12);
     return holding.dividendQuantityMonths ?? 0;
+  }
+
+  function frankingCreditNominal(cashDividend, frankedPct, companyTaxRatePct) {
+    const frankedCash = cashDividend * frankedPct / 100;
+    const rate = companyTaxRatePct / 100;
+    return rate > 0 && rate < 1 ? frankedCash * rate / (1 - rate) : 0;
+  }
+
+  function shareDividendFlows(state) {
+    const cashByPerson = [0, 0];
+    const frankingByPerson = [0, 0];
+    for (const holding of state.holdings) {
+      const quantityMonths = finishDividendExposure(holding);
+      const fx = holding.quoteCurrency === 'AUD' ? 1 : holding.fxToAud;
+      const averageValue = quantityMonths / 12 * holding.price * fx;
+      const cash = averageValue * holding.dividendYieldPct / 100;
+      const credit = holding.frankingEligible
+        ? frankingCreditNominal(cash, holding.frankedPct, holding.companyTaxRatePct)
+        : 0;
+      allocateOwnedAmount(cash, holding.owner).forEach((amount, index) => {
+        cashByPerson[index] += amount;
+      });
+      allocateOwnedAmount(credit, holding.owner).forEach((amount, index) => {
+        frankingByPerson[index] += amount;
+      });
+    }
+    return {
+      cashByPerson,
+      frankingByPerson,
+      cashTotal: cashByPerson[0] + cashByPerson[1],
+      frankingTotal: frankingByPerson[0] + frankingByPerson[1]
+    };
   }
 
   function makeShareSaleRecord({
@@ -1444,6 +1493,8 @@
     state.capitalLossCarryForward = [...capitalLedger.closingLosses];
     const netCapitalGainByPerson = capitalLedger.people.map(
       person => person.netCapitalGainNominal);
+    const dividendFlows = shareDividendFlows(state);
+    state.savings += dividendFlows.cashTotal;
 
     // Other income: annual amounts, CPI-indexed. Taxable items follow their
     // selected owner; non-taxable items are added to household income after tax.
@@ -1518,50 +1569,76 @@
     }
 
     const uppRate = scenario.assumptions.uppPct / 100;
-    const taxableNominal = [0, 1].map(index =>
+    const baseTaxableNominal = [0, 1].map(index =>
       salaries[index] +
       ukState[index] * (1 - uppRate) +
       agePensionNominal / 2 +
       otherTaxableByPerson[index] +
-      interestByPerson[index] +
-      netCapitalGainByPerson[index]
+      interestByPerson[index]
     );
-    const taxReal = taxableNominal.map((value, index) =>
-      projectionNetTax({
-        taxableNominal: value,
-        rebateNominal: value,
-        inflationFactor,
-        year,
-        seniorEligible: ages[index] >= 67
-      })
-    );
-    const totalTaxNominal =
-      taxReal.reduce((sum, value) => sum + value, 0) * inflationFactor;
-    const cgtTaxNominal = [0, 1].reduce((sum, index) => {
-      if (!(netCapitalGainByPerson[index] > 0)) return sum;
-      const withGain = taxReal[index];
-      const withoutGainNominal = taxableNominal[index] - netCapitalGainByPerson[index];
-      const withoutGain = projectionNetTax({
-        taxableNominal: withoutGainNominal,
-        rebateNominal: withoutGainNominal,
-        inflationFactor,
-        year,
-        seniorEligible: ages[index] >= 67
+    const taxLedger = [0, 1].map(index => {
+      const baseTax = taxAfterFranking({
+        taxableNominal: baseTaxableNominal[index],
+        rebateNominal: baseTaxableNominal[index],
+        inflationFactor, year,
+        seniorEligible: ages[index] >= 67,
+        frankingNominal: 0
       });
-      return sum + Math.max(0, withGain - withoutGain) * inflationFactor;
-    }, 0);
+      const taxableWithDividend = baseTaxableNominal[index] +
+        dividendFlows.cashByPerson[index] +
+        dividendFlows.frankingByPerson[index];
+      const ordinaryTax = taxAfterFranking({
+        taxableNominal: taxableWithDividend,
+        rebateNominal: taxableWithDividend,
+        inflationFactor, year,
+        seniorEligible: ages[index] >= 67,
+        frankingNominal: dividendFlows.frankingByPerson[index]
+      });
+      const totalTax = taxAfterFranking({
+        taxableNominal: taxableWithDividend + netCapitalGainByPerson[index],
+        rebateNominal: taxableWithDividend + netCapitalGainByPerson[index],
+        inflationFactor, year,
+        seniorEligible: ages[index] >= 67,
+        frankingNominal: dividendFlows.frankingByPerson[index]
+      });
+      return {
+        baseTax,
+        ordinaryTax,
+        totalTax,
+        frankingNominal: dividendFlows.frankingByPerson[index],
+        cgtTaxNominal: Math.max(0, totalTax.netNominal - ordinaryTax.netNominal),
+        refundNominal: totalTax.refundNominal,
+        dividendNetNominal: dividendFlows.cashByPerson[index] -
+          (ordinaryTax.netNominal - baseTax.netNominal)
+      };
+    });
+    const baseTaxNominal = taxLedger.reduce(
+      (sum, person) => sum + person.baseTax.netNominal, 0);
+    const ordinaryTaxNominal = taxLedger.reduce(
+      (sum, person) => sum + person.ordinaryTax.netNominal, 0);
+    const totalTaxNominal = taxLedger.reduce(
+      (sum, person) => sum + person.totalTax.netNominal, 0);
+    const cgtTaxNominal = taxLedger.reduce(
+      (sum, person) => sum + person.cgtTaxNominal, 0);
+    const dividendNetNominal = taxLedger.reduce(
+      (sum, person) => sum + person.dividendNetNominal, 0);
+    const totalTaxableNominalByPerson = [0, 1].map(index =>
+      baseTaxableNominal[index] + dividendFlows.cashByPerson[index] +
+      dividendFlows.frankingByPerson[index] + netCapitalGainByPerson[index]);
 
-    const grossTaxableSources =
+    const grossNonDividendTaxableSources =
       salaries.reduce((sum, value) => sum + value, 0) +
       ukState.reduce((sum, value) => sum + value, 0) +
       otherTaxableNominal +
       agePensionNominal;
-    const taxableNetRatio = grossTaxableSources > 0
-      ? Math.max(0, (grossTaxableSources - totalTaxNominal) / grossTaxableSources)
+    const taxableNetRatio = grossNonDividendTaxableSources > 0
+      ? Math.max(0, (grossNonDividendTaxableSources - baseTaxNominal) /
+          grossNonDividendTaxableSources)
       : 1;
 
     const guaranteedNet =
-      grossTaxableSources - totalTaxNominal + otherNonTaxableNominal;
+      grossNonDividendTaxableSources - baseTaxNominal +
+      dividendNetNominal + otherNonTaxableNominal;
     const mandatoryTotal =
       mandatoryDraws.reduce((sum, value) => sum + value, 0);
     const targetNominal = scenario.household.targetAfterTax * inflationFactor;
@@ -1604,7 +1681,8 @@
       otherAssetsNominal;
 
     const adjustedTaxableIncomeReal =
-      taxableNominal.reduce((sum, value) => sum + value, 0) / inflationFactor;
+      totalTaxableNominalByPerson.reduce((sum, value) => sum + value, 0) /
+      inflationFactor;
     const abpBalanceReal =
       state.superRetire.reduce((sum, value) => sum + value, 0) / inflationFactor;
     const cshc = cshcEstimate({
@@ -1634,6 +1712,7 @@
         otherIncomeNet:
           (otherTaxableNominal * taxableNetRatio + otherNonTaxableNominal) /
           inflationFactor,
+        shareDividendNet: dividendNetNominal / inflationFactor,
         agePensionNet:
           agePensionNominal * taxableNetRatio / inflationFactor,
         person0Super: superIncome[0] / inflationFactor,
@@ -1644,6 +1723,10 @@
       },
       tax: totalTaxNominal / inflationFactor,
       cgtTax: cgtTaxNominal / inflationFactor,
+      frankingCredits: dividendFlows.frankingTotal / inflationFactor,
+      taxRefund: taxLedger.reduce(
+        (sum, person) => sum + person.refundNominal, 0) / inflationFactor,
+      taxLedger: taxLedger.map(person => ({ ...person })),
       cshc,
       totalIncome: totalIncomeNominal / inflationFactor,
       target: scenario.household.targetAfterTax,
@@ -1959,6 +2042,8 @@
     beginShareYear,
     recordDividendExposure,
     finishDividendExposure,
+    frankingCreditNominal,
+    shareDividendFlows,
     makeShareSaleRecord,
     capitalLedgerForPeople,
     allocateOwnedAmount,
@@ -1982,6 +2067,7 @@
     saptoOffset,
     netTax,
     projectionNetTax,
+    taxAfterFranking,
     deemedIncome,
     agePensionAssetsRate,
     agePensionIncomeRate,

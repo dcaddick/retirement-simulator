@@ -318,6 +318,26 @@ check('unused capital loss carries forward for the correct person',
   capitalLedger.closingLosses[0] === 0 &&
   capitalLedger.closingLosses[1] === 500);
 
+check('30% company rate grosses up a fully franked dividend',
+  Math.abs(core.frankingCreditNominal(1000, 100, 30) - 428.5714286) < 0.001);
+check('25% company rate grosses up a fully franked dividend',
+  Math.abs(core.frankingCreditNominal(1000, 100, 25) - 333.3333333) < 0.001);
+
+const dividendState = {
+  holdings: [{
+    ...core.makeShareholding(0), id: 'dividend', owner: 'p0', quantity: 10,
+    price: 100, dividendYieldPct: 12, frankedPct: 100,
+    companyTaxRatePct: 30, frankingEligible: true, sold: false,
+    dividendQuantityMonths: 60, dividendCursorMonth: 13
+  }]
+};
+const dividendFlows = core.shareDividendFlows(dividendState);
+check('six months of exposure prorates the cash dividend',
+  Math.abs(dividendFlows.cashByPerson[0] - 60) < 0.001);
+check('dividend and franking credit follow share ownership',
+  dividendFlows.cashByPerson[1] === 0 &&
+  dividendFlows.frankingByPerson[0] > 25);
+
 const growingShares = structuredClone(sample);
 growingShares.shareholdings = [{
   ...core.makeShareholding(0), id: 'grow', symbol: 'GROW', quantity: 100,
@@ -351,6 +371,49 @@ check('projection carries a loss into a later gain year',
   lossRows[0].capitalLedger[0].closingLoss === 500 &&
   lossRows[1].capitalLedger[0].netCapitalGainNominal === 500 &&
   lossRows[1].capitalLedger[0].closingLoss === 0);
+
+function makeDividendScenario(owner = 'p0', frankingEligible = true) {
+  const scenario = structuredClone(sample);
+  scenario.people.forEach(person => {
+    person.salary = 0;
+    person.super = 0;
+  });
+  scenario.cash = { amount: 0, interestPct: 0, owner: 'joint' };
+  scenario.savings = { amount: 0, interestPct: 0, owner: 'joint' };
+  scenario.lumpSumWithdrawals = [];
+  scenario.otherIncomes = [];
+  scenario.otherAssets = [];
+  scenario.household.targetAfterTax = 0;
+  scenario.household.annualBudget = 0;
+  scenario.household.includeAgePension = false;
+  scenario.shareholdings = [{
+    ...core.makeShareholding(0),
+    id: `refund-${owner}-${frankingEligible}`,
+    symbol: 'TEST', owner, quantity: 100, price: 10, costBaseAud: 1000,
+    priceGrowthPct: 0, dividendYieldPct: 10, frankedPct: 100,
+    companyTaxRatePct: 30, frankingEligible,
+    saleYear: scenario.startYear + 20
+  }];
+  return scenario;
+}
+
+const frankedRow = core.projectScenario(makeDividendScenario()).rows[0];
+const ineligibleRow = core.projectScenario(
+  makeDividendScenario('p0', false)).rows[0];
+const jointRow = core.projectScenario(
+  makeDividendScenario('joint', true)).rows[0];
+const expectedCredit = 100 * 0.30 / 0.70;
+check('eligible franking can create an estimated refund',
+  Math.abs(frankedRow.components.shareDividendNet -
+    (100 + expectedCredit)) < 0.01 &&
+  Math.abs(frankedRow.frankingCredits - expectedCredit) < 0.01 &&
+  Math.abs(frankedRow.taxRefund - expectedCredit) < 0.01);
+check('ineligible holding receives cash but no franking credit',
+  Math.abs(ineligibleRow.components.shareDividendNet - 100) < 0.01 &&
+  ineligibleRow.frankingCredits === 0);
+check('joint dividends and credits split across both tax ledgers',
+  Math.abs(jointRow.taxLedger[0].frankingNominal - expectedCredit / 2) < 0.01 &&
+  Math.abs(jointRow.taxLedger[1].frankingNominal - expectedCredit / 2) < 0.01);
 
 console.log('\ncurrent Medicare thresholds');
 check('Medicare data is for 2025-26', core.MEDICARE_BASE.effectiveYear === 2025);
