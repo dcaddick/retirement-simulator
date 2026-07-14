@@ -91,6 +91,8 @@
   .assumptions summary{cursor:pointer;color:var(--text)}
   .supporting-notes{margin-top:12px;border-top:1px solid var(--line);padding-top:2px}
   .return-readout{margin:2px 0 7px;color:var(--muted);font-size:11px;text-align:left;font-variant-numeric:tabular-nums;line-height:1.35}
+  .return-readout .return-primary{display:flex;align-items:baseline;gap:4px;flex-wrap:wrap}
+  .return-readout .return-period{white-space:nowrap}
   .return-readout .near-term{display:block;margin-top:2px}
   .divergence-badge{display:inline-block;margin-left:4px;padding:1px 5px;border:1px solid color-mix(in srgb,var(--warn) 55%,transparent);border-radius:999px;background:color-mix(in srgb,var(--warn) 10%,transparent);color:var(--warn);font-size:10px;font-weight:700}
   .inflation-summary{margin:7px 0 2px;padding-top:7px;border-top:1px solid var(--line)}
@@ -2051,7 +2053,7 @@
     const current = core.realReturnPct(nominal, currentInflation);
     const diverges = !manual && currentInflation !== longRunInflation;
     return `<p class="return-readout" id="returnReadout-${index}-${key}">
-      <span>Real return: ${signedPct(longRun)}${manual ? '' : ' long-term'}</span>
+      <span class="return-primary"><span>Real return: ${signedPct(longRun)}</span>${manual ? '' : '<span class="return-period">long-term</span>'}</span>
       ${diverges ? `<span class="near-term">${currentScenario.startYear}: ${signedPct(current)}<span class="divergence-badge">near-term inflation</span></span>` : ''}
     </p>`;
   }
