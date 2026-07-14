@@ -130,8 +130,15 @@ check('deferred review covers all approved out-of-scope items', [
 ].every(id => deferredReview.includes(id)));
 check('methodology discloses fixed nominal brackets',
   methodology.includes('fixed nominal') && methodology.includes('bracket creep'));
-check('README identifies v1.05 and links deferred review',
-  readme.includes('v1.05') && readme.includes('docs/DEFERRED-REVIEW.md'));
+check('README identifies v1.06 share returns and tax ownership',
+  readme.includes('v1.06') && readme.includes('franking') &&
+  readme.includes('capital-loss') && readme.includes('docs/DEFERRED-REVIEW.md'));
+check('deferred register records the four v1.0.6 resolutions',
+  ['#5', '#9', '#10', '#11'].every(issue => deferredReview.includes(issue)) &&
+  (deferredReview.match(/Resolved in v1\.0\.6/g) ?? []).length >= 4);
+check('methodology documents annual share growth timing and franking eligibility',
+  methodology.includes('before dividends and share sales') &&
+  methodology.includes('holding-period') && methodology.includes('losses are applied'));
 check('returns and inflation share a dedicated upper controls block',
   html.indexOf('id="returnAssumptions"') < html.indexOf('id="peopleFields"') &&
   html.includes('Estimated net returns after fees and tax'));
@@ -272,6 +279,10 @@ check('share-return controls stay inline in each chevron editor',
   html.includes('Annual cash dividend yield %') &&
   html.includes('Franked portion %') &&
   html.includes('Assume owner is eligible to claim franking credits'));
+check('shareholding editors preserve open state through field rerenders',
+  html.includes('const expandedShareIds = new Set()') &&
+  html.includes("expandedShareIds.has(holding.id) ? ' open' : ''") &&
+  html.includes("addEventListener('toggle', event =>"));
 check('manual holdings do not construct a Stooq URL',
   core.stooqQuoteUrl({ ...manualHolding, symbol: 'BHP' }) === null);
 check('US Stooq holdings construct an explicit .us URL',
