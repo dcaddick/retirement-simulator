@@ -3,6 +3,7 @@ scratch/
 private/
 scenarios/
 exports/
+handoff/
 *.log
 *.local.json
 .env
