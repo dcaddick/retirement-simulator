@@ -2,6 +2,12 @@
 
 This changelog summarizes public, non-personal milestones. Early development used many private prototype snapshots; those files are intentionally not reproduced in the public repository.
 
+## 1.07 - 2026-07-15
+
+- Corrected Age Pension projections for age-gapped couples: the existing combined couple means tests now pay one partnered share when exactly one person has reached age 67, with taxable pension income allocated only to that eligible person ([#6](https://github.com/dcaddick/retirement-simulator/issues/6)).
+- Released the experimental Monte Carlo companion as v0.6 with the same Age Pension eligibility boundary and person-level tax allocation.
+- Archived the exact outgoing deterministic v1.0.6 executable.
+
 ## 1.06 - 2026-07-14
 
 - Added nominal share-price growth, holding-period cash dividends and optional ownership-aware franking credits, completing the approved share-return scope ([#5](https://github.com/dcaddick/retirement-simulator/issues/5)).

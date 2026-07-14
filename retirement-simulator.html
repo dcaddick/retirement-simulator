@@ -4,7 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src https://api.frankfurter.app https://stooq.com; base-uri 'none'; form-action 'none'" />
-<title>Family Retirement Income Simulator v1.06</title>
+<title>Family Retirement Income Simulator v1.07</title>
 <style>
   :root{
     --bg:#0f1720; --panel:#18232f; --panel2:#1e2c3a; --line:#2b3d4f;
@@ -189,7 +189,7 @@
 <div class="disclaimer-banner top" role="note">Local, reproducible retirement-risk analysis. Estimate only; not financial or tax advice.</div>
 <header>
   <div class="header-row">
-  <h1>Family Retirement Income Simulator <span class="version">v1.06</span></h1>
+  <h1>Family Retirement Income Simulator <span class="version">v1.07</span></h1>
   <nav class="header-actions" aria-label="Scenario actions">
     <button type="button" id="newScenario">New</button>
     <button type="button" id="resetSample">Reset sample</button>
@@ -348,7 +348,7 @@
           <ul id="sourceList"></ul>
           <ul id="limitationsList">
             <li>Annual projection rows; retirement and pension starts use whole ages.</li>
-            <li>Age Pension estimate assumes a homeowner couple, excludes the principal residence and starts only after both partners reach pension age.</li>
+            <li>Age Pension estimate assumes a homeowner couple and excludes the principal residence. Combined couple income and asset tests apply; when only one partner has reached age 67, the estimate pays half of the means-tested combined couple rate.</li>
             <li>Nominal share-price growth is applied before dividends and sales; cost base stays unchanged. Dividend yield excludes price growth and is prorated by months held.</li>
             <li>Dividends and optional franking credits follow ownership. Eligibility is a user assumption; integrity rules are not automated.</li>
             <li>Capital losses are tracked per person, applied before discounts and carried forward from a zero opening balance. CGT is funded from assets and never counts as retirement income.</li>
@@ -412,7 +412,7 @@
       </details>
     </div>
     <div class="note">
-      <b>v1.06.</b> Fictional Australian couple sample data is stored locally on this device and can be imported or exported as JSON. Calculations are transparent estimates and are not financial or tax advice. The Display toggle switches the whole dashboard &mdash; table, chart and headline figures &mdash; between today&rsquo;s dollars and nominal (future) dollars, except the CSHC estimate which stays in today&rsquo;s dollars against its fixed threshold. Numeric inputs recalculate live as you type without moving your modelling position; the &ldquo;Recalculated&rdquo; stamp above the table confirms each run.
+      <b>v1.07.</b> Fictional Australian couple sample data is stored locally on this device and can be imported or exported as JSON. Calculations are transparent estimates and are not financial or tax advice. The Display toggle switches the whole dashboard &mdash; table, chart and headline figures &mdash; between today&rsquo;s dollars and nominal (future) dollars, except the CSHC estimate which stays in today&rsquo;s dollars against its fixed threshold. Numeric inputs recalculate live as you type without moving your modelling position; the &ldquo;Recalculated&rdquo; stamp above the table confirms each run.
     </div>
   </div>
 </div>
@@ -2174,11 +2174,12 @@
   'use strict';
 
   const core = globalThis.RetirementSimulatorCore;
-  const STORAGE_KEY = 'family-retirement-simulator:v1.06:scenario';
+  const STORAGE_KEY = 'family-retirement-simulator:v1.07:scenario';
   const THEME_STORAGE_KEY = 'retirement-simulator-theme';
   // Read-only fallbacks so scenarios saved under earlier versions carry over
   // on first load (they migrate to the current schema automatically).
   const LEGACY_STORAGE_KEYS = [
+    'family-retirement-simulator:v1.06:scenario',
     'family-retirement-simulator:v1.05:scenario',
     'family-retirement-simulator:v1.04:scenario',
     'family-retirement-simulator:v1.03:scenario',
@@ -3526,7 +3527,7 @@
       'Cash interest ' + scenario.cash.interestPct + '%/yr, savings interest ' +
         scenario.savings.interestPct + '%/yr (taxable)',
       'Income-tax brackets and LITO stay fixed in nominal dollars after the legislated 2027 rate change, so inflation creates bracket creep; Medicare and SAPTO thresholds use an indexed approximation',
-      'Age Pension income above the couple free area reduces the combined normal rate by 50 cents per dollar; the projection still requires both partners to reach Age Pension age'
+      'Age Pension uses combined couple income and asset tests; one eligible partner receives half of the means-tested combined rate, and both eligible partners receive the full combined rate'
     ];
     const otherIncomeCount = (scenario.otherIncomes ?? []).length;
     const otherAssetCount = (scenario.otherAssets ?? []).length;

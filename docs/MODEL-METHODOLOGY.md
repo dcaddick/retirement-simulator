@@ -54,7 +54,7 @@ The simulator contains simplified, dated estimates for Australian income tax, Me
 
 Income-tax brackets and LITO use the legislated fixed nominal schedule: the 2026 rate applies in 2026, the legislated 2027 rate applies from 2027, and no unlegislated later tax cuts are forecast. As nominal income rises with inflation against those fixed nominal thresholds, the model includes bracket creep. Medicare and SAPTO retain the simulator's existing indexed approximation by applying their thresholds in today's-dollar terms. This is a deterministic policy baseline, not a prediction of future government decisions.
 
-The normal Age Pension income test uses a 50-cent combined couple reduction for each dollar above the couple free area (25 cents for each partner). The model still requires both partners to have reached Age Pension age; that separate limitation remains under deferred review.
+The normal Age Pension estimate applies the combined homeowner-couple income and assets tests. If one partner has reached Age Pension age, the household receives half of the means-tested combined couple rate and the taxable payment is allocated to that eligible person; once both partners are 67, the household receives the full combined rate. Superannuation held by a partner under Age Pension age remains excluded while it stays in the modelled super environment. The income test uses a 50-cent combined couple reduction for each dollar above the couple free area.
 
 Taxable Other income follows its selected owner (`Person 1`, `Person 2` or `Joint 50/50`). Non-taxable Other income remains a household cash flow. Share dividends and franking credits follow the holding owner on the same basis. Franking eligibility is an explicit user assumption: the simulator does not automate holding-period, related-payment or other integrity rules. Refundable franking offsets can therefore produce an estimated tax refund in a low-tax year.
 
@@ -80,7 +80,7 @@ Calculations run using nominal values. Today's-dollar views divide future nomina
 
 The companion report imports a validated scenario and applies synthetic investment-return paths. Seeded runs support reproducibility, while deterministic stress cases are reported separately.
 
-Monte Carlo v0.5 accepts the standard fictional sample and scenarios using the fields its experimental engine supports. It rejects, with a visible explanation, imports containing populated Other income/Other assets, active Defined Benefit/UK Pension income, or active v1.06 share growth, dividend or franking assumptions; it does not silently discard those cash flows.
+Monte Carlo v0.6 accepts the standard fictional sample and scenarios using the fields its experimental engine supports. It uses the same Age Pension eligibility boundary and person-level tax allocation as the deterministic simulator. It rejects, with a visible explanation, imports containing populated Other income/Other assets, active Defined Benefit/UK Pension income, or active v1.06 share growth, dividend or franking assumptions; it does not silently discard those cash flows.
 
 The reported success rate is conditional on the selected model and assumptions. It is not a personal forecast. The model does not make every material retirement risk stochastic, and deterministic stresses do not alter the Monte Carlo probability denominator.
 

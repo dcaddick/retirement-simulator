@@ -91,11 +91,11 @@ check('return assumptions are explained below the table',
 check('assumptions and methodology moved out of the controls panel',
   html.indexOf('<summary>Model assumptions and sources</summary>') > html.indexOf('<div class="tblwrap">') &&
   html.indexOf('id="methodologySection"') > html.indexOf('<div class="tblwrap">'));
-check('v1.06 document version is consistent',
-  html.includes('<title>Family Retirement Income Simulator v1.06</title>') &&
-  html.includes('<span class="version">v1.06</span>') &&
-  html.includes("const STORAGE_KEY = 'family-retirement-simulator:v1.06:scenario'") &&
-  html.includes("'family-retirement-simulator:v1.05:scenario'"));
+check('v1.07 document version is consistent',
+  html.includes('<title>Family Retirement Income Simulator v1.07</title>') &&
+  html.includes('<span class="version">v1.07</span>') &&
+  html.includes("const STORAGE_KEY = 'family-retirement-simulator:v1.07:scenario'") &&
+  html.includes("'family-retirement-simulator:v1.06:scenario'"));
 check('outgoing v1.04 executable is archived', existsSync(ARCHIVE_104));
 check('outgoing v1.0.5 executable is archived', existsSync(ARCHIVE_105));
 check('outgoing v1.0.6 executable is archived', existsSync(ARCHIVE_106));
@@ -134,8 +134,10 @@ check('deferred review covers all approved out-of-scope items', [
 ].every(id => deferredReview.includes(id)));
 check('methodology discloses fixed nominal brackets',
   methodology.includes('fixed nominal') && methodology.includes('bracket creep'));
-check('README identifies v1.06 share returns and tax ownership',
-  readme.includes('v1.06') && readme.includes('franking') &&
+check('README identifies v1.07 and Monte Carlo v0.6',
+  readme.includes('v1.07') &&
+  readme.includes('retirement-monte-carlo-v0.6.html') &&
+  readme.includes('one partner') && readme.includes('franking') &&
   readme.includes('capital-loss') && readme.includes('docs/DEFERRED-REVIEW.md'));
 check('deferred register records the four v1.0.6 resolutions',
   ['#5', '#9', '#10', '#11'].every(issue => deferredReview.includes(issue)) &&
@@ -143,6 +145,12 @@ check('deferred register records the four v1.0.6 resolutions',
 check('methodology documents annual share growth timing and franking eligibility',
   methodology.includes('before dividends and share sales') &&
   methodology.includes('holding-period') && methodology.includes('losses are applied'));
+check('methodology documents one-eligible couple treatment',
+  methodology.includes('one partner has reached Age Pension age') &&
+  methodology.includes('half of the means-tested combined couple rate'));
+check('deferred register resolves the age-gap item',
+  deferredReview.includes('AIPR-003-AP-AGEGAP') &&
+  deferredReview.includes('Resolved in v1.0.7'));
 check('returns and inflation share a dedicated upper controls block',
   html.indexOf('id="returnAssumptions"') < html.indexOf('id="peopleFields"') &&
   html.includes('Estimated net returns after fees and tax'));
