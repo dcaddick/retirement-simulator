@@ -137,6 +137,15 @@ check('compact lump-sum formatter uses the exported core formatter',
 check('table height splitter is accessible and persistent',
   html.includes('id="tableHeightSplitter"') &&
   html.includes('family-retirement-simulator:table-height'));
+check('table actions place Export CSV after Display',
+  /class="table-actions"[\s\S]*id="displayMode"[\s\S]*id="exportProjectionCsv"/.test(html));
+check('Export CSV is the final table action',
+  /id="exportProjectionCsv"[^>]*>Export CSV<\/button>\s*<\/div>/.test(html));
+check('return readouts are left aligned and use concise labels',
+  html.includes('.return-readout{') &&
+  html.includes('text-align:left') &&
+  html.includes('Real return:') &&
+  html.includes('long-term'));
 check('desktop workspace uses viewport grid and independent scrolling',
   html.includes('grid-template-rows:auto auto minmax(0,1fr) auto') &&
   html.includes('.controls{padding:14px 16px') && html.includes('max-height:none'));
