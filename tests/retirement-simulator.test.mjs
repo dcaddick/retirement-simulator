@@ -247,11 +247,34 @@ check('CSV export reports success and failure accessibly',
 console.log('\nmarket quote policy');
 const manualHolding = core.makeShareholding(0);
 check('new holdings default to manual quotes', manualHolding.quoteMarket === 'manual');
+check('new share-return assumptions are inert',
+  manualHolding.priceGrowthPct === 0 &&
+  manualHolding.dividendYieldPct === 0 &&
+  manualHolding.frankedPct === 0 &&
+  manualHolding.companyTaxRatePct === 30 &&
+  manualHolding.frankingEligible === false);
+check('share-return controls stay inline in each chevron editor',
+  html.includes('Expected share-price growth %/yr') &&
+  html.includes('Annual cash dividend yield %') &&
+  html.includes('Franked portion %') &&
+  html.includes('Assume owner is eligible to claim franking credits'));
 check('manual holdings do not construct a Stooq URL',
   core.stooqQuoteUrl({ ...manualHolding, symbol: 'BHP' }) === null);
 check('US Stooq holdings construct an explicit .us URL',
   core.stooqQuoteUrl({ ...manualHolding, symbol: 'VTI', quoteMarket: 'stooq-us' }) ===
     'https://stooq.com/q/l/?s=vti.us&f=sd2t2ohlcv&h&e=csv');
+
+const badShareReturns = structuredClone(sample);
+badShareReturns.shareholdings = [{
+  ...core.makeShareholding(0), symbol: 'BAD', price: 1,
+  priceGrowthPct: -101, dividendYieldPct: 101, frankedPct: -1,
+  companyTaxRatePct: 27.5, frankingEligible: 'yes'
+}];
+const shareReturnErrors = core.validateScenario(badShareReturns);
+check('invalid share-return assumptions are rejected',
+  ['priceGrowthPct', 'dividendYieldPct', 'frankedPct',
+    'companyTaxRatePct', 'frankingEligible'].every(field =>
+      shareReturnErrors.some(error => error.path.endsWith(field))));
 
 console.log('\ncurrent Medicare thresholds');
 check('Medicare data is for 2025-26', core.MEDICARE_BASE.effectiveYear === 2025);
