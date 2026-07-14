@@ -339,8 +339,8 @@ check('salary growth raises SG-supported super balance',
 console.log('\nother income');
 const withIncome = structuredClone(sample);
 withIncome.otherIncomes = [
-  { id: 'i1', label: 'Rental', currency: 'AUD', fxToAud: 1, amount: 10000, taxable: true },
-  { id: 'i2', label: 'Gift', currency: 'GBP', fxToAud: 2, amount: 1000, taxable: false }
+  { id: 'i1', label: 'Rental', currency: 'AUD', fxToAud: 1, amount: 10000, taxable: true, owner: 'joint' },
+  { id: 'i2', label: 'Gift', currency: 'GBP', fxToAud: 2, amount: 1000, taxable: false, owner: 'joint' }
 ];
 check('scenario with income validates', core.validateScenario(withIncome).length === 0,
   JSON.stringify(core.validateScenario(withIncome)[0] ?? null));
@@ -370,6 +370,38 @@ const rLate = projIncome.rows[20];
 check('CPI-indexed income holds real value at year 20 (>= 80% of year 0)',
   rLate.components.otherIncomeNet >= r0.components.otherIncomeNet * 0.8,
   `${r0.components.otherIncomeNet} -> ${rLate.components.otherIncomeNet}`);
+
+function projectOwnedIncome(owner) {
+  const scenario = structuredClone(sample);
+  scenario.people[0].salary = 90000;
+  scenario.people[1].salary = 0;
+  scenario.otherIncomes = [{
+    id: `income-${owner}`, label: 'Rent', currency: 'AUD', fxToAud: 1,
+    amount: 30000, taxable: true, owner
+  }];
+  return core.projectScenario(scenario).rows[0];
+}
+
+const p0OwnedIncome = projectOwnedIncome('p0');
+const p1OwnedIncome = projectOwnedIncome('p1');
+const jointOwnedIncome = projectOwnedIncome('joint');
+check('other income ownership changes household tax',
+  p0OwnedIncome.tax > jointOwnedIncome.tax &&
+  jointOwnedIncome.tax > p1OwnedIncome.tax,
+  `${p0OwnedIncome.tax} / ${jointOwnedIncome.tax} / ${p1OwnedIncome.tax}`);
+check('other income UI reuses the owner selector',
+  html.includes('Tax owner') &&
+  html.includes('data-path="${path}.owner"') &&
+  html.includes("item.taxable ? '' : ' disabled'"));
+
+const badOwner = structuredClone(sample);
+badOwner.otherIncomes = [{
+  id: 'bad-owner', label: 'Rent', currency: 'AUD', fxToAud: 1,
+  amount: 1000, taxable: true, owner: 'somebody-else'
+}];
+check('invalid other income owner is rejected',
+  core.validateScenario(badOwner).some(error =>
+    error.path === 'otherIncomes.0.owner'));
 
 console.log('\nother assets');
 const withAsset = structuredClone(sample);
@@ -475,7 +507,7 @@ check('survival milestones are ordered', (() => {
 
 console.log('\nvalidation rejects bad items');
 const badIncome = structuredClone(sample);
-badIncome.otherIncomes = [{ id: 'x', label: '', currency: 'EUR', fxToAud: 0, amount: -5, taxable: 'yes' }];
+badIncome.otherIncomes = [{ id: 'x', label: '', currency: 'EUR', fxToAud: 0, amount: -5, taxable: 'yes', owner: 'joint' }];
 const incomeErrors = core.validateScenario(badIncome);
 check('bad income: label/currency/fx/amount/taxable all flagged', incomeErrors.length >= 5,
   JSON.stringify(incomeErrors));

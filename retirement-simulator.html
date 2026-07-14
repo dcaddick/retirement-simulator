@@ -293,7 +293,7 @@
       </div>
       <div id="otherIncomeList"></div>
       <div id="otherAssetList"></div>
-      <p class="sub">Income items are annual amounts, indexed to inflation. Taxable income is split 50/50 between the household for tax. Assets grow (or shrink) at their own rate and their value moves into the savings pot in the disposal year; they count toward the Age Pension assets test but are not deemed, and CGT on disposal is not modelled.</p>
+      <p class="sub">Income items are annual amounts, indexed to inflation. Taxable income follows the selected tax owner; non-taxable income remains a household cash flow. Assets grow (or shrink) at their own rate and their value moves into the savings pot in the disposal year; they count toward the Age Pension assets test but are not deemed, and CGT on disposal is not modelled.</p>
     </details>
     <details class="group" id="householdSection">
       <summary class="group-toggle"><h3>Household</h3></summary>
@@ -351,7 +351,7 @@
             <li>Share values remain flat until sale and produce no dividend or franking-credit income.</li>
             <li>Capital losses are discarded rather than offset or carried forward.</li>
             <li>Survival is illustrative and does not change household cash flows or model a survivor state.</li>
-            <li>Other income is CPI-indexed and split 50/50 for tax when marked taxable. Other assets count in the Age Pension assets test but are not deemed, and no CGT is modelled on their disposal.</li>
+            <li>Other income is CPI-indexed. Taxable items follow the selected owner; non-taxable items remain household cash flow. Other assets count in the Age Pension assets test but are not deemed, and no CGT is modelled on their disposal.</li>
             <li>Early super access is simplified, not full Transition-to-Retirement (TTR). There is no 10%-of-balance annual payment cap, no commutation restriction, and no automatic cessation rule. Tax treatment assumes the member is over 60, where TTR and full retirement-phase withdrawals are both tax-free; the model will misstate results for anyone under 60 drawing super while still working.</li>
           </ul>
         </div>
@@ -1343,16 +1343,22 @@
         });
       });
 
-    // Other income: annual amounts, CPI-indexed. Taxable items join assessable
-    // income (split 50/50 between the household); non-taxable items are added
-    // to income after tax.
-    let otherTaxableNominal = 0;
+    // Other income: annual amounts, CPI-indexed. Taxable items follow their
+    // selected owner; non-taxable items are added to household income after tax.
+    const otherTaxableByPerson = [0, 0];
     let otherNonTaxableNominal = 0;
     (scenario.otherIncomes ?? []).forEach(item => {
       const nominal = item.amount * otherItemFx(item) * inflationFactor;
-      if (item.taxable) otherTaxableNominal += nominal;
-      else otherNonTaxableNominal += nominal;
+      if (item.taxable) {
+        allocateOwnedAmount(nominal, item.owner).forEach((amount, index) => {
+          otherTaxableByPerson[index] += amount;
+        });
+      } else {
+        otherNonTaxableNominal += nominal;
+      }
     });
+    const otherTaxableNominal = otherTaxableByPerson.reduce(
+      (sum, amount) => sum + amount, 0);
 
     const cashInterest = state.cash * scenario.cash.interestPct / 100;
     const savingsInterest =
@@ -1414,7 +1420,7 @@
       salaries[index] +
       ukState[index] * (1 - uppRate) +
       agePensionNominal / 2 +
-      otherTaxableNominal / 2 +
+      otherTaxableByPerson[index] +
       interestByPerson[index] +
       discountedGainByPerson[index]
     );
@@ -1677,6 +1683,9 @@
         }
         if (typeof item.taxable !== 'boolean') {
           add(`${path}.taxable`, 'Taxable must be true or false.');
+        }
+        if (!['p0', 'p1', 'joint'].includes(item.owner)) {
+          add(`${path}.owner`, 'Tax owner must be Person 1, Person 2, or Joint 50/50.');
         }
       });
     }
@@ -2331,6 +2340,11 @@
       ${moneyField('Amount per year', `${path}.amount`, item.amount, item.currency)}
       <label><span class="k">Taxable income</span>
         <input type="checkbox" data-path="${path}.taxable"${item.taxable ? ' checked' : ''}>
+      </label>
+      <label><span class="k">Tax owner</span>
+        <select data-path="${path}.owner"${item.taxable ? '' : ' disabled'}>
+          ${ownerOptions(item.owner, currentScenario.people)}
+        </select>
       </label>
       <button type="button" class="remove-other" data-kind="otherIncomes" data-index="${index}">Remove income</button>
     </div>`;
@@ -3182,7 +3196,7 @@
     const otherAssetCount = (scenario.otherAssets ?? []).length;
     if (otherIncomeCount || otherAssetCount) {
       items.push(
-        `Other items: ${otherIncomeCount} income (CPI-indexed; taxable split 50/50 for tax) ` +
+        `Other items: ${otherIncomeCount} income (CPI-indexed; taxable items follow their selected owner) ` +
         `and ${otherAssetCount} asset (own growth rate; in the assets test, not deemed; ` +
         'disposal proceeds to savings, no CGT modelled)'
       );
