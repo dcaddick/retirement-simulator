@@ -495,7 +495,7 @@
     homeownerAssetFreeArea: 499000,
     assetTaperAnnualPerThousand: 78,
     incomeFreeAreaCoupleAnnual: 396 * 26,
-    incomeTaperCouple: 0.40,
+    incomeTaperCouple: 0.50,
     deemingThresholdCouple: 110600,
     deemingLowerRate: 0.0125,
     deemingUpperRate: 0.0325,
@@ -554,6 +554,23 @@
     const offsets = litoOffset(taxableIncome) +
       (seniorEligible ? saptoOffset(rebateIncome) : 0);
     return Math.max(0, gross - offsets);
+  }
+
+  function projectionNetTax({
+    taxableNominal,
+    rebateNominal,
+    inflationFactor,
+    year,
+    seniorEligible
+  }) {
+    const factor = inflationFactor > 0 ? inflationFactor : 1;
+    const taxableReal = taxableNominal / factor;
+    const rebateReal = rebateNominal / factor;
+    const grossReal = incomeTaxResident(taxableNominal, year) / factor +
+      medicareLevy(taxableReal, seniorEligible);
+    const offsetsReal = litoOffset(taxableNominal) / factor +
+      (seniorEligible ? saptoOffset(rebateReal) : 0);
+    return Math.max(0, grossReal - offsetsReal);
   }
 
   function deemedIncome(financialAssets) {
@@ -1352,9 +1369,10 @@
       discountedGainByPerson[index]
     );
     const taxReal = taxableNominal.map((value, index) =>
-      netTax({
-        taxableIncome: value / inflationFactor,
-        rebateIncome: value / inflationFactor,
+      projectionNetTax({
+        taxableNominal: value,
+        rebateNominal: value,
+        inflationFactor,
         year,
         seniorEligible: ages[index] >= 67
       })
@@ -1364,11 +1382,11 @@
     const cgtTaxNominal = [0, 1].reduce((sum, index) => {
       if (!(discountedGainByPerson[index] > 0)) return sum;
       const withGain = taxReal[index];
-      const withoutGain = netTax({
-        taxableIncome:
-          (taxableNominal[index] - discountedGainByPerson[index]) / inflationFactor,
-        rebateIncome:
-          (taxableNominal[index] - discountedGainByPerson[index]) / inflationFactor,
+      const withoutGainNominal = taxableNominal[index] - discountedGainByPerson[index];
+      const withoutGain = projectionNetTax({
+        taxableNominal: withoutGainNominal,
+        rebateNominal: withoutGainNominal,
+        inflationFactor,
         year,
         seniorEligible: ages[index] >= 67
       });
@@ -1776,6 +1794,7 @@
     litoOffset,
     saptoOffset,
     netTax,
+    projectionNetTax,
     deemedIncome,
     agePensionAssetsRate,
     agePensionIncomeRate,

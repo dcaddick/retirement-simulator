@@ -174,6 +174,48 @@ check('ordinary Medicare thresholds are current',
 check('SAPTO Medicare thresholds are current',
   core.MEDICARE_BASE.sapto.lower === 44268 && core.MEDICARE_BASE.sapto.upper === 55335);
 
+console.log('\nAge Pension income taper');
+const pensionRules = core.SERVICES_AUSTRALIA_2026;
+const freeArea = pensionRules.incomeFreeAreaCoupleAnnual;
+const maximumPension = pensionRules.agePensionMaxCoupleAnnual;
+check('couple income taper is 50 cents combined',
+  pensionRules.incomeTaperCouple === 0.50);
+check('income below free area leaves pension unchanged',
+  core.agePensionIncomeRate(freeArea - 1) === maximumPension);
+check('income at free area leaves pension unchanged',
+  core.agePensionIncomeRate(freeArea) === maximumPension);
+check('income above free area tapers at 50 cents combined',
+  core.agePensionIncomeRate(freeArea + 1000) === maximumPension - 500);
+
+console.log('\nprojection tax basis');
+const projectionNetTax = core.projectionNetTax ?? (() => NaN);
+const taxNow = projectionNetTax({
+  taxableNominal: 100000,
+  rebateNominal: 100000,
+  inflationFactor: 1,
+  year: 2027,
+  seniorEligible: false
+});
+const factor10 = 1.03 ** 10;
+const taxYear10 = projectionNetTax({
+  taxableNominal: 100000 * factor10,
+  rebateNominal: 100000 * factor10,
+  inflationFactor: factor10,
+  year: 2037,
+  seniorEligible: false
+});
+check('fixed nominal brackets create bracket creep in real tax', taxYear10 > taxNow,
+  `${taxNow} -> ${taxYear10}`);
+check('projection tax matches ordinary net tax at inflation factor 1',
+  taxNow === core.netTax({
+    taxableIncome: 100000,
+    rebateIncome: 100000,
+    year: 2027,
+    seniorEligible: false
+  }), `${taxNow}`);
+check('legislated 2026 to 2027 rate transition remains active',
+  core.incomeTaxResident(50000, 2026) - core.incomeTaxResident(50000, 2027) === 268);
+
 console.log('\nbaseline projection');
 const base = core.projectScenario(sample);
 check('rows produced', base.rows.length > 30);
