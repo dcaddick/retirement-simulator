@@ -243,6 +243,20 @@ check('CSV filename records the active display basis',
 check('CSV export reports success and failure accessibly',
   html.includes('Projection table downloaded as CSV.') &&
   html.includes('CSV export failed:'));
+check('share dividends are a conditional chart source',
+  html.includes("['shareDividendNet'") && html.includes('Share dividends'));
+check('enabled lump sums are represented in the chart legend',
+  html.includes('const lumpLegend = rows.some') &&
+  html.includes('Lump sum withdrawal</span>'));
+check('projection table conditionally exposes franking and CGT',
+  html.includes("hasFranking ? ['Franking credits'] : []") &&
+  html.includes("hasCgt ? ['CGT'] : []"));
+check('tax refunds are labelled rather than shown as negative tax',
+  html.includes('Estimated tax refund'));
+check('CGT and loss events expose audit details',
+  html.includes("type: 'capital-loss'") &&
+  html.includes("type: 'cgt-payment'") &&
+  html.includes('closingLoss'));
 
 console.log('\nmarket quote policy');
 const manualHolding = core.makeShareholding(0);

@@ -1513,6 +1513,21 @@
     const capitalLedger = capitalLedgerForPeople(
       saleRecords, state.capitalLossCarryForward);
     state.capitalLossCarryForward = [...capitalLedger.closingLosses];
+    capitalLedger.people.forEach((person, index) => {
+      if (!(person.openingLoss > 0 || person.currentLoss > 0 || person.closingLoss > 0)) return;
+      const applied = person.lossAppliedNonDiscount + person.lossAppliedDiscount;
+      events.push({
+        type: 'capital-loss',
+        person: scenario.people[index].name,
+        openingLoss: person.openingLoss / inflationFactor,
+        currentLoss: person.currentLoss / inflationFactor,
+        applied: applied / inflationFactor,
+        closingLoss: person.closingLoss / inflationFactor,
+        label: applied > 0
+          ? `${scenario.people[index].name} capital losses applied ${formatMoney(applied / inflationFactor)}; ${formatMoney(person.closingLoss / inflationFactor)} carried forward`
+          : `${scenario.people[index].name} capital loss carried forward ${formatMoney(person.closingLoss / inflationFactor)}`
+      });
+    });
     const netCapitalGainByPerson = capitalLedger.people.map(
       person => person.netCapitalGainNominal);
     const dividendFlows = shareDividendFlows(state);
@@ -2210,6 +2225,9 @@
     base.push(['agePensionNet', colour('--chart-pension'), 'Aust. Aged Pension']);
     if ((scenario.otherIncomes ?? []).length) {
       base.push(['otherIncomeNet', '#E38A56', 'Other income']);
+    }
+    if ((scenario.shareholdings ?? []).some(holding => holding.dividendYieldPct > 0)) {
+      base.push(['shareDividendNet', '#E7B85C', 'Share dividends']);
     }
     const sourceMeta = {
       p0Super: ['person0Super', colour('--chart-super-1'), `${people[0].name} super drawdown`],
@@ -3075,9 +3093,12 @@
     ctx.textBaseline = 'bottom';
     ctx.fillText('Essential budget', pads.left + 4, budgetStartY - 3);
 
+    const lumpLegend = rows.some(row => (row.lumpSumTotal || 0) > 0)
+      ? `<span><i style="background:${getComputedStyle(document.documentElement).getPropertyValue('--chart-lump').trim()}"></i>Lump sum withdrawal</span>`
+      : '';
     $('#legend').innerHTML = incomeSegments.map(([, colour, label]) =>
       `<span><i style="background:${colour}"></i>${escapeHtml(label)}</span>`
-    ).join('') +
+    ).join('') + lumpLegend +
       `<span><i style="background:${TARGET_COLOUR}"></i>Preferred Retirement Income</span>` +
       `<span><i style="background:${BUDGET_COLOUR}"></i>Essential Annual Budget</span>`;
     drawSurvivalRibbon(ctx, rows, scenario, x, height - 27);
@@ -3261,6 +3282,8 @@
     const nominal = displayMode === 'nominal';
     const hasOtherIncome = (scenario.otherIncomes ?? []).length > 0;
     const hasOtherAssets = (scenario.otherAssets ?? []).length > 0;
+    const hasFranking = rows.some(row => Math.abs(row.frankingCredits) > 0.005);
+    const hasCgt = rows.some(row => Math.abs(row.cgtTax) > 0.005);
     const headings = [
       'Year',
       people[0].name,
@@ -3278,6 +3301,8 @@
       'Top-up draw',
       'Draw pot',
       'Tax',
+      ...(hasFranking ? ['Franking credits'] : []),
+      ...(hasCgt ? ['CGT'] : []),
       'After tax',
       'Banked',
       'Event',
@@ -3288,6 +3313,9 @@
       // inflation factor for the nominal display mode.
       const factor = nominal ? row.inflationFactor : 1;
       const money = value => core.formatMoney(value * factor);
+      const taxDisplay = row.tax < -0.005
+        ? `Estimated tax refund ${money(-row.tax)}`
+        : money(row.tax);
       const eventText = row.events.map(event => event.label).join('; ');
       const minDraw = row.minDraws[0] + row.minDraws[1];
       const topUpDraw = row.topUpDraws[0] + row.topUpDraws[1];
@@ -3313,7 +3341,9 @@
         <td>${minDrawCell}</td>
         <td>${topUpDraw > 0.5 ? money(topUpDraw) : '-'}</td>
         <td>${money(row.components.potDraw)}</td>
-        <td>${money(row.tax)}</td>
+        <td>${taxDisplay}</td>
+        ${hasFranking ? `<td>${money(row.frankingCredits)}</td>` : ''}
+        ${hasCgt ? `<td>${money(row.cgtTax)}</td>` : ''}
         <td>${money(row.totalIncome)}</td>
         <td>${row.banked > 1 ? money(row.banked) : '-'}</td>
         <td class="event-cell">${escapeHtml(eventText || '-')}</td>
