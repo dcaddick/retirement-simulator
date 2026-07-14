@@ -158,6 +158,30 @@ check('Treasury 2026 accumulation spread is calculated',
 check('Treasury long-run retirement spread is calculated',
   core.realReturnPct(6.5, core.TREASURY_INFLATION.longRunRate * 100) === 4);
 
+console.log('\nCSV export');
+const csvFromMatrix = core.csvFromMatrix ?? (() => '');
+const csv = csvFromMatrix([
+  ['Name', 'Event', 'Value'],
+  ['José', 'Car, holiday', '$1,000'],
+  ['Quote', 'He said "yes"', '=2+2'],
+  ['Line', 'first\nsecond', '@SUM(A1:A2)']
+]);
+check('CSV includes UTF-8 BOM', csv.charCodeAt(0) === 0xFEFF);
+check('CSV quotes commas and doubles embedded quotes',
+  csv.includes('"Car, holiday"') && csv.includes('"He said ""yes"""'));
+check('CSV preserves UTF-8 and CRLF rows',
+  csv.includes('José') && csv.includes('\r\n'));
+check('CSV neutralises spreadsheet formulas',
+  csv.includes("'=2+2") && csv.includes("'@SUM(A1:A2)"));
+check('CSV export reads the rendered table',
+  html.includes('visibleTableMatrix(table)') &&
+  html.includes("const table = $('#tbl')"));
+check('CSV filename records the active display basis',
+  html.includes("'future-dollars'") && html.includes("'todays-dollars'"));
+check('CSV export reports success and failure accessibly',
+  html.includes('Projection table downloaded as CSV.') &&
+  html.includes('CSV export failed:'));
+
 console.log('\nmarket quote policy');
 const manualHolding = core.makeShareholding(0);
 check('new holdings default to manual quotes', manualHolding.quoteMarket === 'manual');

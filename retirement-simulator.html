@@ -320,6 +320,7 @@
           <option value="nominal">Nominal (future dollars)</option>
         </select>
       </label>
+      <button type="button" id="exportProjectionCsv">Export CSV</button>
     </div>
     <div class="tblwrap"><table id="tbl"></table></div>
     <div id="tableHeightSplitter" class="table-height-splitter" role="separator" aria-label="Resize projection table" aria-orientation="horizontal" aria-valuemin="180" aria-valuemax="700" tabindex="0"></div>
@@ -729,6 +730,18 @@
     if (currency === 'GBP') return `£${number}`;
     if (currency === 'USD') return `US$${number}`;
     return `$${number}`;
+  }
+
+  function csvCell(value) {
+    const text = String(value ?? '');
+    const safe = /^[=+\-@]/.test(text) ? `'${text}` : text;
+    return `"${safe.replaceAll('"', '""')}"`;
+  }
+
+  function csvFromMatrix(matrix) {
+    return '\uFEFF' + matrix
+      .map(row => row.map(csvCell).join(','))
+      .join('\r\n') + '\r\n';
   }
 
   function ownerWeights(owner) {
@@ -1769,6 +1782,7 @@
     validateScenario,
     parseMoney,
     formatMoney,
+    csvFromMatrix,
     ownerWeights,
     hitTestSegments,
     exportScenario,
@@ -2480,6 +2494,35 @@
       downloadScenarioFallback(scenario);
       return 'downloaded';
     }
+  }
+
+  function visibleTableMatrix(table) {
+    return [...table.rows].map(row =>
+      [...row.cells].map(cell => cell.textContent.trim())
+    );
+  }
+
+  function projectionCsvFilename(scenario) {
+    const basis = displayMode === 'nominal' ? 'future-dollars' : 'todays-dollars';
+    const date = new Date().toISOString().slice(0, 10);
+    return `${slugify(scenario.scenarioName || 'retirement-scenario')}-projection-${basis}-${date}.csv`;
+  }
+
+  function downloadProjectionCsv() {
+    const table = $('#tbl');
+    if (!currentProjection || !table?.tHead || !table.tBodies[0]?.rows.length) {
+      throw new Error('No valid projection table is available.');
+    }
+    const blob = new Blob(
+      [core.csvFromMatrix(visibleTableMatrix(table))],
+      { type: 'text/csv;charset=utf-8' }
+    );
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = projectionCsvFilename(currentScenario);
+    anchor.click();
+    URL.revokeObjectURL(url);
   }
 
   async function readScenarioFile(file) {
@@ -3639,6 +3682,15 @@
       else if (outcome === 'downloaded') showScenarioMessage('Scenario downloaded.', 'success');
     } catch (error) {
       showScenarioMessage(`Export failed: ${error.message}`, 'error');
+    }
+  });
+
+  $('#exportProjectionCsv').addEventListener('click', () => {
+    try {
+      downloadProjectionCsv();
+      showScenarioMessage('Projection table downloaded as CSV.', 'success');
+    } catch (error) {
+      showScenarioMessage(`CSV export failed: ${error.message}`, 'error');
     }
   });
 
