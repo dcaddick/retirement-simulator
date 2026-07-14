@@ -276,6 +276,53 @@ check('invalid share-return assumptions are rejected',
     'companyTaxRatePct', 'frankingEligible'].every(field =>
       shareReturnErrors.some(error => error.path.endsWith(field))));
 
+const growthState = {
+  holdings: [{
+    ...core.makeShareholding(0), id: 'growth', quantity: 10,
+    price: 100, costBaseAud: 700, priceGrowthPct: 10, sold: false
+  }]
+};
+core.beginShareYear(growthState);
+check('share price grows without changing cost base',
+  Math.abs(growthState.holdings[0].price - 110) < 0.001 &&
+  growthState.holdings[0].costBaseAud === 700);
+core.recordDividendExposure(growthState.holdings[0], 6);
+growthState.holdings[0].quantity = 5;
+core.finishDividendExposure(growthState.holdings[0]);
+check('partial sale records time-weighted quantity exposure',
+  growthState.holdings[0].dividendQuantityMonths === 90,
+  String(growthState.holdings[0].dividendQuantityMonths));
+
+const lossSale = core.makeShareSaleRecord({
+  holding: { ...core.makeShareholding(0), id: 'loss', owner: 'p0' },
+  proceedsNominal: 800,
+  allocatedCostBaseNominal: 1000,
+  saleMonth: 6,
+  saleKind: 'scheduled'
+});
+check('share sale record preserves an undiscounted capital loss',
+  lossSale.capitalResultNominal === -200 &&
+  lossSale.owner === 'p0' && lossSale.saleKind === 'scheduled');
+
+const growingShares = structuredClone(sample);
+growingShares.shareholdings = [{
+  ...core.makeShareholding(0), id: 'grow', symbol: 'GROW', quantity: 100,
+  price: 10, costBaseAud: 1000, priceGrowthPct: 10,
+  saleYear: growingShares.startYear + 20
+}];
+const growingProjection = core.projectScenario(growingShares);
+check('share growth compounds annually in nominal dollars',
+  growingProjection.rows[1].shares * growingProjection.rows[1].inflationFactor >
+    growingProjection.rows[0].shares * growingProjection.rows[0].inflationFactor * 1.09);
+check('zero share growth preserves static nominal value', (() => {
+  const flat = structuredClone(growingShares);
+  flat.shareholdings[0].priceGrowthPct = 0;
+  const rows = core.projectScenario(flat).rows;
+  return Math.abs(
+    rows[1].shares * rows[1].inflationFactor -
+    rows[0].shares * rows[0].inflationFactor) < 0.01;
+})());
+
 console.log('\ncurrent Medicare thresholds');
 check('Medicare data is for 2025-26', core.MEDICARE_BASE.effectiveYear === 2025);
 check('ordinary Medicare thresholds are current',

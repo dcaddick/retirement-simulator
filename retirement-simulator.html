@@ -948,6 +948,46 @@
     return holding.quantity * holding.price * fx;
   }
 
+  function beginShareYear(state) {
+    for (const holding of state.holdings) {
+      holding.dividendQuantityMonths = 0;
+      holding.dividendCursorMonth = 1;
+      if (holding.sold) continue;
+      const growthFactor = Math.max(0, 1 + holding.priceGrowthPct / 100);
+      holding.price *= growthFactor;
+    }
+  }
+
+  function recordDividendExposure(holding, throughMonth) {
+    const month = Math.max(1, Math.min(12, Math.trunc(throughMonth)));
+    const cursor = holding.dividendCursorMonth ?? 1;
+    if (month < cursor) return;
+    holding.dividendQuantityMonths =
+      (holding.dividendQuantityMonths ?? 0) +
+      holding.quantity * (month - cursor + 1);
+    holding.dividendCursorMonth = month + 1;
+  }
+
+  function finishDividendExposure(holding) {
+    recordDividendExposure(holding, 12);
+    return holding.dividendQuantityMonths ?? 0;
+  }
+
+  function makeShareSaleRecord({
+    holding, proceedsNominal, allocatedCostBaseNominal, saleMonth, saleKind
+  }) {
+    return {
+      holdingId: holding.id,
+      owner: holding.owner,
+      proceedsNominal,
+      allocatedCostBaseNominal,
+      capitalResultNominal: proceedsNominal - allocatedCostBaseNominal,
+      discountEligible: holding.cgtDiscountEligible,
+      saleMonth,
+      saleKind
+    };
+  }
+
   function allocateOwnedAmount(amount, owner) {
     return ownerWeights(owner).map(weight => amount * weight);
   }
@@ -1121,33 +1161,41 @@
       .map(([source]) => lumpSourceLabel(source, people)).join(' + ') || 'Unfunded';
   }
 
-  function liquidateNamedSource(state, source, amount, inflationFactor) {
+  function liquidateNamedSource(state, source, amount, inflationFactor, saleMonth = 12) {
     if (source.startsWith('share:')) {
       const holding = state.holdings.find(item => item.id === source.slice(6));
-      if (!holding || holding.sold) return { drawn: 0, gains: [0, 0], event: null, label: 'Shareholding' };
+      if (!holding || holding.sold) return { drawn: 0, saleRecords: [], event: null, label: 'Shareholding' };
+      recordDividendExposure(holding, saleMonth);
       const value = shareValueAud(holding);
       const drawn = Math.min(amount, value);
       const fraction = value > 0 ? drawn / value : 0;
       const costBase = holding.costBaseAud * fraction;
-      const gain = Math.max(0, drawn - costBase) * (holding.cgtDiscountEligible ? 0.5 : 1);
+      const saleRecord = makeShareSaleRecord({
+        holding,
+        proceedsNominal: drawn,
+        allocatedCostBaseNominal: costBase,
+        saleMonth,
+        saleKind: 'named-source'
+      });
       holding.quantity *= 1 - fraction;
       holding.costBaseAud -= costBase;
       holding.sold = holding.quantity <= 1e-8;
-      return { drawn, gains: allocateOwnedAmount(gain, holding.owner), label: holding.symbol || 'Shareholding', event: {
+      return { drawn, saleRecords: drawn > 0 ? [saleRecord] : [], label: holding.symbol || 'Shareholding', event: {
         type: 'share-sale', label: `${holding.symbol || 'Shareholding'} sold for ${formatMoney(drawn / inflationFactor)}`,
-        amount: drawn / inflationFactor, gain: gain / inflationFactor
+        amount: drawn / inflationFactor,
+        gain: saleRecord.capitalResultNominal / inflationFactor
       } };
     }
     if (source.startsWith('asset:')) {
       const asset = state.otherAssets.find(item => item.id === source.slice(6));
       const drawn = Math.min(amount, asset?.sold ? 0 : asset?.value ?? 0);
       if (asset) { asset.value -= drawn; asset.sold = asset.value <= 1e-8; }
-      return { drawn, gains: [0, 0], label: asset?.label || 'Asset', event: drawn > 0 ? {
+      return { drawn, saleRecords: [], label: asset?.label || 'Asset', event: drawn > 0 ? {
         type: 'asset-disposal', label: `${asset.label || 'Asset'} disposed for ${formatMoney(drawn / inflationFactor)}`,
         amount: drawn / inflationFactor
       } : null };
     }
-    return { drawn: 0, gains: [0, 0], event: null, label: '' };
+    return { drawn: 0, saleRecords: [], event: null, label: '' };
   }
 
   function inflationFactors(scenario, rowCount) {
@@ -1164,18 +1212,23 @@
 
   function applyShareSales(state, scenario, year, inflationFactor) {
     const events = [];
-    const discountedGainByPerson = [0, 0];
+    const saleRecords = [];
     let saleYearInterest = 0;
     for (const holding of state.holdings) {
       if (holding.sold || holding.saleYear !== year) continue;
+      recordDividendExposure(holding, holding.saleMonth);
       const proceeds = shareValueAud(holding);
-      const gain = proceeds - holding.costBaseAud;
-      const discounted = Math.max(0, gain) *
-        (holding.cgtDiscountEligible ? 0.5 : 1);
-      const allocations = allocateOwnedAmount(discounted, holding.owner);
-      discountedGainByPerson[0] += allocations[0];
-      discountedGainByPerson[1] += allocations[1];
+      const saleRecord = makeShareSaleRecord({
+        holding,
+        proceedsNominal: proceeds,
+        allocatedCostBaseNominal: holding.costBaseAud,
+        saleMonth: holding.saleMonth,
+        saleKind: 'scheduled'
+      });
+      saleRecords.push(saleRecord);
       state.savings += proceeds;
+      holding.quantity = 0;
+      holding.costBaseAud = 0;
       holding.sold = true;
       const monthsInSavings = Math.max(0, 12 - holding.saleMonth);
       saleYearInterest += proceeds * (scenario.savings.interestPct / 100) *
@@ -1184,10 +1237,10 @@
         type: 'share-sale',
         label: `${holding.symbol} sold`,
         amount: proceeds / inflationFactor,
-        gain: gain / inflationFactor
+        gain: saleRecord.capitalResultNominal / inflationFactor
       });
     }
-    return { events, discountedGainByPerson, saleYearInterest };
+    return { events, saleRecords, saleYearInterest };
   }
 
   function minDrawRate(age) {
@@ -1216,6 +1269,8 @@
       const events = [];
       const openingSavings = state.savings;
 
+      beginShareYear(state);
+
       const shareResult = applyShareSales(state, scenario, year, inflationFactor);
       events.push(...shareResult.events);
 
@@ -1225,7 +1280,7 @@
         year,
         ages,
         inflationFactor,
-        discountedGainByPerson: shareResult.discountedGainByPerson,
+        saleRecords: shareResult.saleRecords,
         openingSavings,
         saleYearInterest: shareResult.saleYearInterest,
         events
@@ -1243,7 +1298,7 @@
     year,
     ages,
     inflationFactor,
-    discountedGainByPerson,
+    saleRecords,
     openingSavings,
     saleYearInterest,
     events
@@ -1321,9 +1376,10 @@
     (scenario.lumpSumWithdrawals ?? []).filter(item => item.enabled !== false && item.year === year)
       .forEach(withdrawal => {
         const requestedNominal = withdrawal.amount * inflationFactor;
-        const named = liquidateNamedSource(state, withdrawal.source, requestedNominal, inflationFactor);
+        const named = liquidateNamedSource(
+          state, withdrawal.source, requestedNominal, inflationFactor, withdrawal.month);
         if (named.event) events.push(named.event);
-        discountedGainByPerson.forEach((_, index) => { discountedGainByPerson[index] += named.gains[index]; });
+        saleRecords.push(...named.saleRecords);
         if (withdrawal.source.startsWith('asset:')) otherAssetsNominal = Math.max(0, otherAssetsNominal - named.drawn);
         const result = drawForLumpSum(
           state, scenario.household.drawdownPriority, requestedNominal - named.drawn,
@@ -1343,6 +1399,16 @@
           label: `Lump sum - ${withdrawal.reason}: ${formatMoney((result.drawn + named.drawn) / inflationFactor)} (${sourceSummary(actualDraws, scenario.people)})`
         });
       });
+
+    const discountedGainByPerson = [0, 0];
+    for (const record of saleRecords) {
+      if (record.capitalResultNominal <= 0) continue;
+      const discounted = record.capitalResultNominal *
+        (record.discountEligible ? 0.5 : 1);
+      allocateOwnedAmount(discounted, record.owner).forEach((amount, index) => {
+        discountedGainByPerson[index] += amount;
+      });
+    }
 
     // Other income: annual amounts, CPI-indexed. Taxable items follow their
     // selected owner; non-taxable items are added to household income after tax.
@@ -1854,6 +1920,10 @@
     exportScenario,
     importScenario,
     shareValueAud,
+    beginShareYear,
+    recordDividendExposure,
+    finishDividendExposure,
+    makeShareSaleRecord,
     allocateOwnedAmount,
     discountedCapitalGainByPerson,
     makeShareholding,
