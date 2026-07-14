@@ -988,6 +988,44 @@
     };
   }
 
+  function capitalLedgerForPeople(saleRecords, openingLosses = [0, 0]) {
+    const people = [0, 1].map(index => ({
+      openingLoss: Math.max(0, openingLosses[index] ?? 0),
+      currentLoss: 0,
+      nonDiscountGain: 0,
+      discountGain: 0,
+      lossAppliedNonDiscount: 0,
+      lossAppliedDiscount: 0,
+      netCapitalGainNominal: 0,
+      closingLoss: 0
+    }));
+
+    for (const record of saleRecords) {
+      const allocations = allocateOwnedAmount(
+        Math.abs(record.capitalResultNominal), record.owner);
+      allocations.forEach((amount, index) => {
+        if (record.capitalResultNominal < 0) people[index].currentLoss += amount;
+        else if (record.discountEligible) people[index].discountGain += amount;
+        else people[index].nonDiscountGain += amount;
+      });
+    }
+
+    for (const person of people) {
+      let availableLoss = person.openingLoss + person.currentLoss;
+      person.lossAppliedNonDiscount = Math.min(person.nonDiscountGain, availableLoss);
+      availableLoss -= person.lossAppliedNonDiscount;
+      person.lossAppliedDiscount = Math.min(person.discountGain, availableLoss);
+      availableLoss -= person.lossAppliedDiscount;
+      const remainingNonDiscount =
+        person.nonDiscountGain - person.lossAppliedNonDiscount;
+      const remainingDiscount = person.discountGain - person.lossAppliedDiscount;
+      person.netCapitalGainNominal = remainingNonDiscount + remainingDiscount * 0.5;
+      person.closingLoss = availableLoss;
+    }
+
+    return { people, closingLosses: people.map(person => person.closingLoss) };
+  }
+
   function allocateOwnedAmount(amount, owner) {
     return ownerWeights(owner).map(weight => amount * weight);
   }
@@ -1085,6 +1123,7 @@
       superTransitioned: splits.map(split => split.transitioned),
       cash: scenario.cash.amount,
       savings: scenario.savings.amount,
+      capitalLossCarryForward: [0, 0],
       holdings: scenario.shareholdings.map(holding => ({ ...holding, sold: false })),
       otherAssets: (scenario.otherAssets ?? []).map(asset => ({
         ...asset,
@@ -1400,15 +1439,11 @@
         });
       });
 
-    const discountedGainByPerson = [0, 0];
-    for (const record of saleRecords) {
-      if (record.capitalResultNominal <= 0) continue;
-      const discounted = record.capitalResultNominal *
-        (record.discountEligible ? 0.5 : 1);
-      allocateOwnedAmount(discounted, record.owner).forEach((amount, index) => {
-        discountedGainByPerson[index] += amount;
-      });
-    }
+    const capitalLedger = capitalLedgerForPeople(
+      saleRecords, state.capitalLossCarryForward);
+    state.capitalLossCarryForward = [...capitalLedger.closingLosses];
+    const netCapitalGainByPerson = capitalLedger.people.map(
+      person => person.netCapitalGainNominal);
 
     // Other income: annual amounts, CPI-indexed. Taxable items follow their
     // selected owner; non-taxable items are added to household income after tax.
@@ -1489,7 +1524,7 @@
       agePensionNominal / 2 +
       otherTaxableByPerson[index] +
       interestByPerson[index] +
-      discountedGainByPerson[index]
+      netCapitalGainByPerson[index]
     );
     const taxReal = taxableNominal.map((value, index) =>
       projectionNetTax({
@@ -1503,9 +1538,9 @@
     const totalTaxNominal =
       taxReal.reduce((sum, value) => sum + value, 0) * inflationFactor;
     const cgtTaxNominal = [0, 1].reduce((sum, index) => {
-      if (!(discountedGainByPerson[index] > 0)) return sum;
+      if (!(netCapitalGainByPerson[index] > 0)) return sum;
       const withGain = taxReal[index];
-      const withoutGainNominal = taxableNominal[index] - discountedGainByPerson[index];
+      const withoutGainNominal = taxableNominal[index] - netCapitalGainByPerson[index];
       const withoutGain = projectionNetTax({
         taxableNominal: withoutGainNominal,
         rebateNominal: withoutGainNominal,
@@ -1624,7 +1659,8 @@
       lumpSumTotal: lumpSumTotalNominal / inflationFactor,
       lumpSumDraws: Object.fromEntries(Object.entries(lumpSumDrawsNominal)
         .map(([source, amount]) => [source, amount / inflationFactor])),
-      events: [...events]
+      events: [...events],
+      capitalLedger: capitalLedger.people.map(person => ({ ...person }))
     };
   }
 
@@ -1924,6 +1960,7 @@
     recordDividendExposure,
     finishDividendExposure,
     makeShareSaleRecord,
+    capitalLedgerForPeople,
     allocateOwnedAmount,
     discountedCapitalGainByPerson,
     makeShareholding,

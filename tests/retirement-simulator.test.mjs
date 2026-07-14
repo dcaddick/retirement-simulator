@@ -304,6 +304,20 @@ check('share sale record preserves an undiscounted capital loss',
   lossSale.capitalResultNominal === -200 &&
   lossSale.owner === 'p0' && lossSale.saleKind === 'scheduled');
 
+const capitalLedger = core.capitalLedgerForPeople([
+  { owner: 'p0', capitalResultNominal: 1000, discountEligible: false },
+  { owner: 'p0', capitalResultNominal: 2000, discountEligible: true },
+  { owner: 'p0', capitalResultNominal: -1500, discountEligible: true },
+  { owner: 'p1', capitalResultNominal: -500, discountEligible: true }
+], [200, 0]);
+check('capital losses reduce non-discount gains before discount gains',
+  capitalLedger.people[0].lossAppliedNonDiscount === 1000 &&
+  capitalLedger.people[0].lossAppliedDiscount === 700 &&
+  capitalLedger.people[0].netCapitalGainNominal === 650);
+check('unused capital loss carries forward for the correct person',
+  capitalLedger.closingLosses[0] === 0 &&
+  capitalLedger.closingLosses[1] === 500);
+
 const growingShares = structuredClone(sample);
 growingShares.shareholdings = [{
   ...core.makeShareholding(0), id: 'grow', symbol: 'GROW', quantity: 100,
@@ -322,6 +336,21 @@ check('zero share growth preserves static nominal value', (() => {
     rows[1].shares * rows[1].inflationFactor -
     rows[0].shares * rows[0].inflationFactor) < 0.01;
 })());
+
+const lossCarry = structuredClone(sample);
+lossCarry.shareholdings = [
+  { ...core.makeShareholding(0), id: 'loss-first', symbol: 'LOSS',
+    owner: 'p0', quantity: 100, price: 5, costBaseAud: 1000,
+    cgtDiscountEligible: false, saleYear: lossCarry.startYear, saleMonth: 1 },
+  { ...core.makeShareholding(1), id: 'gain-later', symbol: 'GAIN',
+    owner: 'p0', quantity: 100, price: 20, costBaseAud: 1000,
+    cgtDiscountEligible: false, saleYear: lossCarry.startYear + 1, saleMonth: 1 }
+];
+const lossRows = core.projectScenario(lossCarry).rows;
+check('projection carries a loss into a later gain year',
+  lossRows[0].capitalLedger[0].closingLoss === 500 &&
+  lossRows[1].capitalLedger[0].netCapitalGainNominal === 500 &&
+  lossRows[1].capitalLedger[0].closingLoss === 0);
 
 console.log('\ncurrent Medicare thresholds');
 check('Medicare data is for 2025-26', core.MEDICARE_BASE.effectiveYear === 2025);
