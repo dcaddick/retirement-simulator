@@ -9,7 +9,7 @@ node tests/retirement-simulator.test.mjs
 node tests/retirement-monte-carlo.test.mjs
 ```
 
-The deterministic suite checks core-engine extraction, script syntax, schema migration, validation and calculation invariants across the supported household model.
+The deterministic suite checks core-engine extraction, script syntax, schema migration, validation and calculation invariants across the supported household model. It also covers the archived-release baseline, safe CSV serialisation, projection-critical numeric validation, the Age Pension couple taper and mixed-basis tax calculations that produce bracket creep against fixed nominal thresholds.
 
 The Monte Carlo suite checks imported-scenario handling, risk-mode behaviour, deterministic stress overrides and invariants that keep stress results outside the stochastic probability denominator.
 
@@ -37,6 +37,7 @@ Automated tests do not replace a real-browser pass. For user-interface changes, 
 - chart rendering and inspection;
 - responsive layout;
 - JSON import and export;
+- visible-table CSV export in both today's-dollar and nominal display modes;
 - local-storage reset and new-scenario behaviour;
 - transfer of a simulator export into the experimental Monte Carlo report.
 - light and dark themes, including persistence after reload;

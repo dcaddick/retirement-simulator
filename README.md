@@ -17,7 +17,7 @@ Single HTML file · no installation · opens locally in a modern browser.
 
 ![Retirement Income Simulator v1.03 in its default dark theme, showing compact planned lump sums and the fictional John and Jane sample](docs/assets/retirement-simulator-v1.03.png)
 
-*The deterministic v1.04 simulator combines editable household assumptions, per-person salary progression, compact toggleable lump-sum planning, inspectable charts and a resizable year-by-year projection.*
+*The deterministic v1.05 simulator combines editable household assumptions, per-person salary progression, compact toggleable lump-sum planning, inspectable charts, a resizable year-by-year projection and CSV export of the visible table.*
 
 ## Yours to download and use
 
@@ -63,12 +63,12 @@ The deterministic simulator models a reusable two-person household and includes:
 - account-based pension minimum drawdowns;
 - Preferred Retirement Income, Essential Annual Budget and surplus banking;
 - today's-dollar and nominal-dollar views;
-- year-by-year projection tables and inspectable charts;
+- year-by-year projection tables, visible-table CSV export and inspectable charts;
 - local autosave plus JSON import and export.
 
 Return assumptions and inflation are shown together. The interface calculates the nominal-minus-inflation spread live, showing both the long-run 2.5% view and the near-term Treasury rate when they differ.
 
-The app favours transparent approximations over hidden precision. See [Model methodology](docs/MODEL-METHODOLOGY.md) for the calculation sequence and boundaries.
+The app favours transparent approximations over hidden precision. See [Model methodology](docs/MODEL-METHODOLOGY.md) for the calculation sequence and boundaries, and the maintained [Deferred Review Register](docs/DEFERRED-REVIEW.md) for known limitations that require later professional review, product decisions or separately designed remediation.
 
 ## Experimental Monte Carlo companion
 

@@ -345,10 +345,10 @@
           <ul id="sourceList"></ul>
           <ul id="limitationsList">
             <li>Annual projection rows; retirement and pension starts use whole ages.</li>
-            <li>Age Pension estimate assumes a homeowner couple and excludes the principal residence.</li>
-            <li>Share values remain flat until sale.</li>
-            <li>Capital-loss carry-forward is not modelled.</li>
-            <li>Survival is illustrative and Person 1-specific.</li>
+            <li>Age Pension estimate assumes a homeowner couple, excludes the principal residence and starts only after both partners reach pension age.</li>
+            <li>Share values remain flat until sale and produce no dividend or franking-credit income.</li>
+            <li>Capital losses are discarded rather than offset or carried forward.</li>
+            <li>Survival is illustrative and does not change household cash flows or model a survivor state.</li>
             <li>Other income is CPI-indexed and split 50/50 for tax when marked taxable. Other assets count in the Age Pension assets test but are not deemed, and no CGT is modelled on their disposal.</li>
             <li>Early super access is simplified, not full Transition-to-Retirement (TTR). There is no 10%-of-balance annual payment cap, no commutation restriction, and no automatic cessation rule. Tax treatment assumes the member is over 60, where TTR and full retirement-phase withdrawals are both tax-free; the model will misstate results for anyone under 60 drawing super while still working.</li>
           </ul>
@@ -3145,7 +3145,9 @@
           `(frozen = fixed nominal GBP, so real value falls with inflation); UPP deduction ${assumptions.uppPct}% for tax`
         : 'UK/DB pensions excluded from the projection',
       'Cash interest ' + scenario.cash.interestPct + '%/yr, savings interest ' +
-        scenario.savings.interestPct + '%/yr (taxable)'
+        scenario.savings.interestPct + '%/yr (taxable)',
+      'Income-tax brackets and LITO stay fixed in nominal dollars after the legislated 2027 rate change, so inflation creates bracket creep; Medicare and SAPTO thresholds use an indexed approximation',
+      'Age Pension income above the couple free area reduces the combined normal rate by 50 cents per dollar; the projection still requires both partners to reach Age Pension age'
     ];
     const otherIncomeCount = (scenario.otherIncomes ?? []).length;
     const otherAssetCount = (scenario.otherAssets ?? []).length;

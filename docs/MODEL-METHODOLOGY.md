@@ -49,11 +49,17 @@ Guaranteed income and mandatory minimum payments are counted before discretionar
 
 ### Tax and government support
 
-The simulator contains simplified, dated estimates for Australian income tax, Medicare, selected offsets, Age Pension and the Commonwealth Seniors Health Card. Medicare low-income thresholds are the legislated 2025–26 amounts checked on 10 July 2026: ordinary individual $28,011 lower/$35,013 upper and SAPTO $44,268 lower/$55,335 upper. Rules and thresholds change and must be reviewed against current authoritative sources before relying on them.
+The simulator contains simplified, dated estimates for Australian income tax, Medicare, selected offsets, Age Pension and the Commonwealth Seniors Health Card.
+
+Income-tax brackets and LITO use the legislated fixed nominal schedule: the 2026 rate applies in 2026, the legislated 2027 rate applies from 2027, and no unlegislated later tax cuts are forecast. As nominal income rises with inflation against those fixed nominal thresholds, the model includes bracket creep. Medicare and SAPTO retain the simulator's existing indexed approximation by applying their thresholds in today's-dollar terms. This is a deterministic policy baseline, not a prediction of future government decisions.
+
+The normal Age Pension income test uses a 50-cent combined couple reduction for each dollar above the couple free area (25 cents for each partner). The model still requires both partners to have reached Age Pension age; that separate limitation remains under deferred review.
+
+Medicare low-income thresholds are the legislated 2025–26 amounts checked on 10 July 2026: ordinary individual $28,011 lower/$35,013 upper and SAPTO $44,268 lower/$55,335 upper. Rules and thresholds change and must be reviewed against current authoritative sources before relying on them.
 
 ### Assets and other income
 
-Cash, savings, shareholdings, other income and other assets are simplified. Timing is annual, share-price forecasting is limited, capital-loss carry-forward is not fully modelled, and disposal tax may be excluded for generic other assets. Share prices are manual by default. The optional Stooq integration is explicitly limited to US-listed symbols and always appends Stooq's `.us` market suffix; Australian and other holdings use manual prices.
+Cash, savings, shareholdings, other income and other assets are simplified. Timing is annual. Share prices are manual and remain static: they do not grow and produce no dividend or franking-credit income. Capital losses are discarded rather than offset or carried forward, and disposal tax may be excluded for generic other assets. The optional Stooq integration is explicitly limited to US-listed symbols and always appends Stooq's `.us` market suffix; Australian and other holdings use manual prices.
 
 ### Foreign pensions and currency
 
@@ -75,7 +81,7 @@ The reported success rate is conditional on the selected model and assumptions. 
 
 ## Important exclusions
 
-Depending on the scenario, material exclusions can include:
+The maintained [Deferred Review Register](DEFERRED-REVIEW.md) records known limitations, their likely impact and the review needed before remediation. Depending on the scenario, material exclusions can include:
 
 - intra-year timing and cash-flow detail;
 - future legislative and tax changes;

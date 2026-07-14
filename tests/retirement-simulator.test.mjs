@@ -8,7 +8,19 @@ const FILE = fileURLToPath(new URL('../retirement-simulator.html', import.meta.u
 const ARCHIVE_104 = fileURLToPath(
   new URL('../archive/retirement-simulator-v1.0.4.html', import.meta.url)
 );
+const DEFERRED_REVIEW = fileURLToPath(
+  new URL('../docs/DEFERRED-REVIEW.md', import.meta.url)
+);
+const METHODOLOGY = fileURLToPath(
+  new URL('../docs/MODEL-METHODOLOGY.md', import.meta.url)
+);
+const README = fileURLToPath(new URL('../README.md', import.meta.url));
 const html = readFileSync(FILE, 'utf8');
+const deferredReview = existsSync(DEFERRED_REVIEW)
+  ? readFileSync(DEFERRED_REVIEW, 'utf8')
+  : '';
+const methodology = readFileSync(METHODOLOGY, 'utf8');
+const readme = readFileSync(README, 'utf8');
 
 function extract(id) {
   const match = html.match(new RegExp(`<script id="${id}">([\\s\\S]*?)<\\/script>`));
@@ -79,6 +91,19 @@ check('v1.05 document version is consistent',
   html.includes("const STORAGE_KEY = 'family-retirement-simulator:v1.05:scenario'") &&
   html.includes("'family-retirement-simulator:v1.04:scenario'"));
 check('outgoing v1.04 executable is archived', existsSync(ARCHIVE_104));
+check('deferred review covers all approved out-of-scope items', [
+  'AIPR-003-SHARES-STATIC',
+  'AIPR-003-AP-AGEGAP',
+  'AIPR-003-MORTALITY',
+  'AIPR-003-SUPER-TAXFREE',
+  'AIPR-003-CGT-LOSS',
+  'AIPR-003-OTHERINC-SPLIT',
+  'AIPR-003-CGT-WATERFALL'
+].every(id => deferredReview.includes(id)));
+check('methodology discloses fixed nominal brackets',
+  methodology.includes('fixed nominal') && methodology.includes('bracket creep'));
+check('README identifies v1.05 and links deferred review',
+  readme.includes('v1.05') && readme.includes('docs/DEFERRED-REVIEW.md'));
 check('returns and inflation share a dedicated upper controls block',
   html.indexOf('id="returnAssumptions"') < html.indexOf('id="peopleFields"') &&
   html.includes('Estimated net returns after fees and tax'));

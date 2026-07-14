@@ -2,6 +2,15 @@
 
 This changelog summarizes public, non-personal milestones. Early development used many private prototype snapshots; those files are intentionally not reproduced in the public repository.
 
+## 1.05 - 2026-07-14
+
+- Added an Excel-compatible CSV export of the currently visible projection table.
+- Tidied Treasury real-return readouts and grouped the display/export table controls.
+- Rejected malformed salary, SG, return and manual-inflation values before projection.
+- Corrected the Age Pension couple income taper to 50 cents combined above the free area.
+- Restored bracket creep for fixed nominal income-tax brackets and LITO, with the policy basis documented.
+- Added a [deferred-review register](docs/DEFERRED-REVIEW.md) for material modelling limitations outside this release.
+
 ## 1.04 - 2026-07-13
 
 - Fixed the v1.03 lump-sum summary renderer so adding a withdrawal after changing the Age Pension setting no longer raises `formatMoney is not defined` ([#2](https://github.com/dcaddick/retirement-simulator/issues/2)).
