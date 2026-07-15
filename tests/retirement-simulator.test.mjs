@@ -735,6 +735,50 @@ check('one-eligible pension is taxed only to the eligible person',
     expectedEligibleTax) < 0.01 &&
   taxedAgeGapRow.taxLedger[1].baseTax.beforeFrankingNominal === 0);
 
+console.log('\nsingle-person Age Pension');
+check('survivor Age Pension helper is exported',
+  typeof core.agePensionForHousehold === 'function');
+if (typeof core.agePensionForHousehold === 'function') {
+  const singleFull = core.agePensionForHousehold({
+    ages: [70, 68],
+    alive: [true, false],
+    survivorIndex: 0,
+    assets: 333000,
+    assessableIncome: 226 * 26,
+    included: true
+  });
+  const singleTooYoung = core.agePensionForHousehold({
+    ages: [66, 70],
+    alive: [true, false],
+    survivorIndex: 0,
+    assets: 0,
+    assessableIncome: 0,
+    included: true
+  });
+  const singleAssetTaper = core.agePensionForHousehold({
+    ages: [70, 68], alive: [true, false], survivorIndex: 0,
+    assets: 334000, assessableIncome: 0, included: true
+  });
+  const singleIncomeTaper = core.agePensionForHousehold({
+    ages: [70, 68], alive: [true, false], survivorIndex: 0,
+    assets: 0, assessableIncome: 226 * 26 + 1000, included: true
+  });
+  check('single maximum Age Pension uses one survivor rate',
+    singleFull.household === 1200.90 * 26);
+  check('single pension is allocated only to the survivor',
+    singleFull.byPerson[0] === singleFull.household &&
+    singleFull.byPerson[1] === 0);
+  check('survivor below age 67 receives zero', singleTooYoung.household === 0);
+  check('single assets test tapers by 78 dollars annually per thousand',
+    singleAssetTaper.household === 1200.90 * 26 - 78);
+  check('single income test tapers at 50 cents',
+    singleIncomeTaper.household === 1200.90 * 26 - 500);
+}
+check('single deeming threshold is applied',
+  core.deemedIncome(66800, 'single') === 66800 * 0.0125);
+check('single CSHC threshold is current',
+  core.SERVICES_AUSTRALIA_2026.cshcSingleThreshold === 101105);
+
 console.log('\nprojection tax basis');
 const projectionNetTax = core.projectionNetTax ?? (() => NaN);
 const taxNow = projectionNetTax({

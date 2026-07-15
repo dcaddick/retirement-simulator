@@ -506,14 +506,20 @@
     cshcUrl: 'https://www.servicesaustralia.gov.au/income-test-for-commonwealth-seniors-health-card?context=21966',
     deemingUrl: 'https://www.servicesaustralia.gov.au/deeming',
     agePensionMaxCoupleAnnual: 1810.40 * 26,
+    agePensionMaxSingleAnnual: 1200.90 * 26,
     homeownerAssetFreeArea: 499000,
+    homeownerAssetFreeAreaSingle: 333000,
     assetTaperAnnualPerThousand: 78,
     incomeFreeAreaCoupleAnnual: 396 * 26,
     incomeTaperCouple: 0.50,
+    incomeFreeAreaSingleAnnual: 226 * 26,
+    incomeTaperSingle: 0.50,
     deemingThresholdCouple: 110600,
+    deemingThresholdSingle: 66800,
     deemingLowerRate: 0.0125,
     deemingUpperRate: 0.0325,
-    cshcCoupleThreshold: 161768
+    cshcCoupleThreshold: 161768,
+    cshcSingleThreshold: 101105
   });
 
   function inflationRateForYear(year, assumptions) {
@@ -604,32 +610,60 @@
     };
   }
 
-  function deemedIncome(financialAssets) {
+  function pensionRuleSet(status = 'couple') {
     const rules = SERVICES_AUSTRALIA_2026;
-    const lowerBand = Math.min(financialAssets, rules.deemingThresholdCouple);
-    const upperBand = Math.max(0, financialAssets - rules.deemingThresholdCouple);
+    if (status === 'single') {
+      return {
+        maximum: rules.agePensionMaxSingleAnnual,
+        assetFreeArea: rules.homeownerAssetFreeAreaSingle,
+        incomeFreeArea: rules.incomeFreeAreaSingleAnnual,
+        incomeTaper: rules.incomeTaperSingle,
+        deemingThreshold: rules.deemingThresholdSingle,
+        cshcThreshold: rules.cshcSingleThreshold
+      };
+    }
+    return {
+      maximum: rules.agePensionMaxCoupleAnnual,
+      assetFreeArea: rules.homeownerAssetFreeArea,
+      incomeFreeArea: rules.incomeFreeAreaCoupleAnnual,
+      incomeTaper: rules.incomeTaperCouple,
+      deemingThreshold: rules.deemingThresholdCouple,
+      cshcThreshold: rules.cshcCoupleThreshold
+    };
+  }
+
+  function deemedIncome(financialAssets, status = 'couple') {
+    const threshold = pensionRuleSet(status).deemingThreshold;
+    const rules = SERVICES_AUSTRALIA_2026;
+    const lowerBand = Math.min(financialAssets, threshold);
+    const upperBand = Math.max(0, financialAssets - threshold);
     return lowerBand * rules.deemingLowerRate + upperBand * rules.deemingUpperRate;
   }
 
-  function agePensionAssetsRate(assets) {
+  function agePensionAssetsRate(assets, status = 'couple') {
     const rules = SERVICES_AUSTRALIA_2026;
-    const reduction = Math.max(0, assets - rules.homeownerAssetFreeArea) /
+    const selected = pensionRuleSet(status);
+    const reduction = Math.max(0, assets - selected.assetFreeArea) /
       1000 * rules.assetTaperAnnualPerThousand;
-    return Math.max(0, rules.agePensionMaxCoupleAnnual - reduction);
+    return Math.max(0, selected.maximum - reduction);
   }
 
-  function agePensionIncomeRate(assessableIncome) {
-    const rules = SERVICES_AUSTRALIA_2026;
-    const reduction = Math.max(0, assessableIncome - rules.incomeFreeAreaCoupleAnnual) *
-      rules.incomeTaperCouple;
-    return Math.max(0, rules.agePensionMaxCoupleAnnual - reduction);
+  function agePensionIncomeRate(assessableIncome, status = 'couple') {
+    const selected = pensionRuleSet(status);
+    const reduction = Math.max(0, assessableIncome - selected.incomeFreeArea) *
+      selected.incomeTaper;
+    return Math.max(0, selected.maximum - reduction);
+  }
+
+  function agePensionRate({ status = 'couple', assets, assessableIncome }) {
+    return Math.min(
+      agePensionAssetsRate(assets, status),
+      agePensionIncomeRate(assessableIncome, status)
+    );
   }
 
   function agePensionCouple({ assets, assessableIncome }) {
-    return Math.min(
-      agePensionAssetsRate(assets),
-      agePensionIncomeRate(assessableIncome)
-    );
+    return agePensionRate({ status: 'couple', assets, assessableIncome });
   }
 
   function agePensionForAges({
@@ -650,14 +684,44 @@
     };
   }
 
-  function cshcEstimate({ adjustedTaxableIncome, accountBasedPensionBalance }) {
-    const deemedAbpIncome = deemedIncome(accountBasedPensionBalance);
+  function agePensionForHousehold({
+    ages,
+    alive = [true, true],
+    survivorIndex = null,
+    assets,
+    assessableIncome,
+    included = true
+  }) {
+    if (!included) {
+      return { eligibleCount: 0, household: 0, byPerson: [0, 0], status: 'off' };
+    }
+    if (survivorIndex !== null) {
+      if (!alive[survivorIndex] || ages[survivorIndex] < 67) {
+        return { eligibleCount: 0, household: 0, byPerson: [0, 0], status: 'single' };
+      }
+      const household = agePensionRate({
+        status: 'single', assets, assessableIncome
+      });
+      const byPerson = [0, 0];
+      byPerson[survivorIndex] = household;
+      return { eligibleCount: 1, household, byPerson, status: 'single' };
+    }
+    return {
+      ...agePensionForAges({ ages, assets, assessableIncome, included }),
+      status: 'couple'
+    };
+  }
+
+  function cshcEstimate({
+    adjustedTaxableIncome, accountBasedPensionBalance, status = 'couple'
+  }) {
+    const deemedAbpIncome = deemedIncome(accountBasedPensionBalance, status);
     const assessedIncome = adjustedTaxableIncome + deemedAbpIncome;
     return {
       assessedIncome,
       deemedAbpIncome,
-      threshold: SERVICES_AUSTRALIA_2026.cshcCoupleThreshold,
-      eligible: assessedIncome < SERVICES_AUSTRALIA_2026.cshcCoupleThreshold
+      threshold: pensionRuleSet(status).cshcThreshold,
+      eligible: assessedIncome < pensionRuleSet(status).cshcThreshold
     };
   }
 
@@ -2224,10 +2288,13 @@
     projectionNetTax,
     taxAfterFranking,
     deemedIncome,
+    pensionRuleSet,
     agePensionAssetsRate,
     agePensionIncomeRate,
+    agePensionRate,
     agePensionCouple,
     agePensionForAges,
+    agePensionForHousehold,
     cshcEstimate,
     assessableFinancialAssets,
     makeProjectionState,
