@@ -1161,12 +1161,24 @@
     return 0.14;
   }
 
+  function projectionHorizonIndex(scenario) {
+    if (!scenario.household.firstDeath?.enabled) return 0;
+    const deceasedIndex = scenario.household.firstDeath.deceasedPerson === 'p1'
+      ? 1 : 0;
+    return 1 - deceasedIndex;
+  }
+
+  function projectionYearCount(scenario) {
+    const horizonIndex = projectionHorizonIndex(scenario);
+    return scenario.household.modelEndAge -
+      scenario.people[horizonIndex].age + 1;
+  }
+
   function validateAnnualPath(scenario, annualPath) {
     if (annualPath == null) return [];
     const errors = [];
     const add = (path, message) => errors.push({ path, message });
-    const expectedCount =
-      scenario.household.modelEndAge - scenario.people[0].age + 1;
+    const expectedCount = projectionYearCount(scenario);
 
     if (annualPath.schemaVersion !== 1) {
       add(
@@ -1239,7 +1251,7 @@
       throw new Error(`${pathErrors[0].path}: ${pathErrors[0].message}`);
     }
 
-    const rowCount = scenario.household.modelEndAge - scenario.people[0].age + 1;
+    const rowCount = projectionYearCount(scenario);
     const factors = inflationFactors(scenario, rowCount);
     const state = makeProjectionState(scenario);
     const rows = [];
@@ -1249,6 +1261,10 @@
       const inflationFactor = factors[index];
       const ages = scenario.people.map(person => person.age + index);
       const events = [];
+      const lifecycle = applyFirstDeathTransition({
+        scenario, state, year, ages
+      });
+      if (lifecycle.event) events.push(lifecycle.event);
       const openingSavings = state.savings;
       const annualReturns = annualReturnsForYear(
         scenario,
@@ -1269,7 +1285,8 @@
         openingSavings,
         saleYearInterest: shareResult.saleYearInterest,
         events,
-        annualReturns
+        annualReturns,
+        lifecycle
       });
       rows.push(row);
     }
@@ -1288,7 +1305,8 @@
     openingSavings,
     saleYearInterest,
     events,
-    annualReturns
+    annualReturns,
+    lifecycle
   }) {
     const salaries = [0, 0];
     const ukState = [0, 0];
@@ -1296,6 +1314,7 @@
     const ukPrivateLump = [0, 0];
 
     scenario.people.forEach((person, index) => {
+      if (!state.lifecycle.alive[index]) return;
       if (!state.superTransitioned[index] && ages[index] >= person.superAccessAge) {
         const pct = Math.max(0, Math.min(100, person.superAccessPct)) / 100;
         const total = totalSuper(state, index);
@@ -1353,6 +1372,29 @@
       }
     });
 
+    if (state.lifecycle.householdStatus === 'survivor') {
+      const survivorIndex = state.lifecycle.survivorIndex;
+      const deceasedIndex = state.lifecycle.deceasedIndex;
+      const survivor = scenario.people[survivorIndex];
+      const deceased = scenario.people[deceasedIndex];
+      if (state.inheritedSuper.accum > 0 &&
+          ages[survivorIndex] >= survivor.superAccessAge) {
+        state.inheritedSuper.retire += state.inheritedSuper.accum;
+        state.inheritedSuper.accum = 0;
+      }
+      state.inheritedSuper.accum *=
+        1 + annualReturns.superAccumulationReturnPct[deceasedIndex] / 100;
+      state.inheritedSuper.retire *=
+        1 + annualReturns.superRetirementReturnPct[deceasedIndex] / 100;
+      const inheritedUk = ukPensionFlows(
+        deceased,
+        ages[deceasedIndex],
+        scenario.assumptions.gbpAud,
+        inflationFactor
+      ).stateAnnuity * deceased.ukStateSurvivorPct / 100;
+      ukState[survivorIndex] += inheritedUk;
+    }
+
     const cashInterest = state.cash * scenario.cash.interestPct / 100;
     const savingsInterest =
       openingSavings * scenario.savings.interestPct / 100 +
@@ -1360,8 +1402,8 @@
     state.cash += cashInterest;
     state.savings += savingsInterest;
     const interestByPerson = [0, 0];
-    const cashWeights = ownerWeights(scenario.cash.owner);
-    const savingsWeights = ownerWeights(scenario.savings.owner);
+    const cashWeights = ownerWeights(state.ownership.cash);
+    const savingsWeights = ownerWeights(state.ownership.savings);
     for (let index = 0; index < 2; index += 1) {
       interestByPerson[index] =
         cashInterest * cashWeights[index] +
@@ -1375,7 +1417,11 @@
         ...holding,
         price: holding.price / inflationFactor
       })),
-      superBalances: [0, 1].map(index => totalSuper(state, index) / inflationFactor),
+      superBalances: [0, 1].map(index => (
+        totalSuper(state, index) +
+        (state.inheritedSuper.ownerIndex === index
+          ? state.inheritedSuper.accum + state.inheritedSuper.retire : 0)
+      ) / inflationFactor),
       ages,
       ukPrivateBalances: state.ukPrivateBalances.map(value => value / inflationFactor)
     });
@@ -1383,9 +1429,12 @@
       salaries.reduce((sum, value) => sum + value, 0) / inflationFactor +
       ukState.reduce((sum, value) => sum + value, 0) / inflationFactor +
       ukPrivateAnnuity.reduce((sum, value) => sum + value, 0) / inflationFactor +
-      deemedIncome(assessableAssetsReal);
-    const agePension = agePensionForAges({
+      deemedIncome(assessableAssetsReal,
+        state.lifecycle.householdStatus === 'survivor' ? 'single' : 'couple');
+    const agePension = agePensionForHousehold({
       ages,
+      alive: state.lifecycle.alive,
+      survivorIndex: state.lifecycle.survivorIndex,
       assets: assessableAssetsReal,
       assessableIncome: agePensionIncomeReal,
       included: scenario.household.includeAgePension
@@ -1398,6 +1447,7 @@
     const mandatoryDraws = [0, 0];
     if (scenario.household.applyMinimumDrawdown) {
       scenario.people.forEach((person, index) => {
+        if (!state.lifecycle.alive[index]) return;
         if (!(state.superRetire[index] > 0)) return;
         mandatoryDraws[index] =
           state.superRetire[index] * minDrawRate(ages[index]);
@@ -1406,6 +1456,14 @@
           state.superRetire[index] - mandatoryDraws[index]
         );
       });
+      if (state.inheritedSuper.retire > 0 &&
+          state.inheritedSuper.ownerIndex !== null) {
+        const ownerIndex = state.inheritedSuper.ownerIndex;
+        const inheritedDraw = state.inheritedSuper.retire *
+          minDrawRate(ages[ownerIndex]);
+        state.inheritedSuper.retire -= inheritedDraw;
+        mandatoryDraws[ownerIndex] += inheritedDraw;
+      }
     }
 
     const uppRate = scenario.assumptions.uppPct / 100;
@@ -1417,17 +1475,18 @@
       discountedGainByPerson[index]
     );
     const taxReal = taxableNominal.map((value, index) =>
-      netTax({
+      state.lifecycle.alive[index] ? netTax({
         taxableIncome: value / inflationFactor,
         rebateIncome: value / inflationFactor,
         year,
         seniorEligible: ages[index] >= 67
-      })
+      }) : 0
     );
     const totalTaxNominal =
       taxReal.reduce((sum, value) => sum + value, 0) * inflationFactor;
     const cgtTaxNominal = [0, 1].reduce((sum, index) => {
-      if (!(discountedGainByPerson[index] > 0)) return sum;
+      if (!state.lifecycle.alive[index] ||
+          !(discountedGainByPerson[index] > 0)) return sum;
       const withGain = taxReal[index];
       const withoutGain = netTax({
         taxableIncome:
@@ -1453,10 +1512,11 @@
       grossTaxableSources - totalTaxNominal;
     const mandatoryTotal =
       mandatoryDraws.reduce((sum, value) => sum + value, 0);
-    const targetNominal = scenario.household.targetAfterTax * inflationFactor;
+    const targetNominal = scenario.household.targetAfterTax * inflationFactor *
+      lifecycle.preferredTargetPct / 100;
     const budgetNominal =
       (scenario.household.annualBudget ?? scenario.household.targetAfterTax) *
-      inflationFactor;
+      inflationFactor * lifecycle.essentialTargetPct / 100;
     const availableBeforeDiscretionary = guaranteedNet + mandatoryTotal;
     let gap = Math.max(0, budgetNominal - availableBeforeDiscretionary);
     const surplusBanked = Math.max(
@@ -1472,6 +1532,12 @@
     );
     gap = waterfall.remaining;
     const extraSuperDraws = [waterfall.drawsBySource.p0Super, waterfall.drawsBySource.p1Super];
+    if (state.lifecycle.householdStatus === 'survivor') {
+      const deceasedIndex = state.lifecycle.deceasedIndex;
+      const survivorIndex = state.lifecycle.survivorIndex;
+      extraSuperDraws[survivorIndex] += extraSuperDraws[deceasedIndex];
+      extraSuperDraws[deceasedIndex] = 0;
+    }
     const potDraw = waterfall.drawsBySource.cash + waterfall.drawsBySource.savings;
 
     const superIncome = mandatoryDraws.map(
@@ -1490,6 +1556,8 @@
     const totalAssetsNominal =
       state.superAccum.reduce((sum, value) => sum + value, 0) +
       state.superRetire.reduce((sum, value) => sum + value, 0) +
+      state.inheritedSuper.accum +
+      state.inheritedSuper.retire +
       state.cash +
       state.savings +
       unsoldShares +
@@ -1498,15 +1566,20 @@
     const adjustedTaxableIncomeReal =
       taxableNominal.reduce((sum, value) => sum + value, 0) / inflationFactor;
     const abpBalanceReal =
-      state.superRetire.reduce((sum, value) => sum + value, 0) / inflationFactor;
+      (state.superRetire.reduce((sum, value) => sum + value, 0) +
+        state.inheritedSuper.retire) / inflationFactor;
     const cshc = cshcEstimate({
       adjustedTaxableIncome: adjustedTaxableIncomeReal,
-      accountBasedPensionBalance: abpBalanceReal
+      accountBasedPensionBalance: abpBalanceReal,
+      status: state.lifecycle.householdStatus === 'survivor' ? 'single' : 'couple'
     });
 
     return {
       year,
-      ages,
+      ages: ages.map((age, index) => state.lifecycle.alive[index] ? age : null),
+      rawAges: [...ages],
+      lifecycle: { ...lifecycle, alive: [...lifecycle.alive] },
+      taxByPerson: taxReal.map(value => value),
       components: {
         workNet:
           salaries.reduce((sum, value) => sum + value, 0) *
@@ -1528,13 +1601,21 @@
       tax: totalTaxNominal / inflationFactor,
       cgtTax: cgtTaxNominal / inflationFactor,
       cshc,
+      agePensionStatus: agePension.status,
       totalIncome: totalIncomeNominal / inflationFactor,
-      target: scenario.household.targetAfterTax,
+      target: targetNominal / inflationFactor,
       budget: budgetNominal / inflationFactor,
       banked: surplusBanked / inflationFactor,
       shortfall: shortfallNominal / inflationFactor,
       totalAssets: totalAssetsNominal / inflationFactor,
       superBalances: [0, 1].map(index => totalSuper(state, index) / inflationFactor),
+      inheritedSuper: {
+        accum: state.inheritedSuper.accum / inflationFactor,
+        retire: state.inheritedSuper.retire / inflationFactor,
+        total: (state.inheritedSuper.accum + state.inheritedSuper.retire) /
+          inflationFactor,
+        ownerIndex: state.inheritedSuper.ownerIndex
+      },
       cash: state.cash / inflationFactor,
       savings: state.savings / inflationFactor,
       shares: unsoldShares / inflationFactor,
@@ -1756,6 +1837,8 @@
     inflationFactors,
     applyShareSales,
     minDrawRate,
+    projectionHorizonIndex,
+    projectionYearCount,
     validateAnnualPath,
     annualReturnsForYear,
     projectScenario
@@ -3219,6 +3302,16 @@
     return copy;
   }
 
+  function scenarioYearCount(scenario) {
+    if (!scenario.household?.firstDeath?.enabled) {
+      return scenario.household.modelEndAge - scenario.people[0].age + 1;
+    }
+    const deceasedIndex = scenario.household.firstDeath.deceasedPerson === 'p1'
+      ? 1 : 0;
+    return scenario.household.modelEndAge -
+      scenario.people[1 - deceasedIndex].age + 1;
+  }
+
   function simulatePaths({
     scenario,
     pathCount,
@@ -3228,8 +3321,7 @@
     stressShocks = null,
     projectScenario
   }) {
-    const yearCount =
-      scenario.household.modelEndAge - scenario.people[0].age + 1;
+    const yearCount = scenarioYearCount(scenario);
     return Array.from({ length: pathCount }, (_, index) => {
       const pathSeed = derivePathSeed(seed, index);
       try {
@@ -3685,8 +3777,7 @@
     profilesByYear = null,
     projectScenario
   }) {
-    const yearCount =
-      scenario.household.modelEndAge - scenario.people[0].age + 1;
+    const yearCount = scenarioYearCount(scenario);
     const annualPath = generatePathFromShocks({
       shocks,
       startYear: scenario.startYear,
@@ -3728,6 +3819,7 @@
     applyRiskModeToScenario,
     stressAssumptionOverride,
     applyStressAssumptionOverride,
+    scenarioYearCount,
     simulatePaths,
     summarizeResults,
     calculateBudgetCurve,
@@ -3944,7 +4036,7 @@
     const glidePath = document.querySelector('#glidePath').value;
     const firstYear = scenario?.startYear ?? 2026;
     const lastYear = scenario
-      ? scenario.startYear + scenario.household.modelEndAge - scenario.people[0].age
+      ? scenario.startYear + simulator.projectionYearCount(scenario) - 1
       : 2100;
     const rawYear = Number(document.querySelector('#glideChangeYear').value) || 2038;
     const transitionYear = Math.min(Math.max(Math.round(rawYear), firstYear), lastYear);
@@ -3987,7 +4079,7 @@
     if (glidePath === 'stay-current') return null;
     const schedule = mc.buildProfileSchedule({
       startYear: activeScenario.startYear,
-      yearCount: activeScenario.household.modelEndAge - activeScenario.people[0].age + 1,
+      yearCount: simulator.projectionYearCount(activeScenario),
       glidePath,
       transitionYear,
       accountProducts: ['pension', 'pension'],
@@ -4163,8 +4255,7 @@
   }
 
   function runBatch({ scenario: candidate, seed, start, end, profiles, profilesByYear, stressShocks = null }) {
-    const yearCount =
-      candidate.household.modelEndAge - candidate.people[0].age + 1;
+    const yearCount = simulator.projectionYearCount(candidate);
     return Array.from({ length: end - start }, (_, offset) => {
       const index = start + offset;
       const pathSeed = mc.derivePathSeed(seed, index);
@@ -4471,6 +4562,16 @@
     const overrideSentence = stressOverride?.inflationPctByYear?.length
       ? `Inflation override ${stressOverride.inflationPctByYear.map(value => `${value}%`).join(' -> ')}. Cash interest ${activeScenario.cash.interestPct}%; savings interest ${activeScenario.savings.interestPct}%.`
       : 'No inflation, cash-interest, or savings-interest override is applied.';
+    const firstDeath = activeScenario.household.firstDeath;
+    const deceasedIndex = firstDeath.deceasedPerson === 'p1' ? 1 : 0;
+    const firstDeathSentence = firstDeath.enabled
+      ? `Fixed first-death scenario: ${activeScenario.people[deceasedIndex].name} ` +
+        `at age ${firstDeath.deathAge}, applied at the start of the same projection ` +
+        'year in every Monte Carlo path. Probabilistic mortality is not modelled. ' +
+        `Survivor Preferred Income ${firstDeath.survivorPreferredPct}% and ` +
+        `Essential Budget ${firstDeath.survivorEssentialPct}%; single Age Pension ` +
+        'rules apply immediately from the transition year.'
+      : 'Fixed first-death scenario is off. Probabilistic mortality is not modelled.';
     document.querySelector('#assumptionsPanel').innerHTML = `
       <p>Scenario: ${escapeHtml(activeScenario.scenarioName ?? 'Imported scenario')} · schema ${escapeHtml(activeScenario.schemaVersion)}</p>
       <p>Config version: 3 · seed ${escapeHtml(seed)} · paths ${escapeHtml(pathCount)}.</p>
@@ -4479,6 +4580,7 @@
       <p><b>Stress event:</b> ${escapeHtml(stress.label)}. ${escapeHtml(stress.detail)} ${stress.shocks.length ? `Shock sequence ${escapeHtml(JSON.stringify(stress.shocks))} is applied to the first years of every Monte Carlo path and budget-sweep path.` : 'No deterministic stress sequence is forced into the Monte Carlo paths.'}</p>
       <p><b>Stress assumption override:</b> ${escapeHtml(overrideSentence)}</p>
       <p><b>Risk mode:</b> ${escapeHtml(riskPolicy.label)}. ${escapeHtml(riskPolicy.detail)} Confidence target ${escapeHtml(formatPercent(riskPolicy.successThreshold))}; terminal reserve ${simulator.formatMoney(activeScenario.household.annualBudget * riskPolicy.terminalReserveYears)}.</p>
+      <p><b>Survivor state:</b> ${escapeHtml(firstDeathSentence)}</p>
       <p>Break-point mode: ${escapeHtml(riskMode)} · budget sweep ${simulator.formatMoney(budgetRange.start)} to ${simulator.formatMoney(budgetRange.end)} by ${simulator.formatMoney(budgetRange.step)}.</p>
       <ul>${profileRows}</ul>
       <p>FX, salary, pension, tax and non-stressed savings assumptions are inherited from the imported deterministic scenario.</p>

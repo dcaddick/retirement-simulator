@@ -6,6 +6,10 @@ const html = await readFile(
   new URL('../retirement-monte-carlo-v0.7.html', import.meta.url),
   'utf8'
 );
+const deterministicHtml = await readFile(
+  new URL('../retirement-simulator.html', import.meta.url),
+  'utf8'
+);
 
 assert.match(
   html,
@@ -38,6 +42,13 @@ assert.ok(
   html.includes("const STORAGE_KEY = 'family-retirement-simulator:v0.7:scenario'") &&
   html.includes("'family-retirement-simulator:v0.6:scenario'"),
   'Monte Carlo v0.7 should retain the v0.6 saved-scenario fallback'
+);
+assert.ok(
+  html.includes('applied at the start of the same projection') &&
+  html.includes('year in every Monte Carlo path. Probabilistic mortality is not modelled.') &&
+  html.includes('single Age Pension') &&
+  html.includes('rules apply immediately from the transition year.'),
+  'Monte Carlo assumptions should disclose the fixed survivor-state boundary'
 );
 
 const scripts = [...html.matchAll(/<script[^>]*>([\s\S]*?)<\/script>/g)].map(
@@ -322,6 +333,132 @@ const monteCarloTaxedRow = simulator.projectScenario(
   monteCarloTaxedAgeGap).rows[0];
 assert.ok(Math.abs(monteCarloTaxedRow.tax - monteCarloExpectedTax) < 0.01,
   'one-eligible Monte Carlo pension should be taxed only to its recipient');
+
+const fixedDeathScenario = structuredClone(adaptedSchema12);
+fixedDeathScenario.assumptions.inflationMode = 'manual';
+fixedDeathScenario.assumptions.manualInflationPct = 0;
+fixedDeathScenario.household.includeAgePension = false;
+fixedDeathScenario.household.applyMinimumDrawdown = false;
+fixedDeathScenario.household.targetAfterTax = 0;
+fixedDeathScenario.household.annualBudget = 0;
+fixedDeathScenario.household.modelEndAge = 66;
+fixedDeathScenario.household.firstDeath = {
+  enabled: true, deceasedPerson: 'p0', deathAge: 65,
+  survivorPreferredPct: 70, survivorEssentialPct: 70
+};
+fixedDeathScenario.people[0] = {
+  ...fixedDeathScenario.people[0], age: 64, retireAge: 67,
+  salary: 100000, sgPct: 0, accumulationReturnPct: 0,
+  retirementReturnPct: 0, super: 100000
+};
+fixedDeathScenario.people[1] = {
+  ...fixedDeathScenario.people[1], age: 62, retireAge: 67,
+  salary: 50000, sgPct: 0, accumulationReturnPct: 0,
+  retirementReturnPct: 0, super: 50000
+};
+fixedDeathScenario.cash.amount = 0;
+fixedDeathScenario.savings.amount = 0;
+fixedDeathScenario.shareholdings = [];
+const zeroProfiles = {
+  p0Accum: { expectedReturnPct: 0, volatilityPct: 0 },
+  p0Retire: { expectedReturnPct: 0, volatilityPct: 0 },
+  p1Accum: { expectedReturnPct: 0, volatilityPct: 0 },
+  p1Retire: { expectedReturnPct: 0, volatilityPct: 0 }
+};
+const fixedDeathPaths = core.simulatePaths({
+  scenario: fixedDeathScenario,
+  pathCount: 4,
+  seed: 12345,
+  profiles: zeroProfiles,
+  projectScenario: simulator.projectScenario
+});
+assert.ok(fixedDeathPaths.every(result => result.engineError === null));
+const transitionRows = fixedDeathPaths.map(result =>
+  result.projection.rows.find(row => row.lifecycle?.transitionedThisYear));
+assert.ok(transitionRows.every(row => row?.year === 2027 &&
+  row.lifecycle.survivorIndex === 1),
+  'every Monte Carlo path should apply the same fixed first-death event');
+assert.ok(transitionRows.every(row => row.ages[0] === null &&
+  row.taxByPerson[0] === 0 && row.inheritedSuper.total > 0),
+  'every path should expose the same survivor audit state');
+const repeatedFixedDeathPaths = core.simulatePaths({
+  scenario: fixedDeathScenario,
+  pathCount: 4,
+  seed: 12345,
+  profiles: zeroProfiles,
+  projectScenario: simulator.projectScenario
+});
+assert.deepEqual(
+  plain(repeatedFixedDeathPaths.map(result => result.projection.rows.map(row => ({
+    year: row.year,
+    totalAssets: row.totalAssets,
+    totalIncome: row.totalIncome,
+    transitionYear: row.lifecycle.transitionYear
+  })))),
+  plain(fixedDeathPaths.map(result => result.projection.rows.map(row => ({
+    year: row.year,
+    totalAssets: row.totalAssets,
+    totalIncome: row.totalIncome,
+    transitionYear: row.lifecycle.transitionYear
+  })))),
+  'the same seed and fixed death should be reproducible'
+);
+
+const deterministicCoreSource = deterministicHtml.match(
+  /<script id="simulator-core">([\s\S]*?)<\/script>/
+)?.[1];
+assert.ok(deterministicCoreSource, 'deterministic core should be available for parity');
+const deterministicContext = vm.createContext({
+  console, structuredClone, Math, Date, globalThis: {}
+});
+deterministicContext.globalThis = deterministicContext;
+vm.runInContext(deterministicCoreSource, deterministicContext);
+const deterministic = deterministicContext.RetirementSimulatorCore;
+const deterministicFixedDeath = deterministic.makeSampleScenario();
+deterministicFixedDeath.assumptions.inflationMode = 'manual';
+deterministicFixedDeath.assumptions.manualInflationPct = 0;
+deterministicFixedDeath.assumptions.ukPensionsEnabled = false;
+deterministicFixedDeath.household.includeAgePension = false;
+deterministicFixedDeath.household.applyMinimumDrawdown = false;
+deterministicFixedDeath.household.targetAfterTax = 0;
+deterministicFixedDeath.household.annualBudget = 0;
+deterministicFixedDeath.household.modelEndAge = 66;
+deterministicFixedDeath.household.firstDeath = structuredClone(
+  fixedDeathScenario.household.firstDeath);
+deterministicFixedDeath.people.forEach((person, index) => Object.assign(person, {
+  age: fixedDeathScenario.people[index].age,
+  retireAge: fixedDeathScenario.people[index].retireAge,
+  salary: fixedDeathScenario.people[index].salary,
+  sgPct: 0,
+  accumulationReturnPct: 0,
+  retirementReturnPct: 0,
+  super: fixedDeathScenario.people[index].super,
+  ukStateAnnualGbp: 0,
+  ukStateSurvivorPct: 0
+}));
+deterministicFixedDeath.cash.amount = 0;
+deterministicFixedDeath.savings.amount = 0;
+deterministicFixedDeath.shareholdings = [];
+deterministicFixedDeath.otherIncomes = [];
+deterministicFixedDeath.otherAssets = [];
+deterministicFixedDeath.lumpSumWithdrawals = [];
+const deterministicFixedRows = deterministic.projectScenario(
+  deterministicFixedDeath).rows;
+assert.deepEqual(
+  plain(fixedDeathPaths[0].projection.rows.map(row => ({
+    year: row.year,
+    totalAssets: row.totalAssets,
+    totalIncome: row.totalIncome,
+    survivorIndex: row.lifecycle.survivorIndex
+  }))),
+  plain(deterministicFixedRows.map(row => ({
+    year: row.year,
+    totalAssets: row.totalAssets,
+    totalIncome: row.totalIncome,
+    survivorIndex: row.lifecycle.survivorIndex
+  }))),
+  'zero-volatility first-death totals should match deterministic projection'
+);
 
 assert.match(html, /effectiveYear:\s*2025/, 'Medicare data should be for 2025-26');
 assert.match(html, /ordinary:\s*\{ lower: 28011, upper: 35013 \}/,
