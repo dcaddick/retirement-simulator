@@ -19,7 +19,7 @@ The feature converts the household from a couple state to a survivor state at th
 - Independent survivor percentages for Preferred Retirement Income and Essential Annual Budget.
 - Immediate asset transfer to the survivor without modelled probate, fees, delays, estate tax or transfer CGT.
 - A separate survivor-owned inherited-super balance that retains its modelled accumulation or drawdown phase.
-- Explicit survivor continuation percentages for UK State Pension and Other income, including Australian defined-benefit-style entries.
+- Explicit deterministic survivor continuation percentages for UK State Pension and Other income, including Australian defined-benefit-style entries.
 - Immediate Age Pension reassessment under single-person rules.
 - Person-level survivor taxation and capital-loss treatment.
 - Survivor-based projection horizon when the feature is enabled.
@@ -36,6 +36,7 @@ The feature converts the household from a couple state to a survivor state at th
 - Exact provider-specific defined-benefit or UK survivor-pension rules.
 - Age Pension bereavement lump sums or fortnightly bereavement calculations.
 - Funeral costs unless the user separately models them as a lump-sum withdrawal.
+- Monte Carlo support for deterministic Other income/assets, active DB/UK pensions or lump sums; those remain tracked by issue #1.
 
 ## Policy basis and explicit simplifications
 
@@ -102,6 +103,12 @@ The lifecycle context exposes at least:
 The transition is idempotent. Once the state records that it has occurred, later annual calls return the existing survivor context without transferring balances or reducing targets again.
 
 Both deterministic and Monte Carlo projection loops call this unit after deriving the year's ages and inflation factor but before any growth, income, sale, lump-sum, pension, drawdown or tax operation. Monte Carlo applies the same selected event on every path.
+
+## Monte Carlo compatibility boundary
+
+Monte Carlo v0.7 applies the fixed first-death transition only to the scenario subset it already models correctly: people, super, cash, savings, shareholdings, household targets, Age Pension and supported assumptions. It continues to reject imports containing deterministic Other income/assets, active DB/UK pensions or lump-sum withdrawals with an explicit compatibility message.
+
+This release does not absorb issue #1. Survivor continuation percentages for DB/UK and Other income are implemented and tested in the deterministic engine. Monte Carlo preserves those fields through deterministic JSON, but does not accept a scenario that would require using them. For every scenario accepted by both engines, the selected deceased person, transition year, spending reduction, asset ownership, inherited-super treatment, single Age Pension boundary and survivor tax allocation must match.
 
 ## Transition order and accounting
 
@@ -239,6 +246,7 @@ Validation reports the exact scenario path and marks the corresponding control. 
 ### Monte Carlo engine
 
 - Imports schema v12 and rejects invalid lifecycle settings explicitly.
+- Continues explicitly rejecting deterministic Other income/assets, active DB/UK pensions and lump sums under issue #1.
 - Applies the same fixed event year and survivor identity to every path.
 - Matches deterministic transition accounting for a zero-volatility fixture.
 - Preserves seed reproducibility.
@@ -266,4 +274,4 @@ Validation reports the exact scenario path and marks the corresponding control. 
 
 ## Success criteria
 
-The release succeeds when a user can opt into a fixed first-death scenario and both engines reproducibly show the same start-of-year survivor transition; transferred balances reconcile; spending, income, tax and Age Pension use explicit survivor rules; existing scenarios remain unchanged by default; output explains the transition; all automated and browser checks pass; and v1.0.8/v0.7 is published with verified assets.
+The release succeeds when a user can opt into a fixed first-death scenario and both engines reproducibly show the same start-of-year survivor transition for their shared supported scenario subset; deterministic transferred balances reconcile; spending, income, tax and Age Pension use explicit survivor rules; Monte Carlo continues to reject issue #1 inputs rather than omit them; existing scenarios remain unchanged by default; output explains the transition; all automated and browser checks pass; and v1.0.8/v0.7 is published with verified assets.
