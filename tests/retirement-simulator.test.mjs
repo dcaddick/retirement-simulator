@@ -56,7 +56,7 @@ vm.runInContext(extract('simulator-core'), context, { filename: 'simulator-core.
 const core = context.RetirementSimulatorCore;
 
 console.log('\nschema + sample');
-check('schema version is 11', core.SCHEMA_VERSION === 11);
+check('schema version is 12', core.SCHEMA_VERSION === 12);
 const sample = core.makeSampleScenario();
 check('sample validates', core.validateScenario(sample).length === 0,
   JSON.stringify(core.validateScenario(sample)[0] ?? null));
@@ -86,6 +86,15 @@ check('sample distinguishes preferred income from essential budget',
   sample.household.targetAfterTax === 80000 && sample.household.annualBudget === 70000);
 check('sample uses the approved Treasury inflation default',
   sample.assumptions.inflationMode === 'treasury');
+check('first death is disabled by default',
+  sample.household.firstDeath?.enabled === false);
+check('survivor spending defaults are 70 percent',
+  sample.household.firstDeath?.survivorPreferredPct === 70 &&
+  sample.household.firstDeath?.survivorEssentialPct === 70);
+check('UK survivor continuation defaults to zero',
+  sample.people.every(person => person.ukStateSurvivorPct === 0));
+check('new Other income survivor continuation defaults to zero',
+  core.makeOtherIncome(0).survivorPct === 0);
 check('v1.00 terminology is rendered',
   html.includes('Preferred Retirement Income') && html.includes('Essential Annual Budget'));
 check('return assumptions are explained below the table',
@@ -120,13 +129,50 @@ delete schema10.shareholdings[0].companyTaxRatePct;
 delete schema10.shareholdings[0].frankingEligible;
 const migrated11 = core.migrateScenario(schema10);
 check('schema 10 migrates inert v1.06 tax and share defaults',
-  migrated11.schemaVersion === 11 &&
+  migrated11.schemaVersion === 12 &&
   migrated11.otherIncomes[0].owner === 'joint' &&
+  migrated11.otherIncomes[0].survivorPct === 0 &&
+  migrated11.household.firstDeath.enabled === false &&
+  migrated11.people.every(person => person.ukStateSurvivorPct === 0) &&
   migrated11.shareholdings[0].priceGrowthPct === 0 &&
   migrated11.shareholdings[0].dividendYieldPct === 0 &&
   migrated11.shareholdings[0].frankedPct === 0 &&
   migrated11.shareholdings[0].companyTaxRatePct === 30 &&
   migrated11.shareholdings[0].frankingEligible === false);
+
+const schema11 = structuredClone(sample);
+schema11.schemaVersion = 11;
+delete schema11.household.firstDeath;
+schema11.people.forEach(person => delete person.ukStateSurvivorPct);
+schema11.otherIncomes = [{
+  ...core.makeOtherIncome(0), id: 'legacy-v11-income', label: 'Legacy income'
+}];
+delete schema11.otherIncomes[0].survivorPct;
+const migrated12 = core.migrateScenario(schema11);
+check('schema 11 migrates inert first-death defaults',
+  migrated12.schemaVersion === 12 &&
+  migrated12.household.firstDeath.enabled === false &&
+  migrated12.household.firstDeath.survivorPreferredPct === 70 &&
+  migrated12.household.firstDeath.survivorEssentialPct === 70 &&
+  migrated12.people.every(person => person.ukStateSurvivorPct === 0) &&
+  migrated12.otherIncomes[0].survivorPct === 0);
+
+const invalidFirstDeath = structuredClone(sample);
+invalidFirstDeath.household.firstDeath = {
+  enabled: true,
+  deceasedPerson: 'unknown',
+  deathAge: sample.people[0].age,
+  survivorPreferredPct: -1,
+  survivorEssentialPct: 101
+};
+const invalidFirstDeathPaths = core.validateScenario(invalidFirstDeath)
+  .map(error => error.path);
+check('invalid first-death settings report exact fields', [
+  'household.firstDeath.deceasedPerson',
+  'household.firstDeath.deathAge',
+  'household.firstDeath.survivorPreferredPct',
+  'household.firstDeath.survivorEssentialPct'
+].every(path => invalidFirstDeathPaths.includes(path)));
 check('deferred review covers all approved out-of-scope items', [
   'AIPR-003-SHARES-STATIC',
   'AIPR-003-AP-AGEGAP',
@@ -671,7 +717,7 @@ check('combined means tests run before the one-eligible multiplier',
 const taxedAgeGap = makeAgeGapScenario([67, 66]);
 taxedAgeGap.otherIncomes = [{
   id: 'age-gap-tax', label: 'Taxable income', currency: 'AUD', fxToAud: 1,
-  amount: 40000, taxable: true, owner: 'p0'
+  amount: 40000, taxable: true, owner: 'p0', survivorPct: 0
 }];
 const taxedAgeGapRow = core.projectScenario(taxedAgeGap).rows[0];
 const expectedPension = core.agePensionForAges({
@@ -755,8 +801,8 @@ check('salary growth raises SG-supported super balance',
 console.log('\nother income');
 const withIncome = structuredClone(sample);
 withIncome.otherIncomes = [
-  { id: 'i1', label: 'Rental', currency: 'AUD', fxToAud: 1, amount: 10000, taxable: true, owner: 'joint' },
-  { id: 'i2', label: 'Gift', currency: 'GBP', fxToAud: 2, amount: 1000, taxable: false, owner: 'joint' }
+  { id: 'i1', label: 'Rental', currency: 'AUD', fxToAud: 1, amount: 10000, taxable: true, owner: 'joint', survivorPct: 0 },
+  { id: 'i2', label: 'Gift', currency: 'GBP', fxToAud: 2, amount: 1000, taxable: false, owner: 'joint', survivorPct: 0 }
 ];
 check('scenario with income validates', core.validateScenario(withIncome).length === 0,
   JSON.stringify(core.validateScenario(withIncome)[0] ?? null));
@@ -793,7 +839,7 @@ function projectOwnedIncome(owner) {
   scenario.people[1].salary = 0;
   scenario.otherIncomes = [{
     id: `income-${owner}`, label: 'Rent', currency: 'AUD', fxToAud: 1,
-    amount: 30000, taxable: true, owner
+    amount: 30000, taxable: true, owner, survivorPct: 0
   }];
   return core.projectScenario(scenario).rows[0];
 }
@@ -813,7 +859,7 @@ check('other income UI reuses the owner selector',
 const badOwner = structuredClone(sample);
 badOwner.otherIncomes = [{
   id: 'bad-owner', label: 'Rent', currency: 'AUD', fxToAud: 1,
-  amount: 1000, taxable: true, owner: 'somebody-else'
+  amount: 1000, taxable: true, owner: 'somebody-else', survivorPct: 0
 }];
 check('invalid other income owner is rejected',
   core.validateScenario(badOwner).some(error =>
@@ -998,7 +1044,7 @@ v5.people[1].ukPrivateAmountGbp = 20000;
 v5.people[1].ukPrivateTakeAge = 66;
 v5.people[1].ukPrivateType = 'lump';
 const migrated = core.migrateScenario(structuredClone(v5));
-check('migrates to v11', migrated.schemaVersion === 11);
+check('migrates to v12', migrated.schemaVersion === 12);
 check('annuity becomes other income', migrated.otherIncomes.length === 1 &&
   migrated.otherIncomes[0].amount === 5000 && migrated.otherIncomes[0].currency === 'GBP');
 check('lump becomes other asset with disposal year',
@@ -1018,14 +1064,14 @@ schema7.schemaVersion = 7;
 schema7.lumpSumWithdrawals.forEach(item => delete item.enabled);
 const migrated8 = core.migrateScenario(schema7);
 check('schema 7 lump sums migrate enabled',
-  migrated8.schemaVersion === 11 && migrated8.lumpSumWithdrawals.every(item => item.enabled === true));
+  migrated8.schemaVersion === 12 && migrated8.lumpSumWithdrawals.every(item => item.enabled === true));
 
 const schema8 = structuredClone(sample);
 schema8.schemaVersion = 8;
 schema8.lumpSumWithdrawals.forEach(item => delete item.month);
 const migrated9 = core.migrateScenario(schema8);
 check('schema 8 lump sums migrate to January and salary growth defaults to zero',
-  migrated9.schemaVersion === 11 &&
+  migrated9.schemaVersion === 12 &&
   migrated9.lumpSumWithdrawals.every(item => item.month === 1) &&
   migrated9.people.every(person => person.salaryGrowthPct === 0));
 
@@ -1034,14 +1080,14 @@ schema9.schemaVersion = 9;
 schema9.people.forEach(person => delete person.salaryGrowthPct);
 const migrated10 = core.migrateScenario(schema9);
 check('schema 9 migrates salary growth to zero',
-  migrated10.schemaVersion === 11 && migrated10.people.every(person => person.salaryGrowthPct === 0));
+  migrated10.schemaVersion === 12 && migrated10.people.every(person => person.salaryGrowthPct === 0));
 
 const invalidMonth = structuredClone(sample);
 invalidMonth.lumpSumWithdrawals[0].month = 13;
 check('invalid lump-sum month is reported',
   core.validateScenario(invalidMonth).some(error => error.path === 'lumpSumWithdrawals.0.month'));
 
-console.log('\nmigration v1 -> v11 (full chain)');
+console.log('\nmigration v1 -> v12 (full chain)');
 const v1 = structuredClone(v5);
 v1.schemaVersion = 1;
 delete v1.lumpSumWithdrawals;
@@ -1049,7 +1095,7 @@ delete v1.household.annualBudget;
 v1.people = v1.people.map(({ superAccessAge, superAccessPct, ukStateIndexation, ...rest }) => rest);
 delete v1.assumptions.ukPensionsEnabled;
 const chained = core.migrateScenario(structuredClone(v1));
-check('v1 chains to v11', chained.schemaVersion === 11);
+check('v1 chains to v12', chained.schemaVersion === 12);
 check('migration adds empty lump sums', Array.isArray(chained.lumpSumWithdrawals) && chained.lumpSumWithdrawals.length === 0);
 check('chained validates', core.validateScenario(chained).length === 0,
   JSON.stringify(core.validateScenario(chained)[0] ?? null));

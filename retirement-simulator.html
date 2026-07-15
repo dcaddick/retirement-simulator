@@ -467,7 +467,7 @@
 <script id="simulator-core">
 (function () {
   'use strict';
-  const SCHEMA_VERSION = 11;
+  const SCHEMA_VERSION = 12;
   const VALID_OWNERS = new Set(['p0', 'p1', 'joint']);
   const DRAWDOWN_SOURCES = new Set(['p0Super', 'p1Super', 'cash', 'savings']);
   const OTHER_CURRENCIES = new Set(['AUD', 'GBP', 'USD']);
@@ -687,6 +687,16 @@
     return superFirst ? [superTier, potTier] : [potTier, superTier];
   }
 
+  function defaultFirstDeath() {
+    return {
+      enabled: false,
+      deceasedPerson: 'p0',
+      deathAge: 80,
+      survivorPreferredPct: 70,
+      survivorEssentialPct: 70
+    };
+  }
+
   function makeSampleScenario() {
     const startYear = new Date().getFullYear();
     return {
@@ -709,7 +719,8 @@
           retirementReturnPct: 6.5,
           ukStateAnnualGbp: 0,
           ukStateStartAge: 67,
-          ukStateIndexation: 'frozen'
+          ukStateIndexation: 'frozen',
+          ukStateSurvivorPct: 0
         },
         {
           id: 'p1',
@@ -726,7 +737,8 @@
           retirementReturnPct: 6.5,
           ukStateAnnualGbp: 0,
           ukStateStartAge: 67,
-          ukStateIndexation: 'frozen'
+          ukStateIndexation: 'frozen',
+          ukStateSurvivorPct: 0
         }
       ],
       cash: { amount: 25000, interestPct: 0, owner: 'joint' },
@@ -751,7 +763,8 @@
         ],
         applyMinimumDrawdown: true,
         includeAgePension: true,
-        showSurvival: true
+        showSurvival: true,
+        firstDeath: defaultFirstDeath()
       },
       assumptions: {
         inflationMode: 'treasury',
@@ -952,6 +965,28 @@
       }));
       current = migrated;
     }
+    if (current.schemaVersion === 11) {
+      const migrated = structuredClone(current);
+      migrated.schemaVersion = 12;
+      migrated.people = migrated.people.map(person => ({
+        ...person,
+        ukStateSurvivorPct: Number.isFinite(person.ukStateSurvivorPct)
+          ? person.ukStateSurvivorPct : 0
+      }));
+      migrated.otherIncomes = (migrated.otherIncomes ?? []).map(item => ({
+        ...item,
+        survivorPct: Number.isFinite(item.survivorPct) ? item.survivorPct : 0
+      }));
+      migrated.household = {
+        ...migrated.household,
+        firstDeath: {
+          ...defaultFirstDeath(),
+          ...(migrated.household?.firstDeath ?? {}),
+          enabled: false
+        }
+      };
+      current = migrated;
+    }
     if (current.schemaVersion !== SCHEMA_VERSION) {
       throw new Error(`Unsupported schema version: ${raw.schemaVersion}.`);
     }
@@ -1143,7 +1178,8 @@
       fxToAud: 1,
       amount: 0,
       taxable: true,
-      owner: 'joint'
+      owner: 'joint',
+      survivorPct: 0
     };
   }
 
@@ -1879,6 +1915,11 @@
             person.superAccessPct < 0 || person.superAccessPct > 100) {
           add(`people.${index}.superAccessPct`, 'Super access % must be between 0 and 100.');
         }
+        if (!Number.isFinite(person.ukStateSurvivorPct) ||
+            person.ukStateSurvivorPct < 0 || person.ukStateSurvivorPct > 100) {
+          add(`people.${index}.ukStateSurvivorPct`,
+            'UK State Pension survivor % must be between 0 and 100.');
+        }
       });
     }
     ['cash', 'savings'].forEach(key => {
@@ -1970,6 +2011,10 @@
         if (!['p0', 'p1', 'joint'].includes(item.owner)) {
           add(`${path}.owner`, 'Tax owner must be Person 1, Person 2, or Joint 50/50.');
         }
+        if (!Number.isFinite(item.survivorPct) ||
+            item.survivorPct < 0 || item.survivorPct > 100) {
+          add(`${path}.survivorPct`, 'Survivor % must be between 0 and 100.');
+        }
       });
     }
     if (!Array.isArray(scenario.otherAssets)) {
@@ -2008,6 +2053,38 @@
     }
     if (!(scenario.household?.modelEndAge >= scenario.people?.[0]?.age)) {
       add('household.modelEndAge', 'Model end age cannot be below Person 1 current age.');
+    }
+    const firstDeath = scenario.household?.firstDeath;
+    if (!firstDeath || typeof firstDeath.enabled !== 'boolean') {
+      add('household.firstDeath.enabled',
+        'First-death inclusion must be true or false.');
+    } else if (firstDeath.enabled) {
+      const validDeceased = ['p0', 'p1'].includes(firstDeath.deceasedPerson);
+      if (!validDeceased) {
+        add('household.firstDeath.deceasedPerson',
+          'Select the person who dies first.');
+      }
+      const deceasedIndex = firstDeath.deceasedPerson === 'p1' ? 1 : 0;
+      const survivorIndex = 1 - deceasedIndex;
+      const deceased = scenario.people?.[deceasedIndex];
+      const survivor = scenario.people?.[survivorIndex];
+      if (!deceased || !Number.isInteger(firstDeath.deathAge) ||
+          firstDeath.deathAge <= deceased.age) {
+        add('household.firstDeath.deathAge',
+          'Death age must be above the current age.');
+      } else if (survivor &&
+          survivor.age + firstDeath.deathAge - deceased.age >=
+            scenario.household.modelEndAge) {
+        add('household.firstDeath.deathAge',
+          'Death must occur before the survivor reaches Model End Age.');
+      }
+      for (const field of ['survivorPreferredPct', 'survivorEssentialPct']) {
+        if (!Number.isFinite(firstDeath[field]) ||
+            firstDeath[field] < 0 || firstDeath[field] > 100) {
+          add(`household.firstDeath.${field}`,
+            'Survivor percentage must be from 0% to 100%.');
+        }
+      }
     }
     if (!Array.isArray(scenario.household?.drawdownPriority) ||
         scenario.household.drawdownPriority.length === 0) {
@@ -2161,6 +2238,7 @@
     drawFromTiers,
     fundTaxExpense,
     defaultDrawdownPriority,
+    defaultFirstDeath,
     migrateScenario,
     inflationFactors,
     applyShareSales,
