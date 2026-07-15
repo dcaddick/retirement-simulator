@@ -111,6 +111,13 @@ assert.ok(monteCarloDemo.people.every(person => person.salaryGrowthPct === 0));
 assert.deepEqual(plain(monteCarloDemo.otherIncomes), []);
 assert.deepEqual(plain(monteCarloDemo.otherAssets), []);
 assert.deepEqual(plain(monteCarloDemo.lumpSumWithdrawals), []);
+assert.ok(monteCarloDemo.people.every(person =>
+  !('ukPrivateAmountGbp' in person) &&
+  !('ukPrivateTakeAge' in person) &&
+  !('ukPrivateType' in person)),
+'native schema 5 should not expose obsolete private-pension fields');
+assert.ok(monteCarloDemo.people.every(person =>
+  ['frozen', 'cpi'].includes(person.ukStateIndexation)));
 
 const newOtherIncome = simulator.makeOtherIncome(2);
 assert.deepEqual(
@@ -162,6 +169,42 @@ delete missingOtherIncomeArray.otherIncomes;
 assert.ok(simulator.validateScenario(missingOtherIncomeArray)
   .some(error => error.path === 'otherIncomes'));
 
+const validPensionScenario = structuredClone(monteCarloDemo);
+validPensionScenario.assumptions.ukPensionsEnabled = true;
+validPensionScenario.assumptions.gbpAud = 1.95;
+validPensionScenario.assumptions.uppPct = 8;
+Object.assign(validPensionScenario.people[0], {
+  ukStateAnnualGbp: 12000,
+  ukStateStartAge: 67,
+  ukStateIndexation: 'frozen',
+  ukStateSurvivorPct: 50
+});
+assert.ok(!simulator.validateScenario(validPensionScenario).some(error =>
+  error.path.includes('ukState') || error.path.startsWith('assumptions.gbpAud') ||
+  error.path.startsWith('assumptions.uppPct') ||
+  error.path.startsWith('assumptions.ukPensionsEnabled')));
+
+for (const [path, value] of [
+  ['assumptions.ukPensionsEnabled', 'yes'],
+  ['assumptions.gbpAud', 0],
+  ['assumptions.uppPct', -1],
+  ['assumptions.uppPct', 101],
+  ['people.0.ukStateAnnualGbp', -1],
+  ['people.0.ukStateStartAge', 54],
+  ['people.0.ukStateStartAge', 81],
+  ['people.0.ukStateIndexation', 'invalid'],
+  ['people.0.ukStateSurvivorPct', -1],
+  ['people.0.ukStateSurvivorPct', 101]
+]) {
+  const invalid = structuredClone(validPensionScenario);
+  const parts = path.split('.');
+  let target = invalid;
+  for (const part of parts.slice(0, -1)) target = target[part];
+  target[parts.at(-1)] = value;
+  assert.ok(simulator.validateScenario(invalid)
+    .some(error => error.path === path), `${path} should reject ${String(value)}`);
+}
+
 const nativeSchema4 = structuredClone(monteCarloDemo);
 nativeSchema4.schemaVersion = 4;
 nativeSchema4.people.forEach(person => { delete person.salaryGrowthPct; });
@@ -169,6 +212,12 @@ delete nativeSchema4.otherIncomes;
 delete nativeSchema4.otherAssets;
 delete nativeSchema4.lumpSumWithdrawals;
 delete nativeSchema4.assumptions.ukPensionsEnabled;
+nativeSchema4.people[0].ukPrivateAmountGbp = 5000;
+nativeSchema4.people[0].ukPrivateTakeAge = 67;
+nativeSchema4.people[0].ukPrivateType = 'annuity';
+nativeSchema4.people[1].ukPrivateAmountGbp = 20000;
+nativeSchema4.people[1].ukPrivateTakeAge = 66;
+nativeSchema4.people[1].ukPrivateType = 'lump';
 nativeSchema4.shareholdings = [{
   id: 'legacy-share', symbol: 'BHP', quantity: 10,
   quoteCurrency: 'AUD', price: 40, fxToAud: 1,
@@ -178,9 +227,31 @@ nativeSchema4.shareholdings = [{
 const migratedSchema5 = simulator.migrateScenario(nativeSchema4);
 assert.equal(migratedSchema5.schemaVersion, 5);
 assert.ok(migratedSchema5.people.every(person => person.salaryGrowthPct === 0));
-assert.deepEqual(plain(migratedSchema5.otherIncomes), []);
-assert.deepEqual(plain(migratedSchema5.otherAssets), []);
 assert.deepEqual(plain(migratedSchema5.lumpSumWithdrawals), []);
+assert.ok(migratedSchema5.people.every(person =>
+  !('ukPrivateAmountGbp' in person) &&
+  !('ukPrivateTakeAge' in person) &&
+  !('ukPrivateType' in person)));
+assert.deepEqual(plain(migratedSchema5.otherIncomes.at(-1)), {
+  id: 'income-migrated-0',
+  label: `${nativeSchema4.people[0].name} private pension annuity`,
+  currency: 'GBP',
+  fxToAud: nativeSchema4.assumptions.gbpAud,
+  amount: 5000,
+  taxable: true,
+  owner: 'joint',
+  survivorPct: 0
+});
+assert.deepEqual(plain(migratedSchema5.otherAssets.at(-1)), {
+  id: 'asset-migrated-1',
+  label: `${nativeSchema4.people[1].name} private pension lump sum`,
+  currency: 'GBP',
+  fxToAud: nativeSchema4.assumptions.gbpAud,
+  amount: 20000,
+  growthPct: 2.5,
+  disposalYear: nativeSchema4.startYear +
+    (66 - nativeSchema4.people[1].age)
+});
 assert.equal(migratedSchema5.assumptions.ukPensionsEnabled, true,
   'legacy native pensions should retain their previous enabled behaviour');
 assert.deepEqual(
@@ -195,6 +266,9 @@ assert.deepEqual(
   }
 );
 
+const guardedSchema5 = structuredClone(migratedSchema5);
+guardedSchema5.otherIncomes = [];
+guardedSchema5.otherAssets = [];
 for (const [label, mutate, pattern] of [
   ['Other asset', scenario => {
     scenario.otherAssets = [{ label: 'Property', amount: 1000 }];
@@ -212,7 +286,7 @@ for (const [label, mutate, pattern] of [
     }];
   }, /cannot yet model v1\.06 share price growth, dividends or franking/]
 ]) {
-  const nativeUnsupported = structuredClone(migratedSchema5);
+  const nativeUnsupported = structuredClone(guardedSchema5);
   mutate(nativeUnsupported);
   assert.throws(
     () => simulator.importScenario(JSON.stringify(nativeUnsupported)),
@@ -269,8 +343,11 @@ v1Scenario.people = v1Scenario.people.map(person => {
 const adaptedV1Scenario = simulator.importScenario(JSON.stringify(v1Scenario));
 assert.equal(adaptedV1Scenario.schemaVersion, 5,
   'v1.00 schema should adapt to the experimental engine schema');
-assert.ok(adaptedV1Scenario.people.every(person => person.ukPrivateAmountGbp === 0),
-  'v1.00 adapter should install inert legacy pension fields');
+assert.ok(adaptedV1Scenario.people.every(person =>
+  !('ukPrivateAmountGbp' in person) &&
+  !('ukPrivateTakeAge' in person) &&
+  !('ukPrivateType' in person)),
+  'deterministic adaptation should remove obsolete private-pension fields');
 
 const supportedIncomeV1Scenario = structuredClone(v1Scenario);
 supportedIncomeV1Scenario.otherIncomes = [{

@@ -701,11 +701,9 @@
           accumulationReturnPct: 5.5,
           retirementReturnPct: 6.5,
           ukStateAnnualGbp: 0,
+          ukStateIndexation: 'frozen',
           ukStateSurvivorPct: 0,
-          ukStateStartAge: 67,
-          ukPrivateAmountGbp: 0,
-          ukPrivateTakeAge: 67,
-          ukPrivateType: 'lump'
+          ukStateStartAge: 67
         },
         {
           id: 'p1',
@@ -721,11 +719,9 @@
           accumulationReturnPct: 5.5,
           retirementReturnPct: 6.5,
           ukStateAnnualGbp: 0,
+          ukStateIndexation: 'frozen',
           ukStateSurvivorPct: 0,
-          ukStateStartAge: 67,
-          ukPrivateAmountGbp: 0,
-          ukPrivateTakeAge: 67,
-          ukPrivateType: 'lump'
+          ukStateStartAge: 67
         }
       ],
       cash: { amount: 25000, interestPct: 0, owner: 'joint' },
@@ -854,15 +850,54 @@
     if (current.schemaVersion === 4) {
       const migrated = structuredClone(current);
       migrated.schemaVersion = 5;
-      migrated.people = migrated.people.map(person => ({
-        ...person,
-        salaryGrowthPct: Number.isFinite(person.salaryGrowthPct)
-          ? person.salaryGrowthPct : 0
-      }));
+      migrated.assumptions = {
+        ...migrated.assumptions,
+        ukPensionsEnabled:
+          typeof migrated.assumptions?.ukPensionsEnabled === 'boolean'
+            ? migrated.assumptions.ukPensionsEnabled : true
+      };
       migrated.otherIncomes = Array.isArray(migrated.otherIncomes)
         ? migrated.otherIncomes : [];
       migrated.otherAssets = Array.isArray(migrated.otherAssets)
         ? migrated.otherAssets : [];
+      const startYear = migrated.startYear ?? new Date().getFullYear();
+      migrated.people = migrated.people.map((person, index) => {
+        const {
+          ukPrivateAmountGbp, ukPrivateTakeAge, ukPrivateType, ...currentPerson
+        } = person;
+        if (ukPrivateAmountGbp > 0) {
+          if (ukPrivateType === 'annuity') {
+            migrated.otherIncomes.push({
+              id: `income-migrated-${index}`,
+              label: `${person.name} private pension annuity`,
+              currency: 'GBP',
+              fxToAud: migrated.assumptions.gbpAud,
+              amount: ukPrivateAmountGbp,
+              taxable: true,
+              owner: 'joint',
+              survivorPct: 0
+            });
+          } else {
+            migrated.otherAssets.push({
+              id: `asset-migrated-${index}`,
+              label: `${person.name} private pension lump sum`,
+              currency: 'GBP',
+              fxToAud: migrated.assumptions.gbpAud,
+              amount: ukPrivateAmountGbp,
+              growthPct: 2.5,
+              disposalYear: startYear +
+                Math.max(0, (ukPrivateTakeAge ?? person.age) - person.age)
+            });
+          }
+        }
+        return {
+          ...currentPerson,
+          salaryGrowthPct: Number.isFinite(person.salaryGrowthPct)
+            ? person.salaryGrowthPct : 0,
+          ukStateIndexation:
+            person.ukStateIndexation === 'cpi' ? 'cpi' : 'frozen'
+        };
+      });
       migrated.lumpSumWithdrawals = Array.isArray(migrated.lumpSumWithdrawals)
         ? migrated.lumpSumWithdrawals : [];
       migrated.shareholdings = (migrated.shareholdings ?? []).map(holding => ({
@@ -876,12 +911,6 @@
           ? holding.companyTaxRatePct : 30,
         frankingEligible: holding.frankingEligible === true
       }));
-      migrated.assumptions = {
-        ...migrated.assumptions,
-        ukPensionsEnabled:
-          typeof migrated.assumptions?.ukPensionsEnabled === 'boolean'
-            ? migrated.assumptions.ukPensionsEnabled : true
-      };
       current = migrated;
     }
     if (current.schemaVersion !== SCHEMA_VERSION) {
@@ -922,15 +951,20 @@
     if (![6, 7, 8, 9, 10, 11, 12].includes(scenario.schemaVersion)) return scenario;
     const adapted = structuredClone(scenario);
     adapted.schemaVersion = SCHEMA_VERSION;
-    adapted.people = adapted.people.map(person => ({
-      ...person,
-      salaryGrowthPct: person.salaryGrowthPct ?? 0,
-      ukStateAnnualGbp: person.ukStateAnnualGbp ?? 0,
-      ukStateSurvivorPct: person.ukStateSurvivorPct ?? 0,
-      ukPrivateAmountGbp: 0,
-      ukPrivateTakeAge: person.ukStateStartAge ?? 67,
-      ukPrivateType: 'lump'
-    }));
+    adapted.people = adapted.people.map(person => {
+      const {
+        ukPrivateAmountGbp, ukPrivateTakeAge, ukPrivateType, ...currentPerson
+      } = person;
+      return {
+        ...currentPerson,
+        salaryGrowthPct: person.salaryGrowthPct ?? 0,
+        ukStateAnnualGbp: person.ukStateAnnualGbp ?? 0,
+        ukStateStartAge: person.ukStateStartAge ?? 67,
+        ukStateIndexation:
+          person.ukStateIndexation === 'cpi' ? 'cpi' : 'frozen',
+        ukStateSurvivorPct: person.ukStateSurvivorPct ?? 0
+      };
+    });
     adapted.household = {
       ...adapted.household,
       firstDeath: {
@@ -1813,12 +1847,37 @@
             person.superAccessPct < 0 || person.superAccessPct > 100) {
           add(`people.${index}.superAccessPct`, 'Super access % must be between 0 and 100.');
         }
+        if (!finiteNonNegative(person.ukStateAnnualGbp)) {
+          add(`people.${index}.ukStateAnnualGbp`,
+            'Annual pension must be zero or greater.');
+        }
+        if (!Number.isFinite(person.ukStateStartAge) ||
+            person.ukStateStartAge < 55 || person.ukStateStartAge > 80) {
+          add(`people.${index}.ukStateStartAge`,
+            'Pension start age must be between 55 and 80.');
+        }
+        if (!['frozen', 'cpi'].includes(person.ukStateIndexation)) {
+          add(`people.${index}.ukStateIndexation`,
+            'Pension indexation must be fixed/frozen or CPI-indexed.');
+        }
         if (!Number.isFinite(person.ukStateSurvivorPct) ||
             person.ukStateSurvivorPct < 0 || person.ukStateSurvivorPct > 100) {
           add(`people.${index}.ukStateSurvivorPct`,
             'UK State Pension survivor % must be between 0 and 100.');
         }
       });
+    }
+    if (typeof scenario.assumptions?.ukPensionsEnabled !== 'boolean') {
+      add('assumptions.ukPensionsEnabled',
+        'Include pensions must be true or false.');
+    }
+    if (!(Number.isFinite(scenario.assumptions?.gbpAud) &&
+        scenario.assumptions.gbpAud > 0)) {
+      add('assumptions.gbpAud', 'GBP to AUD rate must be greater than zero.');
+    }
+    if (!Number.isFinite(scenario.assumptions?.uppPct) ||
+        scenario.assumptions.uppPct < 0 || scenario.assumptions.uppPct > 100) {
+      add('assumptions.uppPct', 'UPP deduction must be between 0 and 100.');
     }
     ['cash', 'savings'].forEach(key => {
       if (!scenario[key] || !finiteNonNegative(scenario[key].amount)) {
