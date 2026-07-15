@@ -104,6 +104,56 @@ assert.deepEqual(plain(monteCarloDemo.otherIncomes), []);
 assert.deepEqual(plain(monteCarloDemo.otherAssets), []);
 assert.deepEqual(plain(monteCarloDemo.lumpSumWithdrawals), []);
 
+const newOtherIncome = simulator.makeOtherIncome(2);
+assert.deepEqual(
+  plain({
+    label: newOtherIncome.label,
+    currency: newOtherIncome.currency,
+    fxToAud: newOtherIncome.fxToAud,
+    amount: newOtherIncome.amount,
+    taxable: newOtherIncome.taxable,
+    owner: newOtherIncome.owner,
+    survivorPct: newOtherIncome.survivorPct
+  }),
+  {
+    label: '', currency: 'AUD', fxToAud: 1, amount: 0,
+    taxable: true, owner: 'joint', survivorPct: 0
+  }
+);
+assert.match(newOtherIncome.id, /^income-/);
+
+const validOtherIncomeScenario = structuredClone(monteCarloDemo);
+validOtherIncomeScenario.otherIncomes = [{
+  id: 'rent', label: 'Rent', currency: 'GBP', fxToAud: 1.95,
+  amount: 10000, taxable: true, owner: 'p0', survivorPct: 50
+}];
+assert.ok(!simulator.validateScenario(validOtherIncomeScenario)
+  .some(error => error.path.startsWith('otherIncomes')));
+
+for (const [field, value] of [
+  ['label', ''],
+  ['currency', 'EUR'],
+  ['fxToAud', 0],
+  ['amount', -1],
+  ['taxable', 'yes'],
+  ['owner', 'invalid'],
+  ['survivorPct', -1],
+  ['survivorPct', 101]
+]) {
+  const invalid = structuredClone(validOtherIncomeScenario);
+  invalid.otherIncomes[0][field] = value;
+  assert.ok(
+    simulator.validateScenario(invalid)
+      .some(error => error.path === `otherIncomes.0.${field}`),
+    `Other income ${field}=${String(value)} should be rejected`
+  );
+}
+
+const missingOtherIncomeArray = structuredClone(monteCarloDemo);
+delete missingOtherIncomeArray.otherIncomes;
+assert.ok(simulator.validateScenario(missingOtherIncomeArray)
+  .some(error => error.path === 'otherIncomes'));
+
 const nativeSchema4 = structuredClone(monteCarloDemo);
 nativeSchema4.schemaVersion = 4;
 nativeSchema4.people.forEach(person => { delete person.salaryGrowthPct; });

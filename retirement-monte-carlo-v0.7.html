@@ -396,6 +396,7 @@
   'use strict';
   const SCHEMA_VERSION = 5;
   const VALID_OWNERS = new Set(['p0', 'p1', 'joint']);
+  const OTHER_CURRENCIES = new Set(['AUD', 'GBP', 'USD']);
   const DRAWDOWN_SOURCES = new Set(['p0Super', 'p1Super', 'cash', 'savings']);
   const TREASURY_INFLATION = Object.freeze({
     sourceDate: '2026-05-12',
@@ -732,6 +733,23 @@
         ukPensionsEnabled: true
       }
     };
+  }
+
+  function makeOtherIncome(index) {
+    return {
+      id: `income-${Date.now()}-${index}`,
+      label: '',
+      currency: 'AUD',
+      fxToAud: 1,
+      amount: 0,
+      taxable: true,
+      owner: 'joint',
+      survivorPct: 0
+    };
+  }
+
+  function otherItemFx(item) {
+    return item.currency === 'AUD' ? 1 : item.fxToAud;
   }
 
   function parseMoney(value) {
@@ -1743,6 +1761,38 @@
         add(`${key}.owner`, 'Owner must be Person 1, Person 2, or Joint 50/50.');
       }
     });
+    if (!Array.isArray(scenario.otherIncomes)) {
+      add('otherIncomes', 'Other incomes must be an array.');
+    } else {
+      scenario.otherIncomes.forEach((item, index) => {
+        const path = `otherIncomes.${index}`;
+        if (!item.label || typeof item.label !== 'string') {
+          add(`${path}.label`, 'Label is required.');
+        }
+        if (!OTHER_CURRENCIES.has(item.currency)) {
+          add(`${path}.currency`, 'Currency must be AUD, GBP, or USD.');
+        }
+        if (item.currency !== 'AUD' &&
+            !(Number.isFinite(item.fxToAud) && item.fxToAud > 0)) {
+          add(`${path}.fxToAud`, 'FX rate must be greater than zero.');
+        }
+        if (!finiteNonNegative(item.amount)) {
+          add(`${path}.amount`, 'Amount must be zero or greater.');
+        }
+        if (typeof item.taxable !== 'boolean') {
+          add(`${path}.taxable`, 'Taxable must be true or false.');
+        }
+        if (!['p0', 'p1', 'joint'].includes(item.owner)) {
+          add(`${path}.owner`,
+            'Tax owner must be Person 1, Person 2, or Joint 50/50.');
+        }
+        if (!Number.isFinite(item.survivorPct) ||
+            item.survivorPct < 0 || item.survivorPct > 100) {
+          add(`${path}.survivorPct`,
+            'Survivor % must be between 0 and 100.');
+        }
+      });
+    }
     if (!Array.isArray(scenario.shareholdings)) {
       add('shareholdings', 'Shareholdings must be an array.');
     } else {
@@ -1861,6 +1911,8 @@
   globalThis.RetirementSimulatorCore = { SCHEMA_VERSION };
   Object.assign(globalThis.RetirementSimulatorCore, {
     makeSampleScenario,
+    makeOtherIncome,
+    otherItemFx,
     validateScenario,
     parseMoney,
     formatMoney,
