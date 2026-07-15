@@ -188,9 +188,9 @@ assert.deepEqual(
 );
 
 for (const [label, mutate, pattern] of [
-  ['Other income', scenario => {
-    scenario.otherIncomes = [{ label: 'Rent', amount: 1000 }];
-  }, /cannot yet model populated Other income or Other assets/],
+  ['Other asset', scenario => {
+    scenario.otherAssets = [{ label: 'Property', amount: 1000 }];
+  }, /cannot yet model populated Other assets/],
   ['lump sum', scenario => {
     scenario.lumpSumWithdrawals = [{ enabled: true }];
   }, /cannot yet model lump-sum withdrawals/],
@@ -248,12 +248,18 @@ assert.equal(adaptedV1Scenario.schemaVersion, 5,
 assert.ok(adaptedV1Scenario.people.every(person => person.ukPrivateAmountGbp === 0),
   'v1.00 adapter should install inert legacy pension fields');
 
-const unsupportedV1Scenario = structuredClone(v1Scenario);
-unsupportedV1Scenario.otherIncomes = [{ label: 'Rental', amount: 1000 }];
-assert.throws(
-  () => simulator.importScenario(JSON.stringify(unsupportedV1Scenario)),
-  /cannot yet model populated Other income or Other assets/,
-  'unsupported v1.00 cash flows should be rejected rather than silently omitted'
+const supportedIncomeV1Scenario = structuredClone(v1Scenario);
+supportedIncomeV1Scenario.otherIncomes = [{
+  id: 'rental', label: 'Rental', currency: 'AUD', fxToAud: 1,
+  amount: 1000, taxable: true, owner: 'p0', survivorPct: 50
+}];
+const adaptedIncomeV1Scenario = simulator.importScenario(
+  JSON.stringify(supportedIncomeV1Scenario));
+assert.equal(adaptedIncomeV1Scenario.schemaVersion, 5);
+assert.deepEqual(
+  plain(adaptedIncomeV1Scenario.otherIncomes),
+  plain(supportedIncomeV1Scenario.otherIncomes),
+  'Other income should survive deterministic schema adaptation unchanged'
 );
 
 const activeSchema9 = structuredClone(v1Scenario);
@@ -358,10 +364,8 @@ assert.equal(
   'deterministic imports should retain the valid age-60 boundary'
 );
 for (const [label, mutate, pattern] of [
-  ['Other income', scenario => { scenario.otherIncomes = [{ label: 'Rent' }]; },
-    /cannot yet model populated Other income or Other assets/],
   ['Other asset', scenario => { scenario.otherAssets = [{ label: 'Property' }]; },
-    /cannot yet model populated Other income or Other assets/],
+    /cannot yet model populated Other assets/],
   ['lump sum', scenario => { scenario.lumpSumWithdrawals = [{ enabled: true }]; },
     /cannot yet model lump-sum withdrawals/],
   ['DB or UK pension', scenario => {
@@ -606,6 +610,34 @@ assert.equal(simulator.salaryForProjectionYear({
   inflationFactor: 1, alive: true
 }), 0);
 
+const incomeItems = [
+  { id: 'taxable', label: 'Rent', currency: 'GBP', fxToAud: 2,
+    amount: 1000, taxable: true, owner: 'p0', survivorPct: 25 },
+  { id: 'non-taxable', label: 'Support', currency: 'AUD', fxToAud: 1,
+    amount: 600, taxable: false, owner: 'joint', survivorPct: 100 }
+];
+const coupleIncomeFlows = simulator.otherIncomeFlows({
+  items: incomeItems,
+  inflationFactor: 1.1,
+  lifecycle: {
+    householdStatus: 'couple', survivorIndex: null, deceasedIndex: null
+  }
+});
+assert.deepEqual(plain(coupleIncomeFlows.taxableByPerson), [2200, 0]);
+assert.deepEqual(plain(coupleIncomeFlows.nonTaxableByPerson), [330, 330]);
+assert.equal(coupleIncomeFlows.taxableTotal, 2200);
+assert.equal(coupleIncomeFlows.nonTaxableTotal, 660);
+
+const survivorIncomeFlows = simulator.otherIncomeFlows({
+  items: incomeItems,
+  inflationFactor: 1,
+  lifecycle: {
+    householdStatus: 'survivor', survivorIndex: 1, deceasedIndex: 0
+  }
+});
+assert.deepEqual(plain(survivorIncomeFlows.taxableByPerson), [0, 500]);
+assert.deepEqual(plain(survivorIncomeFlows.nonTaxableByPerson), [0, 600]);
+
 const monteCarloSalaryParity = structuredClone(adaptedSchema10);
 monteCarloSalaryParity.assumptions.inflationMode = 'manual';
 monteCarloSalaryParity.assumptions.manualInflationPct = 0;
@@ -737,6 +769,149 @@ assert.ok(
   salaryStochasticA[0].projection.rows[1].components.workNet >
     noGrowthPaths[0].projection.rows[1].components.workNet,
   'positive salary growth must not be silently omitted from stochastic paths'
+);
+
+const parityOtherIncomes = [
+  { id: 'rent', label: 'Rent', currency: 'GBP', fxToAud: 2,
+    amount: 12000, taxable: true, owner: 'p0', survivorPct: 50 },
+  { id: 'support', label: 'Support', currency: 'USD', fxToAud: 1.5,
+    amount: 4000, taxable: false, owner: 'joint', survivorPct: 100 }
+];
+const monteCarloIncomeParity = structuredClone(adaptedSchema12);
+Object.assign(monteCarloIncomeParity.assumptions, {
+  inflationMode: 'manual', manualInflationPct: 2, ukPensionsEnabled: false
+});
+Object.assign(monteCarloIncomeParity.household, {
+  targetAfterTax: 30000, annualBudget: 30000, modelEndAge: 67,
+  includeAgePension: true, applyMinimumDrawdown: false,
+  firstDeath: {
+    enabled: true, deceasedPerson: 'p0', deathAge: 65,
+    survivorPreferredPct: 70, survivorEssentialPct: 70
+  }
+});
+monteCarloIncomeParity.cash = { amount: 0, interestPct: 0, owner: 'joint' };
+monteCarloIncomeParity.savings = {
+  amount: 200000, interestPct: 0, owner: 'joint'
+};
+monteCarloIncomeParity.shareholdings = [];
+monteCarloIncomeParity.otherIncomes = structuredClone(parityOtherIncomes);
+monteCarloIncomeParity.otherAssets = [];
+monteCarloIncomeParity.lumpSumWithdrawals = [];
+monteCarloIncomeParity.people.forEach((person, index) => Object.assign(person, {
+  age: index === 0 ? 64 : 62,
+  retireAge: index === 0 ? 64 : 62,
+  superAccessAge: 65,
+  salary: 0,
+  salaryGrowthPct: 0,
+  sgPct: 0,
+  accumulationReturnPct: 0,
+  retirementReturnPct: 0,
+  super: 0,
+  ukStateAnnualGbp: 0,
+  ukStateSurvivorPct: 0
+}));
+const incomePath = {
+  schemaVersion: 1,
+  years: Array.from(
+    { length: simulator.projectionYearCount(monteCarloIncomeParity) },
+    (_, index) => ({
+      year: monteCarloIncomeParity.startYear + index,
+      superAccumulationReturnPct: [0, 0],
+      superRetirementReturnPct: [0, 0]
+    })
+  )
+};
+const monteCarloIncomeRows = simulator.projectScenario(
+  monteCarloIncomeParity, incomePath).rows;
+
+const deterministicIncomeParity = deterministic.makeSampleScenario();
+Object.assign(deterministicIncomeParity.assumptions, {
+  inflationMode: 'manual', manualInflationPct: 2, ukPensionsEnabled: false
+});
+deterministicIncomeParity.household = structuredClone(
+  monteCarloIncomeParity.household);
+deterministicIncomeParity.cash = structuredClone(monteCarloIncomeParity.cash);
+deterministicIncomeParity.savings = structuredClone(
+  monteCarloIncomeParity.savings);
+deterministicIncomeParity.shareholdings = [];
+deterministicIncomeParity.otherIncomes = structuredClone(parityOtherIncomes);
+deterministicIncomeParity.otherAssets = [];
+deterministicIncomeParity.lumpSumWithdrawals = [];
+deterministicIncomeParity.people.forEach((person, index) => Object.assign(person, {
+  age: monteCarloIncomeParity.people[index].age,
+  retireAge: monteCarloIncomeParity.people[index].retireAge,
+  superAccessAge: 65,
+  salary: 0,
+  salaryGrowthPct: 0,
+  sgPct: 0,
+  accumulationReturnPct: 0,
+  retirementReturnPct: 0,
+  super: 0,
+  ukStateAnnualGbp: 0,
+  ukStateSurvivorPct: 0
+}));
+const deterministicIncomeRows = deterministic.projectScenario(
+  deterministicIncomeParity).rows;
+const otherIncomeParityShape = row => ({
+  year: row.year,
+  otherIncomeByPerson: row.otherIncomeByPerson.map(round6),
+  otherIncomeNet: round6(row.components.otherIncomeNet),
+  taxByPerson: row.taxByPerson.map(round6),
+  agePensionNet: round6(row.components.agePensionNet),
+  potDraw: round6(row.components.potDraw),
+  totalIncome: round6(row.totalIncome),
+  totalAssets: round6(row.totalAssets)
+});
+assert.deepEqual(
+  plain(monteCarloIncomeRows.map(otherIncomeParityShape)),
+  plain(deterministicIncomeRows.map(otherIncomeParityShape)),
+  'zero-volatility Other income should match deterministic ownership, tax, pension and funding'
+);
+
+const incomeStochasticA = core.simulatePaths({
+  scenario: monteCarloIncomeParity,
+  pathCount: 3,
+  seed: 97531,
+  profiles: salaryStochasticProfiles,
+  projectScenario: simulator.projectScenario
+});
+const incomeStochasticB = core.simulatePaths({
+  scenario: monteCarloIncomeParity,
+  pathCount: 3,
+  seed: 97531,
+  profiles: salaryStochasticProfiles,
+  projectScenario: simulator.projectScenario
+});
+const incomeStochasticShape = results => plain(results.map(result =>
+  result.projection.rows.map(row => ({
+    otherIncomeNet: row.components.otherIncomeNet,
+    totalIncome: row.totalIncome,
+    totalAssets: row.totalAssets
+  }))));
+assert.deepEqual(
+  incomeStochasticShape(incomeStochasticA),
+  incomeStochasticShape(incomeStochasticB),
+  'Other-income stochastic paths should remain seed-reproducible'
+);
+assert.ok(incomeStochasticA.every(result =>
+  result.engineError === null && result.projection.rows.every(row =>
+    Number.isFinite(row.totalIncome) && Number.isFinite(row.totalAssets) &&
+    row.totalAssets >= 0)),
+'Other-income stochastic paths should preserve accounting invariants');
+const noIncomeStochastic = structuredClone(monteCarloIncomeParity);
+noIncomeStochastic.otherIncomes = [];
+const noIncomePaths = core.simulatePaths({
+  scenario: noIncomeStochastic,
+  pathCount: 3,
+  seed: 97531,
+  profiles: salaryStochasticProfiles,
+  projectScenario: simulator.projectScenario
+});
+assert.ok(
+  incomeStochasticA[0].projection.rows[0].components.otherIncomeNet > 0 &&
+  incomeStochasticA[0].projection.rows[0].components.potDraw <
+    noIncomePaths[0].projection.rows[0].components.potDraw,
+  'Other income must contribute to funding rather than being silently omitted'
 );
 
 const deterministicFixedDeath = deterministic.makeSampleScenario();

@@ -505,6 +505,23 @@
     return Math.max(0, gross - offsets);
   }
 
+  function projectionNetTax({
+    taxableNominal,
+    rebateNominal,
+    inflationFactor,
+    year,
+    seniorEligible
+  }) {
+    const factor = inflationFactor > 0 ? inflationFactor : 1;
+    const taxableReal = taxableNominal / factor;
+    const rebateReal = rebateNominal / factor;
+    const grossReal = incomeTaxResident(taxableNominal, year) / factor +
+      medicareLevy(taxableReal, seniorEligible);
+    const offsetsReal = litoOffset(taxableNominal) / factor +
+      (seniorEligible ? saptoOffset(rebateReal) : 0);
+    return Math.max(0, grossReal - offsetsReal);
+  }
+
   function pensionRuleSet(status = 'couple') {
     const rules = SERVICES_AUSTRALIA_2026;
     return status === 'single'
@@ -880,8 +897,8 @@
     if (activeShareReturns) {
       throw new Error('Monte Carlo v0.7 cannot yet model v1.06 share price growth, dividends or franking. Set those fields to zero/off in a fictional copy before importing.');
     }
-    if ((scenario.otherIncomes ?? []).length || (scenario.otherAssets ?? []).length) {
-      throw new Error('Monte Carlo v0.7 cannot yet model populated Other income or Other assets. Remove them from a fictional copy before importing.');
+    if ((scenario.otherAssets ?? []).length) {
+      throw new Error('Monte Carlo v0.7 cannot yet model populated Other assets. Remove them from a fictional copy before importing.');
     }
     if ((scenario.lumpSumWithdrawals ?? []).some(item => item.enabled !== false)) {
       throw new Error('Monte Carlo v0.7 cannot yet model lump-sum withdrawals. Remove them from a fictional copy before importing.');
@@ -1352,6 +1369,31 @@
     return { rows, firstShortfall };
   }
 
+  function otherIncomeFlows({ items, inflationFactor, lifecycle }) {
+    const taxableByPerson = [0, 0];
+    const nonTaxableByPerson = [0, 0];
+    (items ?? []).forEach(item => {
+      let nominal = item.amount * otherItemFx(item) * inflationFactor;
+      let owner = item.owner;
+      if (lifecycle.householdStatus === 'survivor') {
+        const deceasedOwner = `p${lifecycle.deceasedIndex}`;
+        const survivorOwner = `p${lifecycle.survivorIndex}`;
+        if (owner === deceasedOwner) nominal *= item.survivorPct / 100;
+        owner = survivorOwner;
+      }
+      const target = item.taxable ? taxableByPerson : nonTaxableByPerson;
+      allocateOwnedAmount(nominal, owner).forEach((amount, index) => {
+        target[index] += amount;
+      });
+    });
+    return {
+      taxableByPerson,
+      nonTaxableByPerson,
+      taxableTotal: taxableByPerson.reduce((sum, amount) => sum + amount, 0),
+      nonTaxableTotal: nonTaxableByPerson.reduce((sum, amount) => sum + amount, 0)
+    };
+  }
+
   function salaryForProjectionYear({
     person, age, year, startYear, inflationFactor, alive = true
   }) {
@@ -1475,6 +1517,12 @@
       }
     }
 
+    const otherIncome = otherIncomeFlows({
+      items: scenario.otherIncomes,
+      inflationFactor,
+      lifecycle: state.lifecycle
+    });
+
     const cashInterest = state.cash * scenario.cash.interestPct / 100;
     const savingsInterest =
       openingSavings * scenario.savings.interestPct / 100 +
@@ -1509,6 +1557,7 @@
       salaries.reduce((sum, value) => sum + value, 0) / inflationFactor +
       ukState.reduce((sum, value) => sum + value, 0) / inflationFactor +
       ukPrivateAnnuity.reduce((sum, value) => sum + value, 0) / inflationFactor +
+      (otherIncome.taxableTotal + otherIncome.nonTaxableTotal) / inflationFactor +
       deemedIncome(assessableAssetsReal,
         state.lifecycle.householdStatus === 'survivor' ? 'single' : 'couple');
     const agePension = agePensionForHousehold({
@@ -1551,13 +1600,15 @@
       salaries[index] +
       (ukState[index] + ukPrivateAnnuity[index]) * (1 - uppRate) +
       agePensionByPersonNominal[index] +
+      otherIncome.taxableByPerson[index] +
       interestByPerson[index] +
       discountedGainByPerson[index]
     );
     const taxReal = taxableNominal.map((value, index) =>
-      state.lifecycle.alive[index] ? netTax({
-        taxableIncome: value / inflationFactor,
-        rebateIncome: value / inflationFactor,
+      state.lifecycle.alive[index] ? projectionNetTax({
+        taxableNominal: value,
+        rebateNominal: value,
+        inflationFactor,
         year,
         seniorEligible: ages[index] >= 67
       }) : 0
@@ -1568,11 +1619,12 @@
       if (!state.lifecycle.alive[index] ||
           !(discountedGainByPerson[index] > 0)) return sum;
       const withGain = taxReal[index];
-      const withoutGain = netTax({
-        taxableIncome:
-          (taxableNominal[index] - discountedGainByPerson[index]) / inflationFactor,
-        rebateIncome:
-          (taxableNominal[index] - discountedGainByPerson[index]) / inflationFactor,
+      const withoutGain = projectionNetTax({
+        taxableNominal:
+          taxableNominal[index] - discountedGainByPerson[index],
+        rebateNominal:
+          taxableNominal[index] - discountedGainByPerson[index],
+        inflationFactor,
         year,
         seniorEligible: ages[index] >= 67
       });
@@ -1583,13 +1635,14 @@
       salaries.reduce((sum, value) => sum + value, 0) +
       ukState.reduce((sum, value) => sum + value, 0) +
       ukPrivateAnnuity.reduce((sum, value) => sum + value, 0) +
+      otherIncome.taxableTotal +
       agePensionNominal;
     const taxableNetRatio = grossTaxableSources > 0
       ? Math.max(0, (grossTaxableSources - totalTaxNominal) / grossTaxableSources)
       : 1;
 
     const guaranteedNet =
-      grossTaxableSources - totalTaxNominal;
+      grossTaxableSources - totalTaxNominal + otherIncome.nonTaxableTotal;
     const mandatoryTotal =
       mandatoryDraws.reduce((sum, value) => sum + value, 0);
     const targetNominal = scenario.household.targetAfterTax * inflationFactor *
@@ -1659,6 +1712,9 @@
       ages: ages.map((age, index) => state.lifecycle.alive[index] ? age : null),
       rawAges: [...ages],
       lifecycle: { ...lifecycle, alive: [...lifecycle.alive] },
+      otherIncomeByPerson: [0, 1].map(index =>
+        (otherIncome.taxableByPerson[index] +
+          otherIncome.nonTaxableByPerson[index]) / inflationFactor),
       taxByPerson: taxReal.map(value => value),
       components: {
         workNet:
@@ -1670,6 +1726,9 @@
         ukPrivateAnnuityNet:
           ukPrivateAnnuity.reduce((sum, value) => sum + value, 0) *
           taxableNetRatio / inflationFactor,
+        otherIncomeNet:
+          (otherIncome.taxableTotal * taxableNetRatio +
+            otherIncome.nonTaxableTotal) / inflationFactor,
         agePensionNet:
           agePensionNominal * taxableNetRatio / inflationFactor,
         person0Super: superIncome[0] / inflationFactor,
@@ -1937,6 +1996,7 @@
     litoOffset,
     saptoOffset,
     netTax,
+    projectionNetTax,
     pensionRuleSet,
     deemedIncome,
     agePensionAssetsRate,
@@ -1964,6 +2024,7 @@
     projectionYearCount,
     validateAnnualPath,
     annualReturnsForYear,
+    otherIncomeFlows,
     salaryForProjectionYear,
     projectScenario
   });
