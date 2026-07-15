@@ -1,7 +1,7 @@
 # First-Death and Survivor-State Design
 
-**Date:** 2026-07-15  
-**Issue:** [#7 — Model first-death and survivor-state transitions](https://github.com/dcaddick/retirement-simulator/issues/7)  
+**Date:** 2026-07-15
+**Issue:** [#7 — Model first-death and survivor-state transitions](https://github.com/dcaddick/retirement-simulator/issues/7)
 **Target releases:** deterministic v1.08 / tag v1.0.8; Monte Carlo v0.7
 
 ## Purpose
