@@ -854,9 +854,6 @@
   }
 
   function assertExperimentalFeatureSupport(scenario) {
-    if (scenario.people?.some(person => Number(person.salaryGrowthPct) > 0)) {
-      throw new Error('Monte Carlo v0.7 cannot yet model above-inflation salary growth. Set it to 0% in a fictional copy before importing.');
-    }
     const activeShareReturns = (scenario.shareholdings ?? []).some(holding =>
       Number(holding.priceGrowthPct) !== 0 ||
       Number(holding.dividendYieldPct) !== 0 ||
@@ -1693,6 +1690,13 @@
         if (!finiteNonNegative(person.super)) {
           add(`people.${index}.super`, 'Super must be zero or greater.');
         }
+        if (!finiteNonNegative(person.salary)) {
+          add(`people.${index}.salary`, 'Salary must be zero or greater.');
+        }
+        if (!Number.isFinite(person.salaryGrowthPct) || person.salaryGrowthPct < 0) {
+          add(`people.${index}.salaryGrowthPct`,
+            'Salary growth above inflation must be zero or greater.');
+        }
         if (!finiteNonNegative(person.retireAge) || person.retireAge < person.age) {
           add(`people.${index}.retireAge`, 'Retirement age cannot be below current age.');
         }
@@ -2046,6 +2050,8 @@
       ${moneyField('Super now', `${path}.super`, person.super)}
       ${numberField('Retire age', `${path}.retireAge`, person.retireAge, 'min="0" max="120"')}
       ${moneyField('Salary', `${path}.salary`, person.salary)}
+      ${numberField('Salary growth above inflation %', `${path}.salaryGrowthPct`,
+        person.salaryGrowthPct ?? 0, 'min="0" step="0.1"')}
       ${numberField('SG %', `${path}.sgPct`, person.sgPct, 'min="0" max="30" step="0.1"')}
       ${numberField('Accumulation return %', `${path}.accumulationReturnPct`, person.accumulationReturnPct, 'min="-20" max="30" step="0.1"')}
       ${numberField('Retirement return %', `${path}.retirementReturnPct`, person.retirementReturnPct, 'min="-20" max="30" step="0.1"')}
@@ -4620,6 +4626,12 @@
         `Essential Budget ${firstDeath.survivorEssentialPct}%; single Age Pension ` +
         'rules apply immediately from the transition year.'
       : 'Fixed first-death scenario is off. Probabilistic mortality is not modelled.';
+    const salaryGrowthItems = activeScenario.people
+      .filter(person => Number(person.salaryGrowthPct) > 0)
+      .map(person => `${person.name} ${person.salaryGrowthPct}%`);
+    const salaryGrowthSentence = salaryGrowthItems.length
+      ? `<p><b>Salary growth above inflation:</b> ${escapeHtml(salaryGrowthItems.join('; '))}.</p>`
+      : '';
     document.querySelector('#assumptionsPanel').innerHTML = `
       <p>Scenario: ${escapeHtml(activeScenario.scenarioName ?? 'Imported scenario')} · schema ${escapeHtml(activeScenario.schemaVersion)}</p>
       <p>Config version: 3 · seed ${escapeHtml(seed)} · paths ${escapeHtml(pathCount)}.</p>
@@ -4629,6 +4641,7 @@
       <p><b>Stress assumption override:</b> ${escapeHtml(overrideSentence)}</p>
       <p><b>Risk mode:</b> ${escapeHtml(riskPolicy.label)}. ${escapeHtml(riskPolicy.detail)} Confidence target ${escapeHtml(formatPercent(riskPolicy.successThreshold))}; terminal reserve ${simulator.formatMoney(activeScenario.household.annualBudget * riskPolicy.terminalReserveYears)}.</p>
       <p><b>Survivor state:</b> ${escapeHtml(firstDeathSentence)}</p>
+      ${salaryGrowthSentence}
       <p>Break-point mode: ${escapeHtml(riskMode)} · budget sweep ${simulator.formatMoney(budgetRange.start)} to ${simulator.formatMoney(budgetRange.end)} by ${simulator.formatMoney(budgetRange.step)}.</p>
       <ul>${profileRows}</ul>
       <p>FX, salary, pension, tax and non-stressed savings assumptions are inherited from the imported deterministic scenario.</p>

@@ -164,6 +164,9 @@ assert.ok(html.includes(
   "numberField('Super access age', `${path}.superAccessAge`, person.superAccessAge, 'min=\"60\" max=\"120\"')"));
 assert.ok(html.includes(
   'The simulator treats super withdrawals as tax-free and does not model the additional tax rules that may apply before age 60.'));
+assert.ok(html.includes("numberField('Salary growth above inflation %'"));
+assert.ok(html.includes('salaryGrowthPct ?? 0'));
+assert.ok(html.includes('<b>Salary growth above inflation:</b>'));
 
 const v1Scenario = simulator.makeSampleScenario();
 v1Scenario.schemaVersion = 6;
@@ -209,17 +212,23 @@ const activeSchema10 = structuredClone(disabledSchema9);
 activeSchema10.schemaVersion = 10;
 activeSchema10.people[0].salaryGrowthPct = 1;
 activeSchema10.people[1].salaryGrowthPct = 0;
-assert.throws(
-  () => simulator.importScenario(JSON.stringify(activeSchema10)),
-  /cannot yet model above-inflation salary growth/,
-  'schema 10 active salary growth should be explicitly unsupported'
-);
-const zeroGrowthSchema10 = structuredClone(activeSchema10);
-zeroGrowthSchema10.people.forEach(person => { person.salaryGrowthPct = 0; });
-const adaptedSchema10 = simulator.importScenario(JSON.stringify(zeroGrowthSchema10));
+const adaptedSchema10 = simulator.importScenario(JSON.stringify(activeSchema10));
 assert.equal(adaptedSchema10.schemaVersion, 5);
-assert.ok(adaptedSchema10.people.every(person => person.salaryGrowthPct === 0),
-  'schema 10 zero salary growth should be preserved in native schema 5');
+assert.deepEqual(
+  adaptedSchema10.people.map(person => person.salaryGrowthPct),
+  [1, 0],
+  'schema 10 salary growth should survive deterministic adaptation'
+);
+
+for (const invalidGrowth of [-1, NaN, Infinity, 'abc']) {
+  const invalidSalaryGrowth = structuredClone(adaptedSchema10);
+  invalidSalaryGrowth.people[0].salaryGrowthPct = invalidGrowth;
+  assert.ok(
+    simulator.validateScenario(invalidSalaryGrowth)
+      .some(error => error.path === 'people.0.salaryGrowthPct'),
+    `salary growth ${String(invalidGrowth)} should be rejected`
+  );
+}
 
 const activeSchema11 = structuredClone(v1Scenario);
 activeSchema11.schemaVersion = 11;
