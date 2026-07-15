@@ -57,6 +57,7 @@
   .shareholding{border-top:1px solid var(--line);padding:7px 0}
   .shareholding summary{display:grid;grid-template-columns:1fr auto auto auto;gap:8px;cursor:pointer;color:var(--muted);font-size:11.5px}
   .shareholding-fields{padding:8px 0 2px}
+  .other-item{border-top:1px solid var(--line);padding:8px 0 2px}
   .validation-summary{color:var(--bad);font-size:11.5px;padding-left:20px}
   .validation-summary:empty{display:none}
   .assumptions{margin:12px 0;color:var(--muted);font-size:11.5px}
@@ -266,6 +267,13 @@
     <section class="group pot">
       <h3>Cash and savings</h3>
       <div id="cashSavingsFields" class="people-split"></div>
+    </section>
+    <section class="group" aria-labelledby="otherIncomeHeading">
+      <div class="section-heading">
+        <h3 id="otherIncomeHeading">Other income</h3>
+        <button type="button" id="addOtherIncome">Add income</button>
+      </div>
+      <div id="otherIncomeList"></div>
     </section>
     <section class="group share" aria-labelledby="shareholdingsHeading">
       <div class="section-heading">
@@ -2120,6 +2128,12 @@
     ).join('');
   }
 
+  function otherCurrencyOptions(selected) {
+    return ['AUD', 'GBP', 'USD'].map(currency =>
+      `<option value="${currency}"${currency === selected ? ' selected' : ''}>${currency}</option>`
+    ).join('');
+  }
+
   function ownerLabel(owner, people) {
     if (owner === 'p0') return people[0].name;
     if (owner === 'p1') return people[1].name;
@@ -2212,6 +2226,45 @@
         ${numberField('Interest rate %', 'savings.interestPct', scenario.savings.interestPct, 'min="0" max="30" step="0.1"')}
         ${ownerField('Owner', 'savings.owner', scenario.savings.owner, scenario.people)}
       </fieldset>`;
+  }
+
+  function otherIncomeFields(item, index) {
+    const path = `otherIncomes.${index}`;
+    return `<div class="other-item" data-other-id="${escapeHtml(item.id)}">
+      <label><span class="k">Label</span>
+        <input data-path="${path}.label" value="${escapeHtml(item.label)}"
+          placeholder="e.g. Rental income">
+      </label>
+      <label><span class="k">Currency</span>
+        <select data-path="${path}.currency" class="other-currency"
+          data-index="${index}">${otherCurrencyOptions(item.currency)}</select>
+      </label>
+      <label${item.currency === 'AUD' ? ' hidden' : ''}>
+        <span class="k">FX to AUD</span>
+        <input type="number" min="0" step="0.0001" data-value-type="number"
+          data-path="${path}.fxToAud" value="${item.fxToAud}">
+      </label>
+      ${moneyField('Amount per year', `${path}.amount`, item.amount, item.currency)}
+      <label><span class="k">Taxable income</span>
+        <input type="checkbox" data-path="${path}.taxable"${item.taxable ? ' checked' : ''}>
+      </label>
+      <label><span class="k">Income owner</span>
+        <select data-path="${path}.owner">
+          ${ownerOptions(item.owner, currentScenario.people)}
+        </select>
+      </label>
+      ${numberField('Paid to survivor %', `${path}.survivorPct`,
+        item.survivorPct, 'min="0" max="100" step="5"')}
+      <button type="button" class="remove-other-income" data-index="${index}">
+        Remove income
+      </button>
+    </div>`;
+  }
+
+  function renderOtherIncomes(items) {
+    $('#otherIncomeList').innerHTML = items.length
+      ? items.map(otherIncomeFields).join('')
+      : '<p class="sub">No other income added.</p>';
   }
 
   function shareholdingFields(holding, index, people) {
@@ -2897,6 +2950,7 @@
     $('#scenarioName').value = currentScenario.scenarioName;
     renderPeople(currentScenario.people);
     renderCashAndSavings(currentScenario);
+    renderOtherIncomes(currentScenario.otherIncomes);
     renderShareholdings(currentScenario.shareholdings, currentScenario.people);
     renderUkPensions(currentScenario.people, currentScenario.assumptions);
     renderHousehold(currentScenario.household, currentScenario.assumptions, currentScenario.people);
@@ -2911,6 +2965,24 @@
         ...scenario.shareholdings,
         core.makeShareholding(scenario.shareholdings.length)
       ]
+    };
+  }
+
+  function addOtherIncome(scenario) {
+    return {
+      ...scenario,
+      otherIncomes: [
+        ...(scenario.otherIncomes ?? []),
+        core.makeOtherIncome((scenario.otherIncomes ?? []).length)
+      ]
+    };
+  }
+
+  function removeOtherIncome(scenario, index) {
+    return {
+      ...scenario,
+      otherIncomes: (scenario.otherIncomes ?? []).filter(
+        (_, itemIndex) => itemIndex !== index)
     };
   }
 
@@ -3082,6 +3154,24 @@
     renderShareholdings(currentScenario.shareholdings, currentScenario.people);
     bindMoneyInputs();
     showValidation(core.validateScenario(currentScenario));
+  });
+
+  $('#addOtherIncome').addEventListener('click', () => {
+    currentScenario = addOtherIncome(currentScenario);
+    renderOtherIncomes(currentScenario.otherIncomes);
+    bindMoneyInputs();
+    showValidation(core.validateScenario(currentScenario));
+    scheduleSave(currentScenario);
+  });
+
+  $('#otherIncomeList').addEventListener('click', event => {
+    const removeButton = event.target.closest('.remove-other-income');
+    if (!removeButton) return;
+    if (!confirm('Remove this Other income?')) return;
+    currentScenario = removeOtherIncome(
+      currentScenario, Number(removeButton.dataset.index));
+    renderScenario(currentScenario);
+    scheduleSave(currentScenario);
   });
 
   function refreshAfterTierChange() {
@@ -4765,6 +4855,13 @@
     const salaryGrowthSentence = salaryGrowthItems.length
       ? `<p><b>Salary growth above inflation:</b> ${escapeHtml(salaryGrowthItems.join('; '))}.</p>`
       : '';
+    const otherIncomeItems = (activeScenario.otherIncomes ?? []).map(item =>
+      `${item.label}: ${simulator.formatMoney(
+        item.amount * simulator.otherItemFx(item))} per year`);
+    const otherIncomeSentence = otherIncomeItems.length
+      ? `<p><b>Other income:</b> ${escapeHtml(otherIncomeItems.join('; '))}. ` +
+        'Amounts are CPI-indexed and included in the Age Pension income assessment.</p>'
+      : '';
     document.querySelector('#assumptionsPanel').innerHTML = `
       <p>Scenario: ${escapeHtml(activeScenario.scenarioName ?? 'Imported scenario')} · schema ${escapeHtml(activeScenario.schemaVersion)}</p>
       <p>Config version: 3 · seed ${escapeHtml(seed)} · paths ${escapeHtml(pathCount)}.</p>
@@ -4775,6 +4872,7 @@
       <p><b>Risk mode:</b> ${escapeHtml(riskPolicy.label)}. ${escapeHtml(riskPolicy.detail)} Confidence target ${escapeHtml(formatPercent(riskPolicy.successThreshold))}; terminal reserve ${simulator.formatMoney(activeScenario.household.annualBudget * riskPolicy.terminalReserveYears)}.</p>
       <p><b>Survivor state:</b> ${escapeHtml(firstDeathSentence)}</p>
       ${salaryGrowthSentence}
+      ${otherIncomeSentence}
       <p>Break-point mode: ${escapeHtml(riskMode)} · budget sweep ${simulator.formatMoney(budgetRange.start)} to ${simulator.formatMoney(budgetRange.end)} by ${simulator.formatMoney(budgetRange.step)}.</p>
       <ul>${profileRows}</ul>
       <p>FX, salary, pension, tax and non-stressed savings assumptions are inherited from the imported deterministic scenario.</p>

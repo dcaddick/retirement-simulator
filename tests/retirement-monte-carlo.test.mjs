@@ -232,6 +232,22 @@ assert.ok(html.includes(
 assert.ok(html.includes("numberField('Salary growth above inflation %'"));
 assert.ok(html.includes('salaryGrowthPct ?? 0'));
 assert.ok(html.includes('<b>Salary growth above inflation:</b>'));
+for (const contract of [
+  'id="addOtherIncome"',
+  'id="otherIncomeList"',
+  'data-path="${path}.label"',
+  'data-path="${path}.currency"',
+  'data-path="${path}.fxToAud"',
+  "moneyField('Amount per year'",
+  'data-path="${path}.taxable"',
+  'data-path="${path}.owner"',
+  'Paid to survivor %',
+  'class="remove-other-income"',
+  '<b>Other income:</b>',
+  'CPI-indexed and included in the Age Pension income assessment'
+]) {
+  assert.ok(html.includes(contract), `missing Other income UI contract: ${contract}`);
+}
 
 const v1Scenario = simulator.makeSampleScenario();
 v1Scenario.schemaVersion = 6;
