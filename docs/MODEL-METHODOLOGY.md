@@ -94,6 +94,8 @@ The unreleased schema-5 core supports above-inflation salary growth using the de
 
 Other income is converted to AUD, CPI-indexed, allocated to person-level taxable or non-taxable ledgers, included in the Age Pension income test and continued after first death using the configured survivor continuation percentage. Zero-volatility tests compare the resulting tax, pension, drawdown and assets with the deterministic engine.
 
+Defined Benefit/UK Pension parity separates each gross pension flow from its UPP-adjusted taxable flow. Start age, fixed or CPI indexation, currency conversion, the include toggle and first-death survivor continuation follow the deterministic contract in every path.
+
 The reported success rate is conditional on the selected model and assumptions. It is not a personal forecast. The model does not make every material retirement risk stochastic, and deterministic stresses do not alter the Monte Carlo probability denominator.
 
 ## Important exclusions
