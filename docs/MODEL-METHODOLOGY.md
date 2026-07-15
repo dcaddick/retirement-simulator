@@ -90,6 +90,8 @@ The companion report imports a validated scenario and applies synthetic investme
 
 Monte Carlo v0.7 accepts the standard fictional sample and scenarios using the fields its experimental engine supports. It uses the same Age Pension eligibility boundary, survivor-state transition and person-level tax allocation as the deterministic simulator. An enabled first-death event is fixed at the selected age and start-of-year boundary in every Monte Carlo path; mortality itself is not stochastic. It rejects, with a visible explanation, imports containing populated Other income/Other assets, active Defined Benefit/UK Pension income, active lump sums, or active v1.06 share growth, dividend or franking assumptions; it does not silently discard those cash flows.
 
+The unreleased schema-5 core supports above-inflation salary growth using the deterministic year-by-year formula. The remaining import guards stay explicit until their separate parity slices are complete.
+
 The reported success rate is conditional on the selected model and assumptions. It is not a personal forecast. The model does not make every material retirement risk stochastic, and deterministic stresses do not alter the Monte Carlo probability denominator.
 
 ## Important exclusions

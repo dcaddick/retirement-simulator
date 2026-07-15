@@ -10,6 +10,12 @@ const deterministicHtml = await readFile(
   new URL('../retirement-simulator.html', import.meta.url),
   'utf8'
 );
+const readme = await readFile(new URL('../README.md', import.meta.url), 'utf8');
+const methodology = await readFile(
+  new URL('../docs/MODEL-METHODOLOGY.md', import.meta.url), 'utf8');
+const testingGuide = await readFile(
+  new URL('../docs/TESTING.md', import.meta.url), 'utf8');
+const changelog = await readFile(new URL('../CHANGELOG.md', import.meta.url), 'utf8');
 
 assert.match(
   html,
@@ -38,6 +44,15 @@ assert.match(html, /Family Retirement Monte Carlo Report v0\.7/,
   'Monte Carlo title should identify v0.7');
 assert.match(html, /<span class="version">v0\.7<\/span>/,
   'Monte Carlo heading should identify v0.7');
+assert.ok(readme.includes('schema 5') && readme.includes('salary-growth parity'));
+assert.ok(methodology.includes('above-inflation salary growth') &&
+  methodology.includes('remaining import guards'));
+assert.ok(testingGuide.includes('schema-4 to schema-5 migration') &&
+  testingGuide.includes('salary-growth parity'));
+assert.ok(changelog.includes('Monte Carlo schema 5') &&
+  changelog.includes('salary-growth parity'));
+assert.ok(readme.includes('experimental') && html.includes('experimental'),
+  'salary parity must not remove the experimental label');
 assert.ok(
   html.includes("const STORAGE_KEY = 'family-retirement-simulator:v0.7:scenario'") &&
   html.includes("'family-retirement-simulator:v0.6:scenario'"),
