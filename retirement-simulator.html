@@ -4,7 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src https://api.frankfurter.app https://stooq.com; base-uri 'none'; form-action 'none'" />
-<title>Family Retirement Income Simulator v1.07</title>
+<title>Family Retirement Income Simulator v1.08</title>
 <style>
   :root{
     --bg:#0f1720; --panel:#18232f; --panel2:#1e2c3a; --line:#2b3d4f;
@@ -66,6 +66,7 @@
   .section-heading h3{margin-bottom:0}
   .shareholding{border-top:1px solid var(--line);padding:7px 0}
   .other-item,.lump-item{border-top:1px solid var(--line);padding:7px 0}
+  .survivor-fields{margin:5px 0 9px;padding:6px 0 4px;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
   .lump-summary{display:grid;grid-template-columns:44px minmax(48px,auto) minmax(45px,1fr) minmax(62px,auto) 44px;align-items:center;gap:2px}
   .lump-chevron,.lump-summary-enabled{min-width:44px;min-height:44px;display:grid;place-items:center}
   .lump-chevron{padding:0;background:transparent;border-color:transparent;font-size:19px;transition:transform .15s ease}
@@ -189,7 +190,7 @@
 <div class="disclaimer-banner top" role="note">Local, reproducible retirement-risk analysis. Estimate only; not financial or tax advice.</div>
 <header>
   <div class="header-row">
-  <h1>Family Retirement Income Simulator <span class="version">v1.07</span></h1>
+  <h1>Family Retirement Income Simulator <span class="version">v1.08</span></h1>
   <nav class="header-actions" aria-label="Scenario actions">
     <button type="button" id="newScenario">New</button>
     <button type="button" id="resetSample">Reset sample</button>
@@ -348,12 +349,12 @@
           <ul id="sourceList"></ul>
           <ul id="limitationsList">
             <li>Annual projection rows; retirement and pension starts use whole ages.</li>
-            <li>Age Pension estimate assumes a homeowner couple and excludes the principal residence. Combined couple income and asset tests apply; when only one partner has reached age 67, the estimate pays half of the means-tested combined couple rate.</li>
+            <li>Age Pension estimate assumes homeowners and excludes the principal residence. Couple tests apply before first death; the configured survivor uses the single-person income, asset, deeming and CSHC thresholds immediately from the transition year.</li>
             <li>Nominal share-price growth is applied before dividends and sales; cost base stays unchanged. Dividend yield excludes price growth and is prorated by months held.</li>
             <li>Dividends and optional franking credits follow ownership. Eligibility is a user assumption; integrity rules are not automated.</li>
             <li>Capital losses are tracked per person, applied before discounts and carried forward from a zero opening balance. CGT is funded from assets and never counts as retirement income.</li>
-            <li>Survival is illustrative and does not change household cash flows or model a survivor state.</li>
-            <li>Other income is CPI-indexed. Taxable items follow the selected owner; non-taxable items remain household cash flow. Other assets count in the Age Pension assets test but are not deemed, and no CGT is modelled on their disposal.</li>
+            <li>The survival band remains illustrative. The optional first-death scenario is a separate fixed event at the start of the selected year; it is not a mortality simulation and includes no bereavement payment.</li>
+            <li>Other income is CPI-indexed. Ownership controls tax allocation and survivor continuation; deceased-owned income continues at its entered percentage, while joint and survivor-owned income continue in full. Other assets count in the Age Pension assets test but are not deemed, and no CGT is modelled on their disposal.</li>
             <li>Early super access is simplified, not full Transition-to-Retirement (TTR). There is no 10%-of-balance annual payment cap, no commutation restriction, and no automatic cessation rule. Tax treatment assumes the member is over 60, where TTR and full retirement-phase withdrawals are both tax-free; the model will misstate results for anyone under 60 drawing super while still working.</li>
           </ul>
         </div>
@@ -412,7 +413,7 @@
       </details>
     </div>
     <div class="note">
-      <b>v1.07.</b> Fictional Australian couple sample data is stored locally on this device and can be imported or exported as JSON. Calculations are transparent estimates and are not financial or tax advice. The Display toggle switches the whole dashboard &mdash; table, chart and headline figures &mdash; between today&rsquo;s dollars and nominal (future) dollars, except the CSHC estimate which stays in today&rsquo;s dollars against its fixed threshold. Numeric inputs recalculate live as you type without moving your modelling position; the &ldquo;Recalculated&rdquo; stamp above the table confirms each run.
+      <b>v1.08.</b> Fictional Australian couple sample data is stored locally on this device and can be imported or exported as JSON. Calculations are transparent estimates and are not financial or tax advice. The Display toggle switches the whole dashboard &mdash; table, chart and headline figures &mdash; between today&rsquo;s dollars and nominal (future) dollars, except the CSHC estimate which stays in today&rsquo;s dollars against its fixed threshold. Numeric inputs recalculate live as you type without moving your modelling position; the &ldquo;Recalculated&rdquo; stamp above the table confirms each run.
     </div>
   </div>
 </div>
@@ -2329,10 +2330,14 @@
     if (!(scenario.household?.annualBudget >= 0)) {
       add('household.annualBudget', 'Essential Annual Budget must be zero or greater.');
     }
-    if (!(scenario.household?.modelEndAge >= scenario.people?.[0]?.age)) {
-      add('household.modelEndAge', 'Model end age cannot be below Person 1 current age.');
-    }
     const firstDeath = scenario.household?.firstDeath;
+    const horizonIndex = firstDeath?.enabled
+      ? 1 - (firstDeath.deceasedPerson === 'p1' ? 1 : 0) : 0;
+    if (!(scenario.household?.modelEndAge >= scenario.people?.[horizonIndex]?.age)) {
+      add('household.modelEndAge', firstDeath?.enabled
+        ? 'Model end age cannot be below the survivor current age.'
+        : 'Model end age cannot be below Person 1 current age.');
+    }
     if (!firstDeath || typeof firstDeath.enabled !== 'boolean') {
       add('household.firstDeath.enabled',
         'First-death inclusion must be true or false.');
@@ -2400,7 +2405,8 @@
       add('assumptions.manualInflationPct',
         'Manual inflation % must be between 0 and 20.');
     }
-    const horizonEnd = scenario.startYear + scenario.household.modelEndAge - scenario.people[0].age;
+    const horizonEnd = scenario.startYear + scenario.household.modelEndAge -
+      scenario.people[horizonIndex].age;
     const validLumpSources = new Set(['automatic', ...DRAWDOWN_SOURCES,
       ...scenario.shareholdings.map(item => `share:${item.id}`),
       ...(scenario.otherAssets ?? []).map(item => `asset:${item.id}`)]);
@@ -2434,7 +2440,8 @@
   }
 
   function chartTooltipLines(segment, row, scenario) {
-    const context = `${row.year} · ages ${row.ages[0]} and ${row.ages[1]}`;
+    const ages = row.ages.map(age => age ?? '—');
+    const context = `${row.year} · ages ${ages[0]} and ${ages[1]}`;
     if (segment.key === 'lumpSum') {
       const detail = row.events.filter(event => event.type === 'lump-sum')
         .map(event => `${formatMoney(event.amount)} for ${event.reason} from ${sourceSummary(event.drawsBySource, scenario.people)}`)
@@ -2534,11 +2541,12 @@
   'use strict';
 
   const core = globalThis.RetirementSimulatorCore;
-  const STORAGE_KEY = 'family-retirement-simulator:v1.07:scenario';
+  const STORAGE_KEY = 'family-retirement-simulator:v1.08:scenario';
   const THEME_STORAGE_KEY = 'retirement-simulator-theme';
   // Read-only fallbacks so scenarios saved under earlier versions carry over
   // on first load (they migrate to the current schema automatically).
   const LEGACY_STORAGE_KEYS = [
+    'family-retirement-simulator:v1.07:scenario',
     'family-retirement-simulator:v1.06:scenario',
     'family-retirement-simulator:v1.05:scenario',
     'family-retirement-simulator:v1.04:scenario',
@@ -2840,6 +2848,10 @@
   }
 
   function renderLumpSums(scenario) {
+    const horizonIndex = scenario.household.firstDeath.enabled
+      ? 1 - (scenario.household.firstDeath.deceasedPerson === 'p1' ? 1 : 0) : 0;
+    const horizonYear = scenario.startYear + scenario.household.modelEndAge -
+      scenario.people[horizonIndex].age;
     const latestFirst = (scenario.lumpSumWithdrawals ?? [])
       .map((item, index) => ({ item, index }))
       .sort((a, b) => b.item.year - a.item.year || a.index - b.index);
@@ -2860,7 +2872,7 @@
           <div class="lump-grid">
           ${moneyField('Amount', `lumpSumWithdrawals.${index}.amount`, item.amount)}
           <label><span class="k">Reason</span><input data-path="lumpSumWithdrawals.${index}.reason" value="${escapeHtml(item.reason)}"></label>
-          <label><span class="k">Intended Date</span><span class="two"><select data-path="lumpSumWithdrawals.${index}.month" data-value-type="number" aria-label="Intended month">${monthOptions(item.month)}</select><input type="number" data-path="lumpSumWithdrawals.${index}.year" data-value-type="number" aria-label="Intended year" value="${item.year}" min="${scenario.startYear}" max="${scenario.startYear + scenario.household.modelEndAge - scenario.people[0].age}" step="1"></span></label>
+          <label><span class="k">Intended Date</span><span class="two"><select data-path="lumpSumWithdrawals.${index}.month" data-value-type="number" aria-label="Intended month">${monthOptions(item.month)}</select><input type="number" data-path="lumpSumWithdrawals.${index}.year" data-value-type="number" aria-label="Intended year" value="${item.year}" min="${scenario.startYear}" max="${horizonYear}" step="1"></span></label>
           <label><span class="k">Fund from</span><select data-path="lumpSumWithdrawals.${index}.source">${lumpSourceOptions(item.source, scenario)}</select></label>
           </div>
           <div class="lump-footer">
@@ -2973,6 +2985,7 @@
     return `<legend>${escapeHtml(person.name)}</legend>
       ${moneyField(`${stateLabel} annual`, `${path}.ukStateAnnualGbp`, person.ukStateAnnualGbp, currency)}
       ${numberField(`${stateLabel} start age`, `${path}.ukStateStartAge`, person.ukStateStartAge, 'min="55" max="80"')}
+      ${numberField('Paid to survivor %', `${path}.ukStateSurvivorPct`, person.ukStateSurvivorPct, 'min="0" max="100" step="5"')}
       <label><span class="k">${escapeHtml(stateLabel)} indexation</span>
         <select data-path="${path}.ukStateIndexation">
           <option value="frozen"${person.ukStateIndexation !== 'cpi' ? ' selected' : ''}>${dbMode ? 'Fixed nominal amount' : 'Frozen (AU resident, no uprating)'}</option>
@@ -3026,11 +3039,12 @@
       <label><span class="k">Taxable income</span>
         <input type="checkbox" data-path="${path}.taxable"${item.taxable ? ' checked' : ''}>
       </label>
-      <label><span class="k">Tax owner</span>
-        <select data-path="${path}.owner"${item.taxable ? '' : ' disabled'}>
+      <label><span class="k">Income owner</span>
+        <select data-path="${path}.owner">
           ${ownerOptions(item.owner, currentScenario.people)}
         </select>
       </label>
+      ${numberField('Paid to survivor %', `${path}.survivorPct`, item.survivorPct, 'min="0" max="100" step="5"')}
       <button type="button" class="remove-other" data-kind="otherIncomes" data-index="${index}">Remove income</button>
     </div>`;
   }
@@ -3118,10 +3132,14 @@
   }
 
   function renderHousehold(household, assumptions, people) {
+    const firstDeath = household.firstDeath;
+    const deathPersonIndex = firstDeath.deceasedPerson === 'p1' ? 1 : 0;
+    const horizonLabel = firstDeath.enabled
+      ? 'Model to survivor age' : 'Model to Person 1 age';
     $('#householdFields').innerHTML = `
       ${moneyField('Preferred Retirement Income', 'household.targetAfterTax', household.targetAfterTax)}
       ${moneyField('Essential Annual Budget', 'household.annualBudget', household.annualBudget)}
-      ${numberField('Model to Person 1 age', 'household.modelEndAge', household.modelEndAge, 'min="65" max="120"')}
+      ${numberField(horizonLabel, 'household.modelEndAge', household.modelEndAge, 'min="65" max="120"')}
       <label><span class="k">Apply ABP minimum drawdown</span>
         <input type="checkbox" data-path="household.applyMinimumDrawdown"${household.applyMinimumDrawdown ? ' checked' : ''}>
       </label>
@@ -3131,6 +3149,23 @@
       <label><span class="k">Show illustrative survival band</span>
         <input type="checkbox" data-path="household.showSurvival"${household.showSurvival ? ' checked' : ''}>
       </label>
+      <h4>First-death scenario</h4>
+      <label><span class="k">Model first death</span>
+        <input type="checkbox" data-path="household.firstDeath.enabled"${firstDeath.enabled ? ' checked' : ''}>
+      </label>
+      <div class="survivor-fields"${firstDeath.enabled ? '' : ' hidden'}>
+        <label><span class="k">Person who dies first</span>
+          <select data-path="household.firstDeath.deceasedPerson">
+            <option value="p0"${firstDeath.deceasedPerson === 'p0' ? ' selected' : ''}>${escapeHtml(people[0].name)}</option>
+            <option value="p1"${firstDeath.deceasedPerson === 'p1' ? ' selected' : ''}>${escapeHtml(people[1].name)}</option>
+          </select>
+        </label>
+        ${numberField('Death age', 'household.firstDeath.deathAge', firstDeath.deathAge,
+          `min="${people[deathPersonIndex].age + 1}" max="${household.modelEndAge}" step="1"`)}
+        ${numberField('Survivor Preferred Income %', 'household.firstDeath.survivorPreferredPct', firstDeath.survivorPreferredPct, 'min="0" max="100" step="5"')}
+        ${numberField('Survivor Essential Budget %', 'household.firstDeath.survivorEssentialPct', firstDeath.survivorEssentialPct, 'min="0" max="100" step="5"')}
+        <p class="sub">The transition occurs at the start of the selected year. Assets transfer immediately and survivor income rules apply from that row.</p>
+      </div>
       <h4>Drawdown order</h4>
       ${drawdownPriorityFields(household.drawdownPriority, people)}`;
   }
@@ -3373,6 +3408,30 @@
     ctx.restore();
   }
 
+  function drawFirstDeathMarker(ctx, rows, xScale, top, bottom) {
+    const transitionIndex = rows.findIndex(row =>
+      row.lifecycle?.transitionedThisYear);
+    if (transitionIndex < 0) return;
+    const x = xScale(transitionIndex);
+    ctx.save();
+    ctx.strokeStyle = getComputedStyle(document.documentElement)
+      .getPropertyValue('--warn').trim();
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([5, 3]);
+    ctx.beginPath();
+    ctx.moveTo(x, top);
+    ctx.lineTo(x, bottom);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = getComputedStyle(document.documentElement)
+      .getPropertyValue('--warn').trim();
+    ctx.font = '10px Segoe UI, sans-serif';
+    ctx.textAlign = x > ctx.canvas.width * 0.72 ? 'right' : 'left';
+    ctx.textBaseline = 'top';
+    ctx.fillText('First death', x + (ctx.textAlign === 'right' ? -4 : 4), top + 3);
+    ctx.restore();
+  }
+
   function drawIncomeChart(rows, scenario) {
     const { ctx, width, height } = prepareChart();
     const pads = { left: 54, right: 18, top: 18, bottom: scenario.household.showSurvival ? 58 : 34 };
@@ -3380,8 +3439,8 @@
     const plotHeight = height - pads.top - pads.bottom;
     const endFactor = displayFactor(rows.at(-1));
     const maximum = Math.max(
-      scenario.household.targetAfterTax * endFactor,
-      (scenario.household.annualBudget ?? 0) * endFactor,
+      ...rows.map(row => row.target * displayFactor(row)),
+      ...rows.map(row => row.budget * displayFactor(row)),
       ...rows.map(row => (row.totalIncome + (row.lumpSumTotal || 0)) * displayFactor(row))
     ) * 1.12 || 1;
     chartState.balance = null;
@@ -3433,49 +3492,54 @@
           height: blockHeight, rowIndex, year: row.year, ages: row.ages,
           key: 'lumpSum', label: 'Lump sum withdrawal', value: lumpValue, displayFactor: factor });
       }
-      if (row.ages[0] % 5 === 0) {
+      const displayAge = row.ages.find(age => age !== null);
+      if (displayAge % 5 === 0) {
         ctx.fillStyle = '#9FB0C0';
         ctx.font = '10px Segoe UI, sans-serif';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'top';
-        ctx.fillText(String(row.ages[0]), barX + barWidth / 2, height - pads.bottom + 7);
+        ctx.fillText(String(displayAge), barX + barWidth / 2, height - pads.bottom + 7);
       }
     });
 
     // In nominal mode the preferred-income and essential-budget lines rise with inflation, so both
     // are drawn as per-year paths (flat in today's-dollars mode).
-    const drawReferenceLine = (value, colour, dash) => {
+    const drawReferenceLine = (valueForRow, colour, dash) => {
       ctx.strokeStyle = colour;
       ctx.lineWidth = 1.5;
       ctx.setLineDash(dash);
       ctx.beginPath();
+      let previousY = null;
       rows.forEach((row, rowIndex) => {
-        const lineY = y(value * displayFactor(row));
-        const lineX = rowIndex === rows.length - 1
-          ? width - pads.right
-          : pads.left + rowIndex * step + step / 2;
+        const lineY = y(valueForRow(row) * displayFactor(row));
+        const lineX = pads.left + rowIndex * step + step / 2;
         if (rowIndex === 0) ctx.moveTo(pads.left, lineY);
+        else if (Math.abs(lineY - previousY) > 0.01) ctx.lineTo(lineX, previousY);
         ctx.lineTo(lineX, lineY);
+        previousY = lineY;
       });
+      ctx.lineTo(width - pads.right, previousY);
       ctx.stroke();
       ctx.setLineDash([]);
-      return y(value * displayFactor(rows.at(-1)));
+      return y(valueForRow(rows.at(-1)) * displayFactor(rows.at(-1)));
     };
     const targetEndY = drawReferenceLine(
-      scenario.household.targetAfterTax, TARGET_COLOUR, [5, 4]);
+      row => row.target, TARGET_COLOUR, [5, 4]);
     ctx.fillStyle = TARGET_COLOUR;
     ctx.font = '10px Segoe UI, sans-serif';
     ctx.textAlign = 'right';
     ctx.textBaseline = 'bottom';
     ctx.fillText('Preferred', width - pads.right, targetEndY - 3);
 
-    const budgetValue = scenario.household.annualBudget ?? scenario.household.targetAfterTax;
-    drawReferenceLine(budgetValue, BUDGET_COLOUR, [2, 3]);
-    const budgetStartY = y(budgetValue * displayFactor(rows[0]));
+    drawReferenceLine(row => row.budget, BUDGET_COLOUR, [2, 3]);
+    const budgetStartY = y(rows[0].budget * displayFactor(rows[0]));
     ctx.fillStyle = BUDGET_COLOUR;
     ctx.textAlign = 'left';
     ctx.textBaseline = 'bottom';
     ctx.fillText('Essential budget', pads.left + 4, budgetStartY - 3);
+
+    drawFirstDeathMarker(
+      ctx, rows, x, pads.top, height - pads.bottom);
 
     const lumpLegend = rows.some(row => (row.lumpSumTotal || 0) > 0)
       ? `<span><i style="background:${getComputedStyle(document.documentElement).getPropertyValue('--chart-lump').trim()}"></i>Lump sum withdrawal</span>`
@@ -3494,7 +3558,7 @@
 
   function drawBalanceEventMarkers(ctx, rows, xScale, chartBottom) {
     rows.forEach(row => {
-      if (!row.events.length) return;
+      if (!row.events.some(event => event.type !== 'first-death')) return;
       const x = xScale(row.year);
       ctx.strokeStyle = '#F0C571';
       ctx.setLineDash([3, 3]);
@@ -3522,6 +3586,9 @@
     const series = [
       ['superBalances', 0, '#0B81A2', `${scenario.people[0].name} super`],
       ['superBalances', 1, '#59A89C', `${scenario.people[1].name} super`],
+      ...((rows.some(row => row.inheritedSuper.total > 0))
+        ? [['inheritedSuper', 'total', '#E38A56', 'Inherited super']]
+        : []),
       ['savings', null, '#7F8F98', 'Savings'],
       ['cash', null, '#9FB0C0', 'Cash'],
       ['shares', null, '#F0C571', 'Unsold shares'],
@@ -3551,10 +3618,13 @@
       year => x(year - scenario.startYear),
       height - pads.bottom
     );
+    drawFirstDeathMarker(ctx, rows, x, pads.top, height - pads.bottom);
     $('#legend').innerHTML = series.map(([, , colour, label]) =>
       `<span><i style="background:${colour}"></i>${escapeHtml(label)}</span>`
     ).join('') +
-      '<span><i style="background:#F0C571"></i>Asset event</span>';
+      '<span><i style="background:#F0C571"></i>Asset event</span>' +
+      (rows.some(row => row.lifecycle?.transitionYear !== null)
+        ? '<span><i style="background:var(--warn)"></i>First death</span>' : '');
     chart.setAttribute('aria-label', 'Asset balance chart with share and pension event markers.');
   }
 
@@ -3579,9 +3649,11 @@
     const factor = displayFactor(row);
     const money = value => core.formatMoney(value * factor, 'AUD');
     tooltip.innerHTML = `
-      <strong>${row.year} · ages ${row.ages[0]} and ${row.ages[1]}</strong>
+      <strong>${row.year} · ages ${row.ages.map(age => age ?? '—').join(' and ')}</strong>
       <span>${escapeHtml(people[0].name)} super: ${money(row.superBalances[0])}</span>
       <span>${escapeHtml(people[1].name)} super: ${money(row.superBalances[1])}</span>
+      ${row.inheritedSuper.total > 0
+        ? `<span>Inherited super: ${money(row.inheritedSuper.total)}</span>` : ''}
       <span>Savings: ${money(row.savings)}</span>
       <span>Cash: ${money(row.cash)}</span>
       <span>Unsold shares: ${money(row.shares)}</span>
@@ -3647,7 +3719,7 @@
       {
         label: 'First projected shortfall',
         value: result.firstShortfall
-          ? `${result.firstShortfall.year} · age ${result.firstShortfall.ages[0]}`
+          ? `${result.firstShortfall.year} · age ${result.firstShortfall.ages.find(age => age !== null) ?? '—'}`
           : 'None in model period'
       },
       { label: `Assets at age ${scenario.household.modelEndAge}${basis}`, value: core.formatMoney(endAssets) },
@@ -3668,6 +3740,8 @@
     const hasOtherAssets = (scenario.otherAssets ?? []).length > 0;
     const hasFranking = rows.some(row => Math.abs(row.frankingCredits) > 0.005);
     const hasCgt = rows.some(row => Math.abs(row.cgtTax) > 0.005);
+    const hasInheritedSuper = rows.some(row => row.inheritedSuper.total > 0.005);
+    const ageText = age => age ?? '—';
     const headings = [
       'Year',
       people[0].name,
@@ -3675,6 +3749,7 @@
       'Total Assets',
       `${people[0].name} super`,
       `${people[1].name} super`,
+      ...(hasInheritedSuper ? ['Inherited super'] : []),
       'Cash',
       'Savings',
       ...(hasOtherAssets ? ['Other assets'] : []),
@@ -3709,13 +3784,14 @@
       const minDrawCell = minDraw > 0.5
         ? `${money(minDraw)} (${rateLabels.join(' / ')})`
         : '-';
-      return `<tr class="${row.shortfall > 1 ? 'short' : ''}">
+      return `<tr class="${row.shortfall > 1 ? 'short' : ''}${row.events.length ? ' event' : ''}">
         <td>${row.year}</td>
-        <td>${row.ages[0]}</td>
-        <td>${row.ages[1]}</td>
+        <td>${ageText(row.ages[0])}</td>
+        <td>${ageText(row.ages[1])}</td>
         <td>${money(row.totalAssets)}</td>
         <td>${money(row.superBalances[0])}</td>
         <td>${money(row.superBalances[1])}</td>
+        ${hasInheritedSuper ? `<td>${money(row.inheritedSuper.total)}</td>` : ''}
         <td>${money(row.cash)}</td>
         <td>${money(row.savings)}</td>
         ${hasOtherAssets ? `<td>${money(row.otherAssets)}</td>` : ''}
@@ -3808,6 +3884,8 @@
     const thresholdState = peakCshcRow.cshc.eligible
       ? 'Below estimated threshold'
       : 'Above estimated threshold';
+    const firstDeathRow = result.rows.find(row =>
+      row.lifecycle?.transitionedThisYear);
     $('#flags').innerHTML = [
       statusCard(
         peakCshcRow.cshc.eligible ? 'warn' : 'bad',
@@ -3824,7 +3902,12 @@
             'ok',
             'Model period',
             'No projected shortfall in the selected period.'
-          )
+          ),
+      ...(firstDeathRow ? [statusCard(
+        'warn',
+        'First-death scenario',
+        `${firstDeathRow.year}: ${firstDeathRow.events.find(event => event.type === 'first-death')?.label ?? 'survivor transition'}`
+      )] : [])
     ].join('');
     if (view === 'income') drawIncomeChart(result.rows, scenario);
     else drawBalanceChart(result.rows, scenario);
@@ -3887,7 +3970,11 @@
       'Cash interest ' + scenario.cash.interestPct + '%/yr, savings interest ' +
         scenario.savings.interestPct + '%/yr (taxable)',
       'Income-tax brackets and LITO stay fixed in nominal dollars after the legislated 2027 rate change, so inflation creates bracket creep; Medicare and SAPTO thresholds use an indexed approximation',
-      'Age Pension uses combined couple income and asset tests; one eligible partner receives half of the means-tested combined rate, and both eligible partners receive the full combined rate'
+      scenario.household.firstDeath.enabled
+        ? `First death: ${scenario.people[scenario.household.firstDeath.deceasedPerson === 'p1' ? 1 : 0].name} at age ${scenario.household.firstDeath.deathAge}; ` +
+          `survivor Preferred Income ${scenario.household.firstDeath.survivorPreferredPct}% and Essential Budget ${scenario.household.firstDeath.survivorEssentialPct}% from the transition year`
+        : 'First-death scenario off',
+      'Age Pension uses combined couple tests before first death and single-person tests for the configured survivor; one eligible partner in a couple receives half of the means-tested combined rate'
     ];
     const otherIncomeCount = (scenario.otherIncomes ?? []).length;
     const otherAssetCount = (scenario.otherAssets ?? []).length;

@@ -95,6 +95,23 @@ check('UK survivor continuation defaults to zero',
   sample.people.every(person => person.ukStateSurvivorPct === 0));
 check('new Other income survivor continuation defaults to zero',
   core.makeOtherIncome(0).survivorPct === 0);
+check('first-death controls expose the approved labels and schema paths', [
+  'Model first death',
+  'Person who dies first',
+  'Survivor Preferred Income %',
+  'Survivor Essential Budget %',
+  'household.firstDeath.enabled',
+  'household.firstDeath.deceasedPerson',
+  'household.firstDeath.deathAge'
+].every(value => html.includes(value)));
+check('continuing income editors expose Paid to survivor percent',
+  (html.match(/Paid to survivor %/g) ?? []).length >= 2 &&
+  html.includes('.ukStateSurvivorPct') && html.includes('.survivorPct'));
+check('both charts share the first-death marker helper',
+  html.includes('function drawFirstDeathMarker(') &&
+  (html.match(/drawFirstDeathMarker\(/g) ?? []).length >= 3);
+check('projection table audits inherited super and deceased ages',
+  html.includes('Inherited super') && html.includes("age ?? '—'"));
 check('v1.00 terminology is rendered',
   html.includes('Preferred Retirement Income') && html.includes('Essential Annual Budget'));
 check('return assumptions are explained below the table',
@@ -103,11 +120,11 @@ check('return assumptions are explained below the table',
 check('assumptions and methodology moved out of the controls panel',
   html.indexOf('<summary>Model assumptions and sources</summary>') > html.indexOf('<div class="tblwrap">') &&
   html.indexOf('id="methodologySection"') > html.indexOf('<div class="tblwrap">'));
-check('v1.07 document version is consistent',
-  html.includes('<title>Family Retirement Income Simulator v1.07</title>') &&
-  html.includes('<span class="version">v1.07</span>') &&
-  html.includes("const STORAGE_KEY = 'family-retirement-simulator:v1.07:scenario'") &&
-  html.includes("'family-retirement-simulator:v1.06:scenario'"));
+check('v1.08 document version is consistent',
+  html.includes('<title>Family Retirement Income Simulator v1.08</title>') &&
+  html.includes('<span class="version">v1.08</span>') &&
+  html.includes("const STORAGE_KEY = 'family-retirement-simulator:v1.08:scenario'") &&
+  html.includes("'family-retirement-simulator:v1.07:scenario'"));
 check('outgoing v1.04 executable is archived', existsSync(ARCHIVE_104));
 check('outgoing v1.0.5 executable is archived', existsSync(ARCHIVE_105));
 check('outgoing v1.0.6 executable is archived', existsSync(ARCHIVE_106));
@@ -234,7 +251,8 @@ check('all section headings use one accent colour',
   !html.includes('.group.uk h3') && !html.includes('.group.share h3') && !html.includes('.group.pot h3'));
 check('real return meaning is explained', html.includes('Nominal return minus inflation'));
 check('single Mercer-style survival label is present', html.includes('Chance of living to each age'));
-check('age labels use conventional multiples of five', html.includes('row.ages[0] % 5 === 0'));
+check('age labels use conventional multiples of five',
+  html.includes('displayAge % 5 === 0'));
 check('lump sums render an aligned collapsible summary',
   html.includes('class="lump-summary"') && html.includes('class="lump-chevron"') &&
   html.includes('class="lump-summary-amount"') && html.includes('class="lump-summary-date"'));
@@ -922,7 +940,7 @@ const survivorPensionScenario = structuredClone(sample);
 survivorPensionScenario.assumptions.inflationMode = 'manual';
 survivorPensionScenario.assumptions.manualInflationPct = 0;
 survivorPensionScenario.assumptions.ukPensionsEnabled = false;
-survivorPensionScenario.household.modelEndAge = 69;
+survivorPensionScenario.household.modelEndAge = 68;
 survivorPensionScenario.household.includeAgePension = true;
 survivorPensionScenario.household.applyMinimumDrawdown = false;
 survivorPensionScenario.household.targetAfterTax = 0;
@@ -949,6 +967,13 @@ const survivorPensionRow = core.projectScenario(survivorPensionScenario).rows[1]
 check('transition-year projection uses the single Age Pension rules',
   survivorPensionRow.agePensionStatus === 'single' &&
   survivorPensionRow.components.agePensionNet === 1200.90 * 26);
+const survivorRoundTrip = core.importScenario(
+  core.exportScenario(survivorProjectionScenario));
+check('JSON round-trip retains all schema-v12 survivor fields',
+  JSON.stringify(survivorRoundTrip.household.firstDeath) ===
+    JSON.stringify(survivorProjectionScenario.household.firstDeath) &&
+  survivorRoundTrip.people[0].ukStateSurvivorPct === 50 &&
+  survivorRoundTrip.otherIncomes[0].survivorPct === 25);
 
 console.log('\nprojection tax basis');
 const projectionNetTax = core.projectionNetTax ?? (() => NaN);
@@ -1067,9 +1092,9 @@ check('other income ownership changes household tax',
   jointOwnedIncome.tax > p1OwnedIncome.tax,
   `${p0OwnedIncome.tax} / ${jointOwnedIncome.tax} / ${p1OwnedIncome.tax}`);
 check('other income UI reuses the owner selector',
-  html.includes('Tax owner') &&
+  html.includes('Income owner') &&
   html.includes('data-path="${path}.owner"') &&
-  html.includes("item.taxable ? '' : ' disabled'"));
+  !html.includes("item.taxable ? '' : ' disabled'"));
 
 const badOwner = structuredClone(sample);
 badOwner.otherIncomes = [{
