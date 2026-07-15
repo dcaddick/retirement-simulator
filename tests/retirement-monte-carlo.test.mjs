@@ -82,6 +82,23 @@ assert.equal(monteCarloDemo.household.annualBudget, 70000);
 assert.equal(monteCarloDemo.assumptions.inflationMode, 'manual');
 assert.equal(monteCarloDemo.assumptions.manualInflationPct, 3);
 
+const nativeBelowMinimumSuperAccess = structuredClone(monteCarloDemo);
+nativeBelowMinimumSuperAccess.people[0].superAccessAge = 59;
+const nativeBelowMinimumError = simulator.validateScenario(nativeBelowMinimumSuperAccess)
+  .find(error => error.path === 'people.0.superAccessAge');
+assert.equal(nativeBelowMinimumError?.message,
+  'Super access age must be 60 or older because this simulator does not model taxation of withdrawals before age 60.');
+
+const nativeMinimumSuperAccess = structuredClone(monteCarloDemo);
+nativeMinimumSuperAccess.people[0].superAccessAge = 60;
+assert.ok(!simulator.validateScenario(nativeMinimumSuperAccess)
+  .some(error => error.path === 'people.0.superAccessAge'));
+
+assert.ok(html.includes(
+  "numberField('Super access age', `${path}.superAccessAge`, person.superAccessAge, 'min=\"60\" max=\"120\"')"));
+assert.ok(html.includes(
+  'The simulator treats super withdrawals as tax-free and does not model the additional tax rules that may apply before age 60.'));
+
 const v1Scenario = simulator.makeSampleScenario();
 v1Scenario.schemaVersion = 6;
 v1Scenario.otherIncomes = [];
@@ -185,6 +202,21 @@ assert.equal(adaptedSchema12.schemaVersion, 4);
 assert.deepEqual(plain(adaptedSchema12.household.firstDeath),
   supportedSchema12.household.firstDeath,
   'schema 12 should retain supported first-death settings');
+const importedBelowMinimumSuperAccess = structuredClone(supportedSchema12);
+importedBelowMinimumSuperAccess.people[0].superAccessAge = 59;
+assert.throws(
+  () => simulator.importScenario(JSON.stringify(importedBelowMinimumSuperAccess)),
+  /Super access age must be 60 or older because this simulator does not model taxation of withdrawals before age 60\./,
+  'deterministic imports must not bypass the age-60 boundary'
+);
+
+const importedMinimumSuperAccess = structuredClone(supportedSchema12);
+importedMinimumSuperAccess.people[0].superAccessAge = 60;
+assert.equal(
+  simulator.importScenario(JSON.stringify(importedMinimumSuperAccess)).people[0].superAccessAge,
+  60,
+  'deterministic imports should retain the valid age-60 boundary'
+);
 for (const [label, mutate, pattern] of [
   ['Other income', scenario => { scenario.otherIncomes = [{ label: 'Rent' }]; },
     /cannot yet model populated Other income or Other assets/],
