@@ -842,6 +842,114 @@ if (typeof core.applyFirstDeathTransition === 'function') {
       openingDeceasedSuper);
 }
 
+console.log('\ndeterministic survivor projection');
+const survivorProjectionScenario = structuredClone(sample);
+survivorProjectionScenario.assumptions.inflationMode = 'manual';
+survivorProjectionScenario.assumptions.manualInflationPct = 0;
+survivorProjectionScenario.assumptions.ukPensionsEnabled = true;
+survivorProjectionScenario.household.includeAgePension = false;
+survivorProjectionScenario.household.applyMinimumDrawdown = false;
+survivorProjectionScenario.household.modelEndAge = 66;
+survivorProjectionScenario.household.targetAfterTax = 80000;
+survivorProjectionScenario.household.annualBudget = 70000;
+survivorProjectionScenario.household.firstDeath = {
+  enabled: true,
+  deceasedPerson: 'p0',
+  deathAge: 65,
+  survivorPreferredPct: 70,
+  survivorEssentialPct: 70
+};
+survivorProjectionScenario.people[0] = {
+  ...survivorProjectionScenario.people[0], age: 64, retireAge: 67,
+  salary: 100000, super: 100000, ukStateAnnualGbp: 10000,
+  ukStateStartAge: 65, ukStateSurvivorPct: 50
+};
+survivorProjectionScenario.people[1] = {
+  ...survivorProjectionScenario.people[1], age: 63, retireAge: 67,
+  salary: 50000, super: 50000, ukStateAnnualGbp: 0,
+  ukStateSurvivorPct: 0
+};
+survivorProjectionScenario.cash.amount = 0;
+survivorProjectionScenario.savings.amount = 0;
+survivorProjectionScenario.shareholdings = [];
+survivorProjectionScenario.otherAssets = [];
+survivorProjectionScenario.lumpSumWithdrawals = [];
+survivorProjectionScenario.otherIncomes = [{
+  ...core.makeOtherIncome(0), id: 'survivor-income', label: 'Deceased annuity',
+  amount: 12000, taxable: false, owner: 'p0', survivorPct: 25
+}];
+const survivorRows = core.projectScenario(survivorProjectionScenario).rows;
+const survivorFirstRow = survivorRows[1];
+check('survivor horizon follows the survivor age', survivorRows.length === 4,
+  `${survivorRows.length}`);
+check('first death applies at the start of the selected year',
+  survivorFirstRow.lifecycle.transitionedThisYear === true &&
+  survivorFirstRow.ages[0] === null && survivorFirstRow.ages[1] === 64);
+check('deceased salary and SG stop in the transition year',
+  survivorFirstRow.salaryByPerson[0] === 0 &&
+  survivorFirstRow.salaryByPerson[1] === 50000);
+check('deceased continuation income is paid to the survivor',
+  survivorFirstRow.ukStateByPerson[0] === 0 &&
+  survivorFirstRow.ukStateByPerson[1] === 5000 &&
+  survivorFirstRow.otherIncomeByPerson[0] === 0 &&
+  survivorFirstRow.otherIncomeByPerson[1] === 3000);
+check('survivor preferred and essential targets step down immediately',
+  survivorFirstRow.target === 56000 && survivorFirstRow.budget === 49000);
+check('deceased super is exposed as inherited survivor super',
+  survivorFirstRow.superBalances[0] === 0 &&
+  survivorFirstRow.inheritedSuper.ownerIndex === 1 &&
+  survivorFirstRow.inheritedSuper.total > 0);
+check('first-death event is the first event of the transition year',
+  survivorFirstRow.events[0]?.type === 'first-death');
+check('survivor tax ledger leaves the deceased at zero',
+  survivorFirstRow.taxByPerson[0] === 0);
+
+const reversedSurvivorScenario = structuredClone(survivorProjectionScenario);
+reversedSurvivorScenario.people = [
+  structuredClone(survivorProjectionScenario.people[1]),
+  structuredClone(survivorProjectionScenario.people[0])
+];
+reversedSurvivorScenario.household.firstDeath.deceasedPerson = 'p1';
+reversedSurvivorScenario.otherIncomes[0].owner = 'p1';
+const reversedSurvivorRow = core.projectScenario(reversedSurvivorScenario).rows[1];
+check('survivor household result is independent of person order',
+  reversedSurvivorRow.totalIncome === survivorFirstRow.totalIncome &&
+  reversedSurvivorRow.totalAssets === survivorFirstRow.totalAssets &&
+  reversedSurvivorRow.target === survivorFirstRow.target &&
+  reversedSurvivorRow.budget === survivorFirstRow.budget);
+
+const survivorPensionScenario = structuredClone(sample);
+survivorPensionScenario.assumptions.inflationMode = 'manual';
+survivorPensionScenario.assumptions.manualInflationPct = 0;
+survivorPensionScenario.assumptions.ukPensionsEnabled = false;
+survivorPensionScenario.household.modelEndAge = 69;
+survivorPensionScenario.household.includeAgePension = true;
+survivorPensionScenario.household.applyMinimumDrawdown = false;
+survivorPensionScenario.household.targetAfterTax = 0;
+survivorPensionScenario.household.annualBudget = 0;
+survivorPensionScenario.household.firstDeath = {
+  enabled: true, deceasedPerson: 'p0', deathAge: 69,
+  survivorPreferredPct: 70, survivorEssentialPct: 70
+};
+survivorPensionScenario.people[0] = {
+  ...survivorPensionScenario.people[0], age: 68, retireAge: 68,
+  salary: 0, super: 0
+};
+survivorPensionScenario.people[1] = {
+  ...survivorPensionScenario.people[1], age: 66, retireAge: 66,
+  salary: 0, super: 0
+};
+survivorPensionScenario.cash.amount = 0;
+survivorPensionScenario.savings.amount = 0;
+survivorPensionScenario.shareholdings = [];
+survivorPensionScenario.otherIncomes = [];
+survivorPensionScenario.otherAssets = [];
+survivorPensionScenario.lumpSumWithdrawals = [];
+const survivorPensionRow = core.projectScenario(survivorPensionScenario).rows[1];
+check('transition-year projection uses the single Age Pension rules',
+  survivorPensionRow.agePensionStatus === 'single' &&
+  survivorPensionRow.components.agePensionNet === 1200.90 * 26);
+
 console.log('\nprojection tax basis');
 const projectionNetTax = core.projectionNetTax ?? (() => NaN);
 const taxNow = projectionNetTax({

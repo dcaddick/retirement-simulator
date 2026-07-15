@@ -1365,6 +1365,11 @@
         holding.owner = survivorOwner;
       }
     });
+    state.otherAssets.forEach(asset => {
+      if ([deceasedOwner, 'joint'].includes(asset.owner)) {
+        asset.owner = survivorOwner;
+      }
+    });
     state.lifecycle = {
       householdStatus: 'survivor',
       alive: deceasedIndex === 0 ? [false, true] : [true, false],
@@ -1593,7 +1598,12 @@
     const errors = validateScenario(scenario);
     if (errors.length) throw new Error(`${errors[0].path}: ${errors[0].message}`);
 
-    const rowCount = scenario.household.modelEndAge - scenario.people[0].age + 1;
+    const configuredDeceasedIndex =
+      scenario.household.firstDeath.deceasedPerson === 'p1' ? 1 : 0;
+    const horizonIndex = scenario.household.firstDeath.enabled
+      ? 1 - configuredDeceasedIndex : 0;
+    const rowCount = scenario.household.modelEndAge -
+      scenario.people[horizonIndex].age + 1;
     const factors = inflationFactors(scenario, rowCount);
     const state = makeProjectionState(scenario);
     const rows = [];
@@ -1603,6 +1613,11 @@
       const inflationFactor = factors[index];
       const ages = scenario.people.map(person => person.age + index);
       const events = [];
+
+      const lifecycle = applyFirstDeathTransition({
+        scenario, state, year, ages
+      });
+      if (lifecycle.event) events.push(lifecycle.event);
       const openingSavings = state.savings;
 
       beginShareYear(state);
@@ -1619,7 +1634,8 @@
         saleRecords: shareResult.saleRecords,
         openingSavings,
         saleYearInterest: shareResult.saleYearInterest,
-        events
+        events,
+        lifecycle
       });
       rows.push(row);
     }
@@ -1637,12 +1653,14 @@
     saleRecords,
     openingSavings,
     saleYearInterest,
-    events
+    events,
+    lifecycle
   }) {
     const salaries = [0, 0];
     const ukState = [0, 0];
 
     scenario.people.forEach((person, index) => {
+      if (!state.lifecycle.alive[index]) return;
       if (!state.superTransitioned[index] && ages[index] >= person.superAccessAge) {
         const pct = Math.max(0, Math.min(100, person.superAccessPct)) / 100;
         const total = totalSuper(state, index);
@@ -1686,6 +1704,31 @@
         ukState[index] = uk.stateAnnuity;
       }
     });
+
+    if (state.lifecycle.householdStatus === 'survivor') {
+      const survivorIndex = state.lifecycle.survivorIndex;
+      const deceasedIndex = state.lifecycle.deceasedIndex;
+      const survivor = scenario.people[survivorIndex];
+      const deceased = scenario.people[deceasedIndex];
+      if (state.inheritedSuper.accum > 0 &&
+          ages[survivorIndex] >= survivor.superAccessAge) {
+        state.inheritedSuper.retire += state.inheritedSuper.accum;
+        state.inheritedSuper.accum = 0;
+      }
+      state.inheritedSuper.accum *=
+        1 + deceased.accumulationReturnPct / 100;
+      state.inheritedSuper.retire *=
+        1 + deceased.retirementReturnPct / 100;
+      if (scenario.assumptions.ukPensionsEnabled !== false) {
+        const inheritedUk = ukPensionFlows(
+          deceased,
+          ages[deceasedIndex],
+          scenario.assumptions.gbpAud,
+          inflationFactor
+        ).stateAnnuity * deceased.ukStateSurvivorPct / 100;
+        ukState[survivorIndex] += inheritedUk;
+      }
+    }
 
     // Other assets: grow at each asset's own nominal rate, then move the value
     // into the savings pot in the disposal year.
@@ -1762,18 +1805,27 @@
     // Other income: annual amounts, CPI-indexed. Taxable items follow their
     // selected owner; non-taxable items are added to household income after tax.
     const otherTaxableByPerson = [0, 0];
-    let otherNonTaxableNominal = 0;
+    const otherNonTaxableByPerson = [0, 0];
     (scenario.otherIncomes ?? []).forEach(item => {
-      const nominal = item.amount * otherItemFx(item) * inflationFactor;
-      if (item.taxable) {
-        allocateOwnedAmount(nominal, item.owner).forEach((amount, index) => {
-          otherTaxableByPerson[index] += amount;
-        });
-      } else {
-        otherNonTaxableNominal += nominal;
+      let nominal = item.amount * otherItemFx(item) * inflationFactor;
+      let owner = item.owner;
+      if (state.lifecycle.householdStatus === 'survivor') {
+        const deceasedOwner = `p${state.lifecycle.deceasedIndex}`;
+        const survivorOwner = `p${state.lifecycle.survivorIndex}`;
+        if (owner === deceasedOwner) {
+          nominal *= item.survivorPct / 100;
+        }
+        owner = survivorOwner;
       }
+      const target = item.taxable
+        ? otherTaxableByPerson : otherNonTaxableByPerson;
+      allocateOwnedAmount(nominal, owner).forEach((amount, index) => {
+        target[index] += amount;
+      });
     });
     const otherTaxableNominal = otherTaxableByPerson.reduce(
+      (sum, amount) => sum + amount, 0);
+    const otherNonTaxableNominal = otherNonTaxableByPerson.reduce(
       (sum, amount) => sum + amount, 0);
 
     const cashInterest = state.cash * scenario.cash.interestPct / 100;
@@ -1783,8 +1835,8 @@
     state.cash += cashInterest;
     state.savings += savingsInterest;
     const interestByPerson = [0, 0];
-    const cashWeights = ownerWeights(scenario.cash.owner);
-    const savingsWeights = ownerWeights(scenario.savings.owner);
+    const cashWeights = ownerWeights(state.ownership.cash);
+    const savingsWeights = ownerWeights(state.ownership.savings);
     for (let index = 0; index < 2; index += 1) {
       interestByPerson[index] =
         cashInterest * cashWeights[index] +
@@ -1798,7 +1850,11 @@
         ...holding,
         price: holding.price / inflationFactor
       })),
-      superBalances: [0, 1].map(index => totalSuper(state, index) / inflationFactor),
+      superBalances: [0, 1].map(index => (
+        totalSuper(state, index) +
+        (state.inheritedSuper.ownerIndex === index
+          ? state.inheritedSuper.accum + state.inheritedSuper.retire : 0)
+      ) / inflationFactor),
       ages
     });
     // Other assets count in the assets test but are excluded from deeming
@@ -1808,9 +1864,12 @@
       salaries.reduce((sum, value) => sum + value, 0) / inflationFactor +
       ukState.reduce((sum, value) => sum + value, 0) / inflationFactor +
       (otherTaxableNominal + otherNonTaxableNominal) / inflationFactor +
-      deemedIncome(assessableAssetsReal);
-    const agePension = agePensionForAges({
+      deemedIncome(assessableAssetsReal, state.lifecycle.householdStatus === 'survivor'
+        ? 'single' : 'couple');
+    const agePension = agePensionForHousehold({
       ages,
+      alive: state.lifecycle.alive,
+      survivorIndex: state.lifecycle.survivorIndex,
       assets: assessableAssetsReal + otherAssetsReal,
       assessableIncome: agePensionIncomeReal,
       included: scenario.household.includeAgePension
@@ -1823,6 +1882,7 @@
     const mandatoryDraws = [0, 0];
     if (scenario.household.applyMinimumDrawdown) {
       scenario.people.forEach((person, index) => {
+        if (!state.lifecycle.alive[index]) return;
         if (!(state.superRetire[index] > 0)) return;
         mandatoryDraws[index] =
           state.superRetire[index] * minDrawRate(ages[index]);
@@ -1831,6 +1891,14 @@
           state.superRetire[index] - mandatoryDraws[index]
         );
       });
+      if (state.inheritedSuper.retire > 0 &&
+          state.inheritedSuper.ownerIndex !== null) {
+        const ownerIndex = state.inheritedSuper.ownerIndex;
+        const inheritedDraw = state.inheritedSuper.retire *
+          minDrawRate(ages[ownerIndex]);
+        state.inheritedSuper.retire -= inheritedDraw;
+        mandatoryDraws[ownerIndex] += inheritedDraw;
+      }
     }
 
     const uppRate = scenario.assumptions.uppPct / 100;
@@ -1842,6 +1910,17 @@
       interestByPerson[index]
     );
     const taxLedger = [0, 1].map(index => {
+      if (!state.lifecycle.alive[index]) {
+        const zeroTax = {
+          grossNominal: 0, offsetNominal: 0, medicareNominal: 0,
+          creditsNominal: 0, netNominal: 0, refundNominal: 0
+        };
+        return {
+          baseTax: { ...zeroTax }, ordinaryTax: { ...zeroTax },
+          totalTax: { ...zeroTax }, frankingNominal: 0,
+          cgtTaxNominal: 0, refundNominal: 0, dividendNetNominal: 0
+        };
+      }
       const baseTax = taxAfterFranking({
         taxableNominal: baseTaxableNominal[index],
         rebateNominal: baseTaxableNominal[index],
@@ -1917,10 +1996,11 @@
     }
     const mandatoryTotal =
       mandatoryDraws.reduce((sum, value) => sum + value, 0);
-    const targetNominal = scenario.household.targetAfterTax * inflationFactor;
+    const targetNominal = scenario.household.targetAfterTax * inflationFactor *
+      lifecycle.preferredTargetPct / 100;
     const budgetNominal =
       (scenario.household.annualBudget ?? scenario.household.targetAfterTax) *
-      inflationFactor;
+      inflationFactor * lifecycle.essentialTargetPct / 100;
     // v0.96: top-ups anchor to Preferred Retirement Income in both modes. With minimum
     // drawdown enforced, mandatory minimums are Priority 1 and the tiers fill any
     // remaining gap to Preferred Retirement Income; spending stays capped at the
@@ -1930,6 +2010,12 @@
 
     const waterfall = drawFromTiers(state, scenario.household.drawdownPriority, gap);
     const extraSuperDraws = [waterfall.drawsBySource.p0Super, waterfall.drawsBySource.p1Super];
+    if (state.lifecycle.householdStatus === 'survivor') {
+      const deceasedIndex = state.lifecycle.deceasedIndex;
+      const survivorIndex = state.lifecycle.survivorIndex;
+      extraSuperDraws[survivorIndex] += extraSuperDraws[deceasedIndex];
+      extraSuperDraws[deceasedIndex] = 0;
+    }
     const potDraw = waterfall.drawsBySource.cash + waterfall.drawsBySource.savings;
 
     const superIncome = mandatoryDraws.map(
@@ -1951,6 +2037,8 @@
     const totalAssetsNominal =
       state.superAccum.reduce((sum, value) => sum + value, 0) +
       state.superRetire.reduce((sum, value) => sum + value, 0) +
+      state.inheritedSuper.accum +
+      state.inheritedSuper.retire +
       state.cash +
       state.savings +
       unsoldShares +
@@ -1960,16 +2048,27 @@
       totalTaxableNominalByPerson.reduce((sum, value) => sum + value, 0) /
       inflationFactor;
     const abpBalanceReal =
-      state.superRetire.reduce((sum, value) => sum + value, 0) / inflationFactor;
+      (state.superRetire.reduce((sum, value) => sum + value, 0) +
+        state.inheritedSuper.retire) / inflationFactor;
     const cshc = cshcEstimate({
       adjustedTaxableIncome: adjustedTaxableIncomeReal,
-      accountBasedPensionBalance: abpBalanceReal
+      accountBasedPensionBalance: abpBalanceReal,
+      status: state.lifecycle.householdStatus === 'survivor' ? 'single' : 'couple'
     });
 
     return {
       year,
-      ages,
+      ages: ages.map((age, index) => state.lifecycle.alive[index] ? age : null),
+      rawAges: [...ages],
+      lifecycle: { ...lifecycle, alive: [...lifecycle.alive] },
       inflationFactor,
+      salaryByPerson: salaries.map(value => value / inflationFactor),
+      ukStateByPerson: ukState.map(value => value / inflationFactor),
+      otherIncomeByPerson: [0, 1].map(index =>
+        (otherTaxableByPerson[index] + otherNonTaxableByPerson[index]) /
+        inflationFactor),
+      taxByPerson: taxLedger.map(person =>
+        person.totalTax.netNominal / inflationFactor),
       minDraws: mandatoryDraws.map(value => value / inflationFactor),
       topUpDraws: extraSuperDraws.map(value => value / inflationFactor),
       minRates: [0, 1].map(index =>
@@ -2004,13 +2103,21 @@
         (sum, person) => sum + person.refundNominal, 0) / inflationFactor,
       taxLedger: taxLedger.map(person => ({ ...person })),
       cshc,
+      agePensionStatus: agePension.status,
       totalIncome: totalIncomeNominal / inflationFactor,
-      target: scenario.household.targetAfterTax,
+      target: targetNominal / inflationFactor,
       budget: budgetNominal / inflationFactor,
       banked: surplusBanked / inflationFactor,
       shortfall: shortfallNominal / inflationFactor,
       totalAssets: totalAssetsNominal / inflationFactor,
       superBalances: [0, 1].map(index => totalSuper(state, index) / inflationFactor),
+      inheritedSuper: {
+        accum: state.inheritedSuper.accum / inflationFactor,
+        retire: state.inheritedSuper.retire / inflationFactor,
+        total: (state.inheritedSuper.accum + state.inheritedSuper.retire) /
+          inflationFactor,
+        ownerIndex: state.inheritedSuper.ownerIndex
+      },
       cash: state.cash / inflationFactor,
       savings: state.savings / inflationFactor,
       shares: unsoldShares / inflationFactor,
