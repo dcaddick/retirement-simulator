@@ -326,6 +326,27 @@ for (const contract of [
 ]) {
   assert.ok(html.includes(contract), `missing Other income UI contract: ${contract}`);
 }
+for (const contract of [
+  'id="ukPensionsEnabled"',
+  'id="pensionType"',
+  'value="defined-benefit"',
+  'value="uk-state"',
+  'id="gbpAudRow"',
+  'id="uppRow"',
+  'Include these pensions in the projection',
+  'Paid to survivor %',
+  'ukStateIndexation',
+  'Fixed nominal amount',
+  'Frozen (AU resident, no uprating)',
+  '<b>Pension mode:</b>'
+]) assert.ok(html.includes(contract), `missing pension UI contract: ${contract}`);
+
+for (const obsolete of [
+  'Private pension take age',
+  'Private pension treatment',
+  'Lump sum into savings pot',
+  'Annual lifetime annuity'
+]) assert.ok(!html.includes(obsolete), `obsolete pension UI remains: ${obsolete}`);
 
 const v1Scenario = simulator.makeSampleScenario();
 v1Scenario.schemaVersion = 6;

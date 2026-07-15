@@ -284,15 +284,28 @@
     </section>
     <section class="group uk" aria-labelledby="ukPensionsHeading">
       <h3 id="ukPensionsHeading">Defined Benefit/UK Pensions</h3>
-      <label><span class="k">GBP&rarr;AUD rate</span>
+      <label><span class="k">Include these pensions in the projection</span>
+        <input type="checkbox" id="ukPensionsEnabled"
+          data-path="assumptions.ukPensionsEnabled">
+      </label>
+      <label><span class="k">Pension type</span>
+        <select id="pensionType">
+          <option value="defined-benefit">Australian defined benefit</option>
+          <option value="uk-state">UK State Pension</option>
+        </select>
+      </label>
+      <label id="gbpAudRow"><span class="k">GBP&rarr;AUD rate</span>
         <input type="number" id="gbpAud" min="0" step="0.0001"
           data-value-type="number" data-path="assumptions.gbpAud">
       </label>
-      <div class="people-split pensions-split">
+      <label id="uppRow"><span class="k">UK pension UPP deduction %</span>
+        <input type="number" min="0" max="100" step="0.1"
+          data-value-type="number" data-path="assumptions.uppPct">
+      </label>
+      <div id="ukPensionFields" class="people-split pensions-split">
         <fieldset id="ukPerson0"></fieldset>
         <fieldset id="ukPerson1"></fieldset>
       </div>
-      <p class="sub">State Pension is annual lifetime income from the selected age. A private lump sum is paid into the household savings pot.</p>
     </section>
     <section class="group">
       <h3>Household</h3>
@@ -2166,12 +2179,6 @@
     return 'Joint 50/50';
   }
 
-  function privatePensionAmountLabel(type) {
-    return type === 'annuity'
-      ? 'Private annuity (£/year)'
-      : 'Private pension lump sum (£)';
-  }
-
   function setPathImmutable(source, dottedPath, value) {
     const result = structuredClone(source);
     const parts = dottedPath.split('.');
@@ -2351,30 +2358,38 @@
       : '<p class="empty-state">No shareholdings added.</p>';
   }
 
-  function ukPersonFields(person, index) {
+  function ukPersonFields(person, index, assumptions) {
     const path = `people.${index}`;
+    const dbMode = assumptions.gbpAud === 1;
+    const currency = dbMode ? 'AUD' : 'GBP';
+    const stateLabel = dbMode ? 'Defined Benefit' : 'State Pension';
     return `<legend>${escapeHtml(person.name)}</legend>
-      ${moneyField('State Pension annual', `${path}.ukStateAnnualGbp`, person.ukStateAnnualGbp, 'GBP')}
-      ${numberField('State Pension start age', `${path}.ukStateStartAge`, person.ukStateStartAge, 'min="55" max="80"')}
-      ${moneyField(
-        privatePensionAmountLabel(person.ukPrivateType),
-        `${path}.ukPrivateAmountGbp`,
-        person.ukPrivateAmountGbp,
-        'GBP'
-      )}
-      ${numberField('Private pension take age', `${path}.ukPrivateTakeAge`, person.ukPrivateTakeAge, 'min="55" max="100"')}
-      <label><span class="k">Private pension treatment</span>
-        <select data-path="${path}.ukPrivateType">
-          <option value="lump"${person.ukPrivateType === 'lump' ? ' selected' : ''}>Lump sum into savings pot</option>
-          <option value="annuity"${person.ukPrivateType === 'annuity' ? ' selected' : ''}>Annual lifetime annuity</option>
+      ${moneyField(`${stateLabel} annual`, `${path}.ukStateAnnualGbp`,
+        person.ukStateAnnualGbp, currency)}
+      ${numberField(`${stateLabel} start age`, `${path}.ukStateStartAge`,
+        person.ukStateStartAge, 'min="55" max="80"')}
+      ${numberField('Paid to survivor %', `${path}.ukStateSurvivorPct`,
+        person.ukStateSurvivorPct, 'min="0" max="100" step="5"')}
+      <label><span class="k">${escapeHtml(stateLabel)} indexation</span>
+        <select data-path="${path}.ukStateIndexation">
+          <option value="frozen"${person.ukStateIndexation !== 'cpi' ? ' selected' : ''}>${dbMode ? 'Fixed nominal amount' : 'Frozen (AU resident, no uprating)'}</option>
+          <option value="cpi"${person.ukStateIndexation === 'cpi' ? ' selected' : ''}>${dbMode ? 'CPI-indexed' : 'CPI-indexed (comparison only)'}</option>
         </select>
       </label>`;
   }
 
   function renderUkPensions(people, assumptions) {
+    const enabled = assumptions.ukPensionsEnabled !== false;
+    $('#ukPensionsEnabled').checked = enabled;
+    const dbMode = assumptions.gbpAud === 1;
+    $('#pensionType').value = dbMode ? 'defined-benefit' : 'uk-state';
     $('#gbpAud').value = assumptions.gbpAud;
-    $('#ukPerson0').innerHTML = ukPersonFields(people[0], 0);
-    $('#ukPerson1').innerHTML = ukPersonFields(people[1], 1);
+    $('#gbpAudRow').hidden = dbMode;
+    $('#uppRow').hidden = dbMode;
+    $('#ukPerson0').innerHTML = ukPersonFields(people[0], 0, assumptions);
+    $('#ukPerson1').innerHTML = ukPersonFields(people[1], 1, assumptions);
+    $('#ukPensionFields').style.opacity = enabled ? '' : '0.45';
+    $('#ukPensionFields').style.pointerEvents = enabled ? '' : 'none';
   }
 
   function drawdownSourceOptions(selected, people) {
@@ -2441,7 +2456,6 @@
       <label><span class="k">Show illustrative survival band</span>
         <input type="checkbox" data-path="household.showSurvival"${household.showSurvival ? ' checked' : ''}>
       </label>
-      ${numberField('UK pension UPP deduction %', 'assumptions.uppPct', assumptions.uppPct, 'min="0" max="100" step="0.1"')}
       <h4>Drawdown order</h4>
       ${drawdownPriorityFields(household.drawdownPriority, people)}`;
     $('#inflationMode').value = assumptions.inflationMode;
@@ -3146,6 +3160,35 @@
 
   $('#controls').addEventListener('change', event => {
     if (event.target.matches('.holding-csv')) return;
+    if (event.target.matches('#pensionType')) {
+      const dbMode = event.target.value === 'defined-benefit';
+      currentScenario = setPathImmutable(
+        currentScenario,
+        'assumptions.gbpAud',
+        dbMode
+          ? 1
+          : (currentScenario.assumptions.gbpAud === 1
+              ? 1.95
+              : currentScenario.assumptions.gbpAud)
+      );
+      if (dbMode) {
+        currentScenario = setPathImmutable(
+          currentScenario,
+          'assumptions.uppPct',
+          0
+        );
+      }
+      currentScenario = {
+        ...currentScenario,
+        people: currentScenario.people.map(person => ({
+          ...person,
+          ukStateIndexation: dbMode ? 'cpi' : 'frozen'
+        }))
+      };
+      scheduleSave(currentScenario);
+      renderScenario(currentScenario);
+      return;
+    }
     if (event.target.dataset.saleIndex !== undefined) {
       const index = Number(event.target.dataset.saleIndex);
       const [saleYear, saleMonth] = event.target.value.split('-').map(Number);
@@ -4888,6 +4931,25 @@
       ? `<p><b>Other income:</b> ${escapeHtml(otherIncomeItems.join('; '))}. ` +
         'Amounts are CPI-indexed and included in the Age Pension income assessment.</p>'
       : '';
+    const pensionIsDb = activeScenario.assumptions.gbpAud === 1;
+    const pensionModeLabel = pensionIsDb
+      ? 'Australian Defined Benefit'
+      : 'UK State Pension';
+    const pensionItems = activeScenario.people
+      .filter(person => Number(person.ukStateAnnualGbp) > 0)
+      .map(person => `${person.name}: ${pensionIsDb ? '$' : '£'}` +
+        `${person.ukStateAnnualGbp} from age ${person.ukStateStartAge}, ` +
+        `${person.ukStateIndexation === 'cpi' ? 'CPI-indexed' : 'fixed/frozen'}, ` +
+        `${person.ukStateSurvivorPct}% to survivor`);
+    const pensionDetails = activeScenario.assumptions.ukPensionsEnabled === false
+      ? 'Disabled; stored values do not feed the projection.'
+      : `${pensionItems.join('; ') || 'No positive pension amounts.'}` +
+        (pensionIsDb
+          ? ''
+          : ` GBP/AUD ${activeScenario.assumptions.gbpAud}; ` +
+            `UPP deduction ${activeScenario.assumptions.uppPct}%.`);
+    const pensionSentence = `<p><b>Pension mode:</b> ` +
+      `${escapeHtml(pensionModeLabel)}. ${escapeHtml(pensionDetails)}</p>`;
     document.querySelector('#assumptionsPanel').innerHTML = `
       <p>Scenario: ${escapeHtml(activeScenario.scenarioName ?? 'Imported scenario')} · schema ${escapeHtml(activeScenario.schemaVersion)}</p>
       <p>Config version: 3 · seed ${escapeHtml(seed)} · paths ${escapeHtml(pathCount)}.</p>
@@ -4897,6 +4959,7 @@
       <p><b>Stress assumption override:</b> ${escapeHtml(overrideSentence)}</p>
       <p><b>Risk mode:</b> ${escapeHtml(riskPolicy.label)}. ${escapeHtml(riskPolicy.detail)} Confidence target ${escapeHtml(formatPercent(riskPolicy.successThreshold))}; terminal reserve ${simulator.formatMoney(activeScenario.household.annualBudget * riskPolicy.terminalReserveYears)}.</p>
       <p><b>Survivor state:</b> ${escapeHtml(firstDeathSentence)}</p>
+      ${pensionSentence}
       ${salaryGrowthSentence}
       ${otherIncomeSentence}
       <p>Break-point mode: ${escapeHtml(riskMode)} · budget sweep ${simulator.formatMoney(budgetRange.start)} to ${simulator.formatMoney(budgetRange.end)} by ${simulator.formatMoney(budgetRange.step)}.</p>
