@@ -276,10 +276,6 @@ for (const [label, mutate, pattern] of [
   ['lump sum', scenario => {
     scenario.lumpSumWithdrawals = [{ enabled: true }];
   }, /cannot yet model lump-sum withdrawals/],
-  ['pension', scenario => {
-    scenario.assumptions.ukPensionsEnabled = true;
-    scenario.people[0].ukStateAnnualGbp = 1000;
-  }, /cannot yet preserve v1\.00 Defined Benefit\/UK Pension treatment/],
   ['share returns', scenario => {
     scenario.shareholdings = [{
       ...migratedSchema5.shareholdings[0], priceGrowthPct: 1
@@ -449,6 +445,49 @@ assert.equal(adaptedSchema12.schemaVersion, 5);
 assert.deepEqual(plain(adaptedSchema12.household.firstDeath),
   supportedSchema12.household.firstDeath,
   'schema 12 should retain supported first-death settings');
+
+const definedBenefitInput = structuredClone(supportedSchema12);
+definedBenefitInput.assumptions.ukPensionsEnabled = true;
+definedBenefitInput.assumptions.gbpAud = 1;
+definedBenefitInput.assumptions.uppPct = 0;
+Object.assign(definedBenefitInput.people[0], {
+  ukStateAnnualGbp: 24000, ukStateStartAge: 65,
+  ukStateIndexation: 'cpi', ukStateSurvivorPct: 60
+});
+const adaptedDefinedBenefit = simulator.importScenario(
+  JSON.stringify(definedBenefitInput));
+assert.deepEqual(
+  plain({
+    assumptions: adaptedDefinedBenefit.assumptions,
+    pension: adaptedDefinedBenefit.people[0]
+  }),
+  plain({
+    assumptions: definedBenefitInput.assumptions,
+    pension: definedBenefitInput.people[0]
+  }),
+  'Defined Benefit fields should survive deterministic adaptation'
+);
+
+const ukPensionInput = structuredClone(supportedSchema12);
+ukPensionInput.assumptions.ukPensionsEnabled = true;
+ukPensionInput.assumptions.gbpAud = 1.95;
+ukPensionInput.assumptions.uppPct = 8;
+Object.assign(ukPensionInput.people[0], {
+  ukStateAnnualGbp: 12000, ukStateStartAge: 67,
+  ukStateIndexation: 'frozen', ukStateSurvivorPct: 50
+});
+const adaptedUkPension = simulator.importScenario(JSON.stringify(ukPensionInput));
+assert.equal(adaptedUkPension.assumptions.gbpAud, 1.95);
+assert.equal(adaptedUkPension.assumptions.uppPct, 8);
+assert.deepEqual(
+  plain({
+    annual: adaptedUkPension.people[0].ukStateAnnualGbp,
+    startAge: adaptedUkPension.people[0].ukStateStartAge,
+    indexation: adaptedUkPension.people[0].ukStateIndexation,
+    survivorPct: adaptedUkPension.people[0].ukStateSurvivorPct
+  }),
+  { annual: 12000, startAge: 67, indexation: 'frozen', survivorPct: 50 }
+);
 const importedBelowMinimumSuperAccess = structuredClone(supportedSchema12);
 importedBelowMinimumSuperAccess.people[0].superAccessAge = 59;
 assert.throws(
@@ -468,11 +507,7 @@ for (const [label, mutate, pattern] of [
   ['Other asset', scenario => { scenario.otherAssets = [{ label: 'Property' }]; },
     /cannot yet model populated Other assets/],
   ['lump sum', scenario => { scenario.lumpSumWithdrawals = [{ enabled: true }]; },
-    /cannot yet model lump-sum withdrawals/],
-  ['DB or UK pension', scenario => {
-    scenario.assumptions.ukPensionsEnabled = true;
-    scenario.people[0].ukStateAnnualGbp = 1000;
-  }, /cannot yet preserve v1\.00 Defined Benefit\/UK Pension treatment/]
+    /cannot yet model lump-sum withdrawals/]
 ]) {
   const unsupported = structuredClone(supportedSchema12);
   mutate(unsupported);
@@ -738,6 +773,40 @@ const survivorIncomeFlows = simulator.otherIncomeFlows({
 });
 assert.deepEqual(plain(survivorIncomeFlows.taxableByPerson), [0, 500]);
 assert.deepEqual(plain(survivorIncomeFlows.nonTaxableByPerson), [0, 600]);
+
+const pensionPerson = {
+  ...definedBenefitInput.people[0], age: 64,
+  ukStateAnnualGbp: 24000, ukStateStartAge: 65,
+  ukStateIndexation: 'cpi', ukStateSurvivorPct: 60
+};
+const roundedPensionFlow = flow => ({
+  grossNominal: Math.round(flow.grossNominal * 1e6) / 1e6,
+  taxableNominal: Math.round(flow.taxableNominal * 1e6) / 1e6
+});
+assert.deepEqual(plain(simulator.pensionFlows({
+  person: pensionPerson, age: 64, inflationFactor: 1.1,
+  assumptions: definedBenefitInput.assumptions
+})), { grossNominal: 0, taxableNominal: 0 });
+assert.deepEqual(roundedPensionFlow(simulator.pensionFlows({
+  person: pensionPerson, age: 65, inflationFactor: 1.1,
+  assumptions: definedBenefitInput.assumptions
+})), { grossNominal: 26400, taxableNominal: 26400 });
+
+const fixedUkPerson = {
+  ...pensionPerson, ukStateAnnualGbp: 12000,
+  ukStateStartAge: 65, ukStateIndexation: 'frozen'
+};
+assert.deepEqual(roundedPensionFlow(simulator.pensionFlows({
+  person: fixedUkPerson, age: 65, inflationFactor: 1.1,
+  assumptions: ukPensionInput.assumptions
+})), { grossNominal: 23400, taxableNominal: 21528 });
+
+const disabledPension = structuredClone(ukPensionInput.assumptions);
+disabledPension.ukPensionsEnabled = false;
+assert.deepEqual(plain(simulator.pensionFlows({
+  person: fixedUkPerson, age: 67, inflationFactor: 1.2,
+  assumptions: disabledPension
+})), { grossNominal: 0, taxableNominal: 0 });
 
 const monteCarloSalaryParity = structuredClone(adaptedSchema10);
 monteCarloSalaryParity.assumptions.inflationMode = 'manual';
@@ -1013,6 +1082,146 @@ assert.ok(
   incomeStochasticA[0].projection.rows[0].components.potDraw <
     noIncomePaths[0].projection.rows[0].components.potDraw,
   'Other income must contribute to funding rather than being silently omitted'
+);
+
+function configurePensionParityScenario(scenario, pensionInput) {
+  const configured = structuredClone(scenario);
+  Object.assign(configured.assumptions, {
+    inflationMode: 'manual',
+    manualInflationPct: 2,
+    ukPensionsEnabled: true,
+    gbpAud: pensionInput.assumptions.gbpAud,
+    uppPct: pensionInput.assumptions.uppPct
+  });
+  Object.assign(configured.household, {
+    targetAfterTax: 30000,
+    annualBudget: 30000,
+    modelEndAge: 68,
+    includeAgePension: true,
+    applyMinimumDrawdown: false,
+    firstDeath: {
+      enabled: true, deceasedPerson: 'p0', deathAge: 66,
+      survivorPreferredPct: 70, survivorEssentialPct: 70
+    }
+  });
+  configured.cash = { amount: 0, interestPct: 0, owner: 'joint' };
+  configured.savings = { amount: 200000, interestPct: 0, owner: 'joint' };
+  configured.shareholdings = [];
+  configured.otherIncomes = [];
+  configured.otherAssets = [];
+  configured.lumpSumWithdrawals = [];
+  configured.people.forEach((person, index) => Object.assign(person, {
+    age: index === 0 ? 64 : 62,
+    retireAge: index === 0 ? 64 : 62,
+    superAccessAge: 65,
+    salary: 0,
+    salaryGrowthPct: 0,
+    sgPct: 0,
+    accumulationReturnPct: 0,
+    retirementReturnPct: 0,
+    super: 0,
+    ukStateAnnualGbp: index === 0
+      ? pensionInput.people[0].ukStateAnnualGbp
+      : pensionInput.people[0].ukStateAnnualGbp / 2,
+    ukStateStartAge: index === 0 ? 65 : 67,
+    ukStateIndexation: index === 0
+      ? pensionInput.people[0].ukStateIndexation : 'cpi',
+    ukStateSurvivorPct: index === 0 ? 60 : 0
+  }));
+  return configured;
+}
+
+function zeroPensionPath(scenario) {
+  return {
+    schemaVersion: 1,
+    years: Array.from(
+      { length: simulator.projectionYearCount(scenario) },
+      (_, index) => ({
+        year: scenario.startYear + index,
+        superAccumulationReturnPct: [0, 0],
+        superRetirementReturnPct: [0, 0]
+      })
+    )
+  };
+}
+
+const pensionParityShape = row => ({
+  year: row.year,
+  ukStateByPerson: row.ukStateByPerson.map(round6),
+  ukStateGross: round6(row.components.ukStateGross),
+  ukStateNet: round6(row.components.ukStateNet),
+  taxByPerson: row.taxByPerson.map(round6),
+  agePensionNet: round6(row.components.agePensionNet),
+  potDraw: round6(row.components.potDraw),
+  totalIncome: round6(row.totalIncome),
+  totalAssets: round6(row.totalAssets)
+});
+
+for (const [label, pensionInput] of [
+  ['Defined Benefit', adaptedDefinedBenefit],
+  ['UK State Pension', adaptedUkPension]
+]) {
+  const monteCarloPensionParity = configurePensionParityScenario(
+    pensionInput, pensionInput);
+  const deterministicPensionParity = configurePensionParityScenario(
+    deterministic.makeSampleScenario(), pensionInput);
+  const monteCarloRows = simulator.projectScenario(
+    monteCarloPensionParity, zeroPensionPath(monteCarloPensionParity)).rows;
+  const deterministicRows = deterministic.projectScenario(
+    deterministicPensionParity).rows;
+  assert.deepEqual(
+    plain(monteCarloRows.map(pensionParityShape)),
+    plain(deterministicRows.map(pensionParityShape)),
+    `zero-volatility ${label} should match deterministic pension flows`
+  );
+}
+
+const stochasticUkPension = configurePensionParityScenario(
+  adaptedUkPension, adaptedUkPension);
+const pensionStochasticA = core.simulatePaths({
+  scenario: stochasticUkPension,
+  pathCount: 3,
+  seed: 86420,
+  profiles: salaryStochasticProfiles,
+  projectScenario: simulator.projectScenario
+});
+const pensionStochasticB = core.simulatePaths({
+  scenario: stochasticUkPension,
+  pathCount: 3,
+  seed: 86420,
+  profiles: salaryStochasticProfiles,
+  projectScenario: simulator.projectScenario
+});
+const pensionStochasticShape = results => plain(results.map(result =>
+  result.projection.rows.map(row => ({
+    ukStateNet: row.components.ukStateNet,
+    totalIncome: row.totalIncome,
+    totalAssets: row.totalAssets
+  }))));
+assert.deepEqual(
+  pensionStochasticShape(pensionStochasticA),
+  pensionStochasticShape(pensionStochasticB),
+  'pension stochastic paths should remain seed-reproducible'
+);
+assert.ok(pensionStochasticA.every(result =>
+  result.engineError === null && result.projection.rows.every(row =>
+    Number.isFinite(row.totalIncome) && Number.isFinite(row.totalAssets) &&
+    row.totalAssets >= 0)),
+'pension stochastic paths should preserve accounting invariants');
+const disabledStochasticPension = structuredClone(stochasticUkPension);
+disabledStochasticPension.assumptions.ukPensionsEnabled = false;
+const disabledPensionPaths = core.simulatePaths({
+  scenario: disabledStochasticPension,
+  pathCount: 3,
+  seed: 86420,
+  profiles: salaryStochasticProfiles,
+  projectScenario: simulator.projectScenario
+});
+assert.ok(
+  pensionStochasticA[0].projection.rows[1].components.ukStateNet > 0 &&
+  pensionStochasticA[0].projection.rows[1].components.potDraw <
+    disabledPensionPaths[0].projection.rows[1].components.potDraw,
+  'active pensions must contribute to funding rather than being omitted'
 );
 
 const deterministicFixedDeath = deterministic.makeSampleScenario();

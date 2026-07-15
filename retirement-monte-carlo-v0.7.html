@@ -648,15 +648,13 @@
     savings,
     shareholdings,
     superBalances,
-    ages,
-    ukPrivateBalances
+    ages
   }) {
     const shares = shareholdings.reduce((sum, holding) =>
       sum + (holding.sold ? 0 : shareValueAud(holding)), 0);
     const superAssessable = superBalances.reduce((sum, balance, index) =>
       sum + (ages[index] >= 67 ? balance : 0), 0);
-    return cash + savings + shares + superAssessable +
-      ukPrivateBalances.reduce((sum, balance) => sum + balance, 0);
+    return cash + savings + shares + superAssessable;
   }
 
   function defaultDrawdownPriority(superFirst) {
@@ -940,11 +938,6 @@
     if ((scenario.lumpSumWithdrawals ?? []).some(item => item.enabled !== false)) {
       throw new Error('Monte Carlo v0.7 cannot yet model lump-sum withdrawals. Remove them from a fictional copy before importing.');
     }
-    const hasPensionIncome = scenario.people?.some(person =>
-      Number(person.ukStateAnnualGbp) > 0);
-    if (scenario.assumptions?.ukPensionsEnabled !== false && hasPensionIncome) {
-      throw new Error('Monte Carlo v0.7 cannot yet preserve v1.00 Defined Benefit/UK Pension treatment. Use a fictional copy with those pensions excluded.');
-    }
   }
 
   function adaptV1ScenarioForExperimentalMonteCarlo(scenario) {
@@ -1043,19 +1036,24 @@
     return `https://stooq.com/q/l/?s=${symbol}.us&f=sd2t2ohlcv&h&e=csv`;
   }
 
-  function ukPensionFlows(person, age, gbpAud, inflationFactor) {
-    const stateAnnuity = age >= person.ukStateStartAge
-      ? person.ukStateAnnualGbp * gbpAud * inflationFactor
-      : 0;
-    const privateAnnuity = person.ukPrivateType === 'annuity' &&
-      age >= person.ukPrivateTakeAge
-      ? person.ukPrivateAmountGbp * gbpAud * inflationFactor
-      : 0;
-    const privateLump = person.ukPrivateType === 'lump' &&
-      age === person.ukPrivateTakeAge
-      ? person.ukPrivateAmountGbp * gbpAud * inflationFactor
-      : 0;
-    return { stateAnnuity, privateAnnuity, privateLump };
+  function pensionMode(assumptions) {
+    return assumptions.gbpAud === 1 ? 'defined-benefit' : 'uk-state';
+  }
+
+  function pensionFlows({ person, age, inflationFactor, assumptions }) {
+    if (assumptions.ukPensionsEnabled === false ||
+        age < person.ukStateStartAge) {
+      return { grossNominal: 0, taxableNominal: 0 };
+    }
+    const indexed = person.ukStateIndexation === 'cpi'
+      ? inflationFactor : 1;
+    const mode = pensionMode(assumptions);
+    const fx = mode === 'defined-benefit' ? 1 : assumptions.gbpAud;
+    const grossNominal = person.ukStateAnnualGbp * fx * indexed;
+    const taxableNominal = mode === 'uk-state'
+      ? grossNominal * (1 - assumptions.uppPct / 100)
+      : grossNominal;
+    return { grossNominal, taxableNominal };
   }
 
   function superAccessSplit(person) {
@@ -1088,12 +1086,7 @@
         savings: scenario.savings.owner
       },
       inheritedSuper: { accum: 0, retire: 0, ownerIndex: null },
-      holdings: scenario.shareholdings.map(holding => ({ ...holding, sold: false })),
-      ukPrivateBalances: scenario.people.map(person =>
-        person.ukPrivateType === 'lump'
-          ? person.ukPrivateAmountGbp * scenario.assumptions.gbpAud
-          : 0
-      )
+      holdings: scenario.shareholdings.map(holding => ({ ...holding, sold: false }))
     };
   }
 
@@ -1134,9 +1127,6 @@
     state.superAccum[deceasedIndex] = 0;
     state.superRetire[deceasedIndex] = 0;
     state.superTransitioned[deceasedIndex] = true;
-    state.ukPrivateBalances[survivorIndex] +=
-      state.ukPrivateBalances[deceasedIndex];
-    state.ukPrivateBalances[deceasedIndex] = 0;
     if ([deceasedOwner, 'joint'].includes(state.ownership.cash)) {
       state.ownership.cash = survivorOwner;
     }
@@ -1462,9 +1452,8 @@
     lifecycle
   }) {
     const salaries = [0, 0];
-    const ukState = [0, 0];
-    const ukPrivateAnnuity = [0, 0];
-    const ukPrivateLump = [0, 0];
+    const pensionGross = [0, 0];
+    const pensionTaxable = [0, 0];
 
     scenario.people.forEach((person, index) => {
       if (!state.lifecycle.alive[index]) return;
@@ -1504,34 +1493,14 @@
         : state.superAccum[index] *
             (1 + annualReturns.superAccumulationReturnPct[index] / 100);
 
-      if (person.ukPrivateType === 'lump' && ages[index] < person.ukPrivateTakeAge) {
-        state.ukPrivateBalances[index] =
-          person.ukPrivateAmountGbp *
-          scenario.assumptions.gbpAud *
-          inflationFactor;
-      }
-
-      if (scenario.assumptions.ukPensionsEnabled !== false) {
-        const uk = ukPensionFlows(
-          person,
-          ages[index],
-          scenario.assumptions.gbpAud,
-          inflationFactor
-        );
-        ukState[index] = uk.stateAnnuity;
-        ukPrivateAnnuity[index] = uk.privateAnnuity;
-        ukPrivateLump[index] = uk.privateLump;
-
-        if (uk.privateLump > 0 && state.ukPrivateBalances[index] > 0) {
-          state.savings += uk.privateLump;
-          state.ukPrivateBalances[index] = 0;
-          events.push({
-            type: 'uk-private-lump',
-            label: `${person.name} UK private pension lump sum`,
-            amount: uk.privateLump / inflationFactor
-          });
-        }
-      }
+      const pension = pensionFlows({
+        person,
+        age: ages[index],
+        inflationFactor,
+        assumptions: scenario.assumptions
+      });
+      pensionGross[index] = pension.grossNominal;
+      pensionTaxable[index] = pension.taxableNominal;
     });
 
     if (state.lifecycle.householdStatus === 'survivor') {
@@ -1548,15 +1517,17 @@
         1 + annualReturns.superAccumulationReturnPct[deceasedIndex] / 100;
       state.inheritedSuper.retire *=
         1 + annualReturns.superRetirementReturnPct[deceasedIndex] / 100;
-      if (scenario.assumptions.ukPensionsEnabled !== false) {
-        const inheritedUk = ukPensionFlows(
-          deceased,
-          ages[deceasedIndex],
-          scenario.assumptions.gbpAud,
-          inflationFactor
-        ).stateAnnuity * deceased.ukStateSurvivorPct / 100;
-        ukState[survivorIndex] += inheritedUk;
-      }
+      const inheritedPension = pensionFlows({
+        person: deceased,
+        age: ages[deceasedIndex],
+        inflationFactor,
+        assumptions: scenario.assumptions
+      });
+      const continuation = deceased.ukStateSurvivorPct / 100;
+      pensionGross[survivorIndex] +=
+        inheritedPension.grossNominal * continuation;
+      pensionTaxable[survivorIndex] +=
+        inheritedPension.taxableNominal * continuation;
     }
 
     const otherIncome = otherIncomeFlows({
@@ -1592,13 +1563,11 @@
         (state.inheritedSuper.ownerIndex === index
           ? state.inheritedSuper.accum + state.inheritedSuper.retire : 0)
       ) / inflationFactor),
-      ages,
-      ukPrivateBalances: state.ukPrivateBalances.map(value => value / inflationFactor)
+      ages
     });
     const agePensionIncomeReal =
       salaries.reduce((sum, value) => sum + value, 0) / inflationFactor +
-      ukState.reduce((sum, value) => sum + value, 0) / inflationFactor +
-      ukPrivateAnnuity.reduce((sum, value) => sum + value, 0) / inflationFactor +
+      pensionGross.reduce((sum, value) => sum + value, 0) / inflationFactor +
       (otherIncome.taxableTotal + otherIncome.nonTaxableTotal) / inflationFactor +
       deemedIncome(assessableAssetsReal,
         state.lifecycle.householdStatus === 'survivor' ? 'single' : 'couple');
@@ -1637,10 +1606,9 @@
       }
     }
 
-    const uppRate = scenario.assumptions.uppPct / 100;
     const taxableNominal = [0, 1].map(index =>
       salaries[index] +
-      (ukState[index] + ukPrivateAnnuity[index]) * (1 - uppRate) +
+      pensionTaxable[index] +
       agePensionByPersonNominal[index] +
       otherIncome.taxableByPerson[index] +
       interestByPerson[index] +
@@ -1675,8 +1643,7 @@
 
     const grossTaxableSources =
       salaries.reduce((sum, value) => sum + value, 0) +
-      ukState.reduce((sum, value) => sum + value, 0) +
-      ukPrivateAnnuity.reduce((sum, value) => sum + value, 0) +
+      pensionGross.reduce((sum, value) => sum + value, 0) +
       otherIncome.taxableTotal +
       agePensionNominal;
     const taxableNetRatio = grossTaxableSources > 0
@@ -1735,8 +1702,7 @@
       state.inheritedSuper.retire +
       state.cash +
       state.savings +
-      unsoldShares +
-      state.ukPrivateBalances.reduce((sum, value) => sum + value, 0);
+      unsoldShares;
 
     const adjustedTaxableIncomeReal =
       taxableNominal.reduce((sum, value) => sum + value, 0) / inflationFactor;
@@ -1754,6 +1720,7 @@
       ages: ages.map((age, index) => state.lifecycle.alive[index] ? age : null),
       rawAges: [...ages],
       lifecycle: { ...lifecycle, alive: [...lifecycle.alive] },
+      ukStateByPerson: pensionGross.map(value => value / inflationFactor),
       otherIncomeByPerson: [0, 1].map(index =>
         (otherIncome.taxableByPerson[index] +
           otherIncome.nonTaxableByPerson[index]) / inflationFactor),
@@ -1763,11 +1730,11 @@
           salaries.reduce((sum, value) => sum + value, 0) *
           taxableNetRatio / inflationFactor,
         ukStateNet:
-          ukState.reduce((sum, value) => sum + value, 0) *
+          pensionGross.reduce((sum, value) => sum + value, 0) *
           taxableNetRatio / inflationFactor,
-        ukPrivateAnnuityNet:
-          ukPrivateAnnuity.reduce((sum, value) => sum + value, 0) *
-          taxableNetRatio / inflationFactor,
+        ukStateGross:
+          pensionGross.reduce((sum, value) => sum + value, 0) /
+          inflationFactor,
         otherIncomeNet:
           (otherIncome.taxableTotal * taxableNetRatio +
             otherIncome.nonTaxableTotal) / inflationFactor,
@@ -2051,7 +2018,8 @@
     discountedCapitalGainByPerson,
     makeShareholding,
     stooqQuoteUrl,
-    ukPensionFlows,
+    pensionMode,
+    pensionFlows,
     TREASURY_INFLATION,
     TAX_SCHEDULES,
     TAX_SOURCE,
@@ -2138,7 +2106,6 @@
     const base = [
       ['workNet', '#C8C8C8', 'Work income'],
       ['ukStateNet', '#C99A45', 'UK State Pension'],
-      ['ukPrivateAnnuityNet', '#F0C571', 'UK private annuity'],
       ['agePensionNet', '#7E4794', 'Aust. Aged Pension']
     ];
     const sourceMeta = {
