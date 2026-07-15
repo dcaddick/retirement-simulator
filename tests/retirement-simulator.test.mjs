@@ -67,6 +67,25 @@ check('schema version is 12', core.SCHEMA_VERSION === 12);
 const sample = core.makeSampleScenario();
 check('sample validates', core.validateScenario(sample).length === 0,
   JSON.stringify(core.validateScenario(sample)[0] ?? null));
+const belowMinimumSuperAccess = structuredClone(sample);
+belowMinimumSuperAccess.people[0].superAccessAge = 59;
+const belowMinimumSuperAccessError = core.validateScenario(belowMinimumSuperAccess)
+  .find(error => error.path === 'people.0.superAccessAge');
+check('super access age 59 is rejected with the approved explanation',
+  belowMinimumSuperAccessError?.message ===
+    'Super access age must be 60 or older because this simulator does not model taxation of withdrawals before age 60.',
+  JSON.stringify(belowMinimumSuperAccessError));
+
+const minimumSuperAccess = structuredClone(sample);
+minimumSuperAccess.people[0].superAccessAge = 60;
+check('super access age 60 remains valid',
+  !core.validateScenario(minimumSuperAccess)
+    .some(error => error.path === 'people.0.superAccessAge'));
+
+check('deterministic super access control exposes the age-60 minimum',
+  html.includes("numberField('Super access age', `${path}.superAccessAge`, person.superAccessAge, 'min=\"60\" max=\"120\"')"));
+check('deterministic assumptions explain the age-60 boundary',
+  html.includes('The simulator treats super withdrawals as tax-free and does not model the additional tax rules that may apply before age 60.'));
 check('sample has otherIncomes/otherAssets arrays',
   Array.isArray(sample.otherIncomes) && Array.isArray(sample.otherAssets));
 check('sample lump sums include valid intended months',

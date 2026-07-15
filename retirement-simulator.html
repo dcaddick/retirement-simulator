@@ -355,7 +355,7 @@
             <li>Capital losses are tracked per person, applied before discounts and carried forward from a zero opening balance. CGT is funded from assets and never counts as retirement income.</li>
             <li>The survival band remains illustrative. The optional first-death scenario is a separate fixed event at the start of the selected year; it is not a mortality simulation and includes no bereavement payment.</li>
             <li>Other income is CPI-indexed. Ownership controls tax allocation and survivor continuation; deceased-owned income continues at its entered percentage, while joint and survivor-owned income continue in full. Other assets count in the Age Pension assets test but are not deemed, and no CGT is modelled on their disposal.</li>
-            <li>Early super access is simplified, not full Transition-to-Retirement (TTR). There is no 10%-of-balance annual payment cap, no commutation restriction, and no automatic cessation rule. Tax treatment assumes the member is over 60, where TTR and full retirement-phase withdrawals are both tax-free; the model will misstate results for anyone under 60 drawing super while still working.</li>
+            <li>Super access age is limited to 60 or older. The simulator treats super withdrawals as tax-free and does not model the additional tax rules that may apply before age 60.</li>
           </ul>
         </div>
       </details>
@@ -2187,8 +2187,10 @@
         if (!finiteNonNegative(person.retireAge) || person.retireAge < person.age) {
           add(`people.${index}.retireAge`, 'Retirement age cannot be below current age.');
         }
-        if (!finiteNonNegative(person.superAccessAge) || person.superAccessAge > 120) {
-          add(`people.${index}.superAccessAge`, 'Super access age must be between 0 and 120.');
+        if (!Number.isFinite(person.superAccessAge) ||
+            person.superAccessAge < 60 || person.superAccessAge > 120) {
+          add(`people.${index}.superAccessAge`,
+            'Super access age must be 60 or older because this simulator does not model taxation of withdrawals before age 60.');
         }
         if (!Number.isFinite(person.superAccessPct) ||
             person.superAccessPct < 0 || person.superAccessPct > 100) {
@@ -2726,9 +2728,9 @@
       ${numberField('Salary growth above inflation %', `${path}.salaryGrowthPct`,
         person.salaryGrowthPct ?? 0, 'min="0" step="0.1"')}
       ${numberField('SG %', `${path}.sgPct`, person.sgPct, 'min="0" max="30" step="0.1"')}
-      ${numberField('Super access age', `${path}.superAccessAge`, person.superAccessAge, 'min="0" max="120"')}
+      ${numberField('Super access age', `${path}.superAccessAge`, person.superAccessAge, 'min="60" max="120"')}
       ${numberField('Super access %', `${path}.superAccessPct`, person.superAccessPct, 'min="0" max="100" step="1"')}
-      <p class="sub">Age and % of super balance moved into drawdown phase. Independent of retire age &mdash; simplified early-access modelling, not full TTR (see Model assumptions).</p>
+      <p class="sub">Age and % of super balance moved into drawdown phase. The simulator treats super withdrawals as tax-free and does not model the additional tax rules that may apply before age 60.</p>
     </fieldset>`;
   }
 
