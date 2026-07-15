@@ -26,6 +26,7 @@ const METHODOLOGY = fileURLToPath(
 const TESTING = fileURLToPath(
   new URL('../docs/TESTING.md', import.meta.url)
 );
+const CHANGELOG = fileURLToPath(new URL('../CHANGELOG.md', import.meta.url));
 const SCREENSHOT_108 = fileURLToPath(
   new URL('../docs/assets/retirement-simulator-v1.08.png', import.meta.url)
 );
@@ -36,6 +37,7 @@ const deferredReview = existsSync(DEFERRED_REVIEW)
   : '';
 const methodology = readFileSync(METHODOLOGY, 'utf8');
 const testingGuide = readFileSync(TESTING, 'utf8');
+const changelog = readFileSync(CHANGELOG, 'utf8');
 const readme = readFileSync(README, 'utf8');
 
 function extract(id) {
@@ -258,6 +260,18 @@ check('methodology documents one-eligible couple treatment',
 check('deferred register resolves the age-gap item',
   deferredReview.includes('AIPR-003-AP-AGEGAP') &&
   deferredReview.includes('Resolved in v1.0.7'));
+check('public docs explain the supported age-60 super boundary',
+  readme.includes('super access age of 60 or older') &&
+  methodology.includes('Super access age is limited to 60 or older') &&
+  testingGuide.includes('age 59 is rejected') &&
+  testingGuide.includes('age 60 is accepted'));
+check('changelog records the super access validation decision',
+  changelog.includes('Reject super access ages below 60') &&
+  changelog.includes('issues/8'));
+check('deferred register resolves the pre-60 taxation item',
+  deferredReview.includes('| AIPR-003-SUPER-TAXFREE |') &&
+  deferredReview.includes('| Resolved | Super access ages below 60 are rejected') &&
+  deferredReview.includes('taxation of withdrawals before age 60'));
 check('returns and inflation share a dedicated upper controls block',
   html.indexOf('id="returnAssumptions"') < html.indexOf('id="peopleFields"') &&
   html.includes('Estimated net returns after fees and tax'));

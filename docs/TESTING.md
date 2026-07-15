@@ -9,9 +9,9 @@ node tests/retirement-simulator.test.mjs
 node tests/retirement-monte-carlo.test.mjs
 ```
 
-The deterministic suite checks core-engine extraction, script syntax, schema migration, validation and calculation invariants across the supported household model. It also covers the archived-release baseline, safe CSV serialisation, projection-critical numeric validation, the Age Pension couple taper, zero/half/full age-gap boundaries, fixed first-death transition ordering, survivor ownership and inherited super, single-person Age Pension, reversed partner order, eligible-person tax allocation, younger-partner super assessment, bracket creep, share growth, holding-period dividends, franking refunds, capital-loss carry-forward and CGT expense funding.
+The deterministic suite checks core-engine extraction, script syntax, schema migration, validation and calculation invariants across the supported household model. It also covers the archived-release baseline, safe CSV serialisation, projection-critical numeric validation, the Age Pension couple taper, zero/half/full age-gap boundaries, fixed first-death transition ordering, survivor ownership and inherited super, single-person Age Pension, reversed partner order, eligible-person tax allocation, younger-partner super assessment, bracket creep, share growth, holding-period dividends, franking refunds, capital-loss carry-forward and CGT expense funding. The suite also verifies that age 59 is rejected with the approved explanation and age 60 is accepted.
 
-The Monte Carlo v0.7 suite checks imported-scenario handling, matching age-gap and survivor Age Pension treatment, person-level tax allocation, the same fixed first-death event in every Monte Carlo path, deterministic parity under zero volatility, reproducibility, risk-mode behaviour, deterministic stress overrides and invariants that keep stress results outside the stochastic probability denominator.
+The Monte Carlo v0.7 suite checks imported-scenario handling, matching age-gap and survivor Age Pension treatment, person-level tax allocation, the same fixed first-death event in every Monte Carlo path, deterministic parity under zero volatility, reproducibility, risk-mode behaviour, deterministic stress overrides and invariants that keep stress results outside the stochastic probability denominator. The suite also verifies that age 59 is rejected with the approved explanation and age 60 is accepted.
 
 The repository workflow at `.github/workflows/test.yml` runs both commands with Node 20 for pull requests and pushes to `main`.
 
@@ -50,6 +50,7 @@ Automated tests do not replace a real-browser pass. For user-interface changes, 
 - lump-sum include/exclude toggles, concise tooltips and Event-column updates;
 - preservation of active tab, open sections, focus and panel/table scroll positions after recalculation.
 - per-person salary growth at 0% and a positive percentage, including retirement cutoff;
+- super access validation in both tools, confirming age 59 is rejected with the concise tax explanation and age 60 is accepted;
 - UK State Pension tooltips in today's and nominal dollars, showing after-tax allocation and gross value;
 - disabling the Age Pension estimate and then adding a lump-sum withdrawal without a script error.
 - Age Pension results for neither, one and both eligible partners, including reversed partner order and the transition when the younger partner reaches 67;

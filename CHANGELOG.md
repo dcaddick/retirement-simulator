@@ -2,6 +2,10 @@
 
 This changelog summarizes public, non-personal milestones. Early development used many private prototype snapshots; those files are intentionally not reproduced in the public repository.
 
+## Unreleased
+
+- Reject super access ages below 60 in both simulators because pre-60 withdrawal taxation is outside the simplified model ([#8](https://github.com/dcaddick/retirement-simulator/issues/8)).
+
 ## 1.08 - 2026-07-15
 
 - Added an optional fixed first-death event at the start of the selected projection year, with immediate survivor spending targets, ownership transfer, deceased-income cessation and configurable continuing-income percentages ([#7](https://github.com/dcaddick/retirement-simulator/issues/7)).

@@ -44,7 +44,7 @@ Preferred Retirement Income and Essential Annual Budget step to their configured
 
 ### Superannuation
 
-The model separates accumulation and retirement-phase balances, accepts separate estimated net return assumptions after fees and tax, and supports configurable transition timing. A higher retirement-phase assumption can represent pension-phase tax treatment; it does not imply a different underlying investment portfolio. Early access is simplified and is not a complete Transition-to-Retirement compliance model.
+The model separates accumulation and retirement-phase balances, accepts separate estimated net return assumptions after fees and tax, and supports configurable transition timing. A higher retirement-phase assumption can represent pension-phase tax treatment; it does not imply a different underlying investment portfolio. Super access age is limited to 60 or older because the simulator treats withdrawals as tax-free and does not model the additional tax rules that may apply before age 60. It remains a simplified model and does not implement complete Transition-to-Retirement compliance rules.
 
 The interface displays a simple real-return spread calculated as nominal return minus inflation. Under the Treasury schedule it shows the long-run spread against 2.5% and, when different, the near-term spread against the modelled calendar-year rate. This readout is an assumption aid, not a forecast of purchasing-power returns.
 

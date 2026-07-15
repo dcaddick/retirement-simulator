@@ -54,7 +54,7 @@ The deterministic simulator models a reusable two-person household and includes:
 
 - salaries, retirement ages and superannuation contributions;
 - accumulation and retirement-phase super balances;
-- flexible super-access timing and ordered drawdown tiers;
+- super access from age 60 and ordered drawdown tiers;
 - planned one-off withdrawals with intended month/year, compact modelling rows and include/exclude toggles;
 - cash, savings, shareholdings, other income and other assets;
 - nominal share-price growth, holding-period dividends and optional franking credits by owner;
@@ -70,6 +70,8 @@ The deterministic simulator models a reusable two-person household and includes:
 - local autosave plus JSON import and export.
 
 Return assumptions and inflation are shown together. The interface calculates the nominal-minus-inflation spread live, showing both the long-run 2.5% view and the near-term Treasury rate when they differ.
+
+Both tools require a super access age of 60 or older. They treat super withdrawals as tax-free and do not model the additional tax rules that may apply before age 60.
 
 The app favours transparent approximations over hidden precision. See [Model methodology](docs/MODEL-METHODOLOGY.md) for the calculation sequence and boundaries, and the maintained [Deferred Review Register](docs/DEFERRED-REVIEW.md) for known limitations that require later professional review, product decisions or separately designed remediation.
 
