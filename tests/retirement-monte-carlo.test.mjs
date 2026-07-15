@@ -3,7 +3,7 @@ import { readFile } from 'node:fs/promises';
 import vm from 'node:vm';
 
 const html = await readFile(
-  new URL('../retirement-monte-carlo-v0.6.html', import.meta.url),
+  new URL('../retirement-monte-carlo-v0.7.html', import.meta.url),
   'utf8'
 );
 
@@ -30,14 +30,14 @@ assert.ok(
   html.includes('retirement-simulator-theme'),
   'Monte Carlo should share the locally persisted theme preference'
 );
-assert.match(html, /Family Retirement Monte Carlo Report v0\.6/,
-  'Monte Carlo title should identify v0.6');
-assert.match(html, /<span class="version">v0\.6<\/span>/,
-  'Monte Carlo heading should identify v0.6');
+assert.match(html, /Family Retirement Monte Carlo Report v0\.7/,
+  'Monte Carlo title should identify v0.7');
+assert.match(html, /<span class="version">v0\.7<\/span>/,
+  'Monte Carlo heading should identify v0.7');
 assert.ok(
-  html.includes("const STORAGE_KEY = 'family-retirement-simulator:v0.6:scenario'") &&
-  html.includes("'family-retirement-simulator:v0.95:scenario'"),
-  'Monte Carlo v0.6 should retain the legacy saved-scenario fallback'
+  html.includes("const STORAGE_KEY = 'family-retirement-simulator:v0.7:scenario'") &&
+  html.includes("'family-retirement-simulator:v0.6:scenario'"),
+  'Monte Carlo v0.7 should retain the v0.6 saved-scenario fallback'
 );
 
 const scripts = [...html.matchAll(/<script[^>]*>([\s\S]*?)<\/script>/g)].map(
@@ -60,6 +60,7 @@ const simulatorCoreScript = scripts.find(script =>
 assert.ok(simulatorCoreScript, 'embedded deterministic core should exist');
 vm.runInContext(simulatorCoreScript, context);
 const simulator = context.RetirementSimulatorCore;
+const plain = value => JSON.parse(JSON.stringify(value));
 const monteCarloDemo = simulator.makeSampleScenario();
 assert.equal(monteCarloDemo.people[0].name, 'John');
 assert.equal(monteCarloDemo.people[0].super, 220000);
@@ -80,7 +81,7 @@ v1Scenario.people = v1Scenario.people.map(person => {
   return rest;
 });
 const adaptedV1Scenario = simulator.importScenario(JSON.stringify(v1Scenario));
-assert.equal(adaptedV1Scenario.schemaVersion, 3,
+assert.equal(adaptedV1Scenario.schemaVersion, 4,
   'v1.00 schema should adapt to the experimental engine schema');
 assert.ok(adaptedV1Scenario.people.every(person => person.ukPrivateAmountGbp === 0),
   'v1.00 adapter should install inert legacy pension fields');
@@ -106,7 +107,7 @@ assert.throws(
 const disabledSchema9 = structuredClone(activeSchema9);
 disabledSchema9.lumpSumWithdrawals[0].enabled = false;
 const adaptedSchema9 = simulator.importScenario(JSON.stringify(disabledSchema9));
-assert.equal(adaptedSchema9.schemaVersion, 3);
+assert.equal(adaptedSchema9.schemaVersion, 4);
 assert.ok(!('lumpSumWithdrawals' in adaptedSchema9),
   'schema 9 disabled lump sums should be discarded by the adapter');
 
@@ -122,7 +123,7 @@ assert.throws(
 const zeroGrowthSchema10 = structuredClone(activeSchema10);
 zeroGrowthSchema10.people.forEach(person => { person.salaryGrowthPct = 0; });
 const adaptedSchema10 = simulator.importScenario(JSON.stringify(zeroGrowthSchema10));
-assert.equal(adaptedSchema10.schemaVersion, 3);
+assert.equal(adaptedSchema10.schemaVersion, 4);
 assert.ok(adaptedSchema10.people.every(person => !('salaryGrowthPct' in person)),
   'schema 10 zero salary growth should be removed by the adapter');
 
@@ -147,11 +148,89 @@ Object.assign(inertSchema11.shareholdings[0], {
   companyTaxRatePct: 30, frankingEligible: false
 });
 const adaptedSchema11 = simulator.importScenario(JSON.stringify(inertSchema11));
-assert.equal(adaptedSchema11.schemaVersion, 3);
+assert.equal(adaptedSchema11.schemaVersion, 4);
 for (const key of ['priceGrowthPct', 'dividendYieldPct', 'frankedPct',
   'companyTaxRatePct', 'frankingEligible']) {
   assert.ok(!(key in adaptedSchema11.shareholdings[0]), `${key} should be stripped`);
 }
+
+const supportedSchema12 = structuredClone(inertSchema11);
+supportedSchema12.schemaVersion = 12;
+supportedSchema12.otherIncomes = [];
+supportedSchema12.otherAssets = [];
+supportedSchema12.lumpSumWithdrawals = [];
+supportedSchema12.household.firstDeath = {
+  enabled: true,
+  deceasedPerson: 'p0',
+  deathAge: 65,
+  survivorPreferredPct: 70,
+  survivorEssentialPct: 70
+};
+supportedSchema12.people.forEach(person => {
+  person.ukStateSurvivorPct = 0;
+});
+const adaptedSchema12 = simulator.importScenario(JSON.stringify(supportedSchema12));
+assert.equal(adaptedSchema12.schemaVersion, 4);
+assert.deepEqual(plain(adaptedSchema12.household.firstDeath),
+  supportedSchema12.household.firstDeath,
+  'schema 12 should retain supported first-death settings');
+for (const [label, mutate, pattern] of [
+  ['Other income', scenario => { scenario.otherIncomes = [{ label: 'Rent' }]; },
+    /cannot yet model populated Other income or Other assets/],
+  ['Other asset', scenario => { scenario.otherAssets = [{ label: 'Property' }]; },
+    /cannot yet model populated Other income or Other assets/],
+  ['lump sum', scenario => { scenario.lumpSumWithdrawals = [{ enabled: true }]; },
+    /cannot yet model lump-sum withdrawals/],
+  ['DB or UK pension', scenario => {
+    scenario.assumptions.ukPensionsEnabled = true;
+    scenario.people[0].ukStateAnnualGbp = 1000;
+  }, /cannot yet preserve v1\.00 Defined Benefit\/UK Pension treatment/]
+]) {
+  const unsupported = structuredClone(supportedSchema12);
+  mutate(unsupported);
+  assert.throws(() => simulator.importScenario(JSON.stringify(unsupported)),
+    pattern, `schema 12 active ${label} should remain explicitly unsupported`);
+}
+
+for (const [deceasedPerson, ages, survivorIndex] of [
+  ['p0', [65, 63], 1],
+  ['p1', [63, 65], 0]
+]) {
+  const scenario = structuredClone(adaptedSchema12);
+  scenario.household.firstDeath.deceasedPerson = deceasedPerson;
+  scenario.household.firstDeath.deathAge = 65;
+  const state = simulator.makeProjectionState(scenario);
+  const deceasedIndex = 1 - survivorIndex;
+  const openingSuper = simulator.totalSuper(state, deceasedIndex);
+  const transition = simulator.applyFirstDeathTransition({
+    scenario, state, year: scenario.startYear + 2, ages
+  });
+  assert.equal(transition.survivorIndex, survivorIndex);
+  assert.equal(state.lifecycle.householdStatus, 'survivor');
+  assert.equal(simulator.totalSuper(state, deceasedIndex), 0);
+  assert.equal(state.inheritedSuper.accum + state.inheritedSuper.retire,
+    openingSuper);
+  assert.equal(transition.preferredTargetPct, 70);
+  assert.equal(transition.essentialTargetPct, 70);
+  const repeat = simulator.applyFirstDeathTransition({
+    scenario, state, year: scenario.startYear + 3,
+    ages: ages.map(age => age + 1)
+  });
+  assert.equal(repeat.transitionedThisYear, false);
+  assert.equal(state.inheritedSuper.accum + state.inheritedSuper.retire,
+    openingSuper, 'first-death transition should be idempotent');
+}
+
+assert.equal(typeof simulator.agePensionForHousehold, 'function');
+assert.deepEqual(plain(simulator.agePensionForHousehold({
+  ages: [70, 68], alive: [true, false], survivorIndex: 0,
+  assets: 0, assessableIncome: 0, included: true
+})), {
+  eligibleCount: 1,
+  household: 1200.90 * 26,
+  byPerson: [1200.90 * 26, 0],
+  status: 'single'
+});
 
 const monteCarloCoreScript = scripts.find(script =>
   script.includes('RetirementMonteCarloCore')
@@ -160,7 +239,6 @@ assert.ok(monteCarloCoreScript, 'Monte Carlo core script should exist');
 vm.runInContext(monteCarloCoreScript, context);
 
 const core = context.RetirementMonteCarloCore;
-const plain = value => JSON.parse(JSON.stringify(value));
 
 const monteCarloPensionInputs = { assets: 0, assessableIncome: 0 };
 const monteCarloFullPension = simulator.agePensionCouple(
@@ -486,4 +564,4 @@ assert.ok(
   'savings interest should rise under the inflation stress but remain explicit'
 );
 
-console.log('retirement-monte-carlo-v0.6 risk-mode, age-gap and stress override tests passed');
+console.log('retirement-monte-carlo-v0.7 survivor-boundary, risk-mode, age-gap and stress override tests passed');

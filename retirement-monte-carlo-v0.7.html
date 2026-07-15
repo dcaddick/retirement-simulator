@@ -4,7 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src https://api.frankfurter.app https://stooq.com; base-uri 'none'; form-action 'none'" />
-<title>Family Retirement Monte Carlo Report v0.6</title>
+<title>Family Retirement Monte Carlo Report v0.7</title>
 <style>
   :root{
     --bg:#0f1720; --panel:#18232f; --panel2:#1e2c3a; --line:#2b3d4f;
@@ -148,7 +148,7 @@
 </head>
 <body>
 <header>
-  <h1>Family Retirement Monte Carlo Report <span class="version">v0.6</span></h1>
+  <h1>Family Retirement Monte Carlo Report <span class="version">v0.7</span></h1>
   <div class="sub">Local, reproducible retirement-risk analysis.</div>
   <div class="advice-warning">Estimate only; not financial or tax advice.</div>
   <nav class="scenario-actions" aria-label="Scenario actions">
@@ -339,7 +339,7 @@
     <div class="legend" id="legend"></div>
     <div class="tblwrap"><table id="tbl"></table></div>
     <div class="note">
-      <b>v0.6 experimental companion.</b> Generic two-person sample data is stored locally on this device and can be imported or exported as JSON. Calculations are transparent estimates in today&rsquo;s AUD and are not financial or tax advice.
+      <b>v0.7 experimental companion.</b> Generic two-person sample data is stored locally on this device and can be imported or exported as JSON. Calculations are transparent estimates in today&rsquo;s AUD and are not financial or tax advice.
     </div>
   </div>
 </div>
@@ -394,7 +394,7 @@
 <script id="simulator-core">
 (function () {
   'use strict';
-  const SCHEMA_VERSION = 3;
+  const SCHEMA_VERSION = 4;
   const VALID_OWNERS = new Set(['p0', 'p1', 'joint']);
   const DRAWDOWN_SOURCES = new Set(['p0Super', 'p1Super', 'cash', 'savings']);
   const TREASURY_INFLATION = Object.freeze({
@@ -435,11 +435,16 @@
     homeownerAssetFreeArea: 499000,
     assetTaperAnnualPerThousand: 78,
     incomeFreeAreaCoupleAnnual: 396 * 26,
-    incomeTaperCouple: 0.40,
+    incomeTaperCouple: 0.50,
+    agePensionMaxSingleAnnual: 1200.90 * 26,
+    homeownerAssetFreeAreaSingle: 333000,
+    incomeFreeAreaSingleAnnual: 226 * 26,
+    deemingThresholdSingle: 66800,
     deemingThresholdCouple: 110600,
     deemingLowerRate: 0.0125,
     deemingUpperRate: 0.0325,
-    cshcCoupleThreshold: 161768
+    cshcCoupleThreshold: 161768,
+    cshcSingleThreshold: 101105
   });
 
   function inflationRateForYear(year, assumptions) {
@@ -499,32 +504,58 @@
     return Math.max(0, gross - offsets);
   }
 
-  function deemedIncome(financialAssets) {
+  function pensionRuleSet(status = 'couple') {
     const rules = SERVICES_AUSTRALIA_2026;
-    const lowerBand = Math.min(financialAssets, rules.deemingThresholdCouple);
-    const upperBand = Math.max(0, financialAssets - rules.deemingThresholdCouple);
+    return status === 'single'
+      ? {
+          maxAnnual: rules.agePensionMaxSingleAnnual,
+          homeownerAssetFreeArea: rules.homeownerAssetFreeAreaSingle,
+          incomeFreeAreaAnnual: rules.incomeFreeAreaSingleAnnual,
+          deemingThreshold: rules.deemingThresholdSingle,
+          cshcThreshold: rules.cshcSingleThreshold
+        }
+      : {
+          maxAnnual: rules.agePensionMaxCoupleAnnual,
+          homeownerAssetFreeArea: rules.homeownerAssetFreeArea,
+          incomeFreeAreaAnnual: rules.incomeFreeAreaCoupleAnnual,
+          deemingThreshold: rules.deemingThresholdCouple,
+          cshcThreshold: rules.cshcCoupleThreshold
+        };
+  }
+
+  function deemedIncome(financialAssets, status = 'couple') {
+    const rules = SERVICES_AUSTRALIA_2026;
+    const threshold = pensionRuleSet(status).deemingThreshold;
+    const lowerBand = Math.min(financialAssets, threshold);
+    const upperBand = Math.max(0, financialAssets - threshold);
     return lowerBand * rules.deemingLowerRate + upperBand * rules.deemingUpperRate;
   }
 
-  function agePensionAssetsRate(assets) {
+  function agePensionAssetsRate(assets, status = 'couple') {
     const rules = SERVICES_AUSTRALIA_2026;
-    const reduction = Math.max(0, assets - rules.homeownerAssetFreeArea) /
+    const set = pensionRuleSet(status);
+    const reduction = Math.max(0, assets - set.homeownerAssetFreeArea) /
       1000 * rules.assetTaperAnnualPerThousand;
-    return Math.max(0, rules.agePensionMaxCoupleAnnual - reduction);
+    return Math.max(0, set.maxAnnual - reduction);
   }
 
-  function agePensionIncomeRate(assessableIncome) {
+  function agePensionIncomeRate(assessableIncome, status = 'couple') {
     const rules = SERVICES_AUSTRALIA_2026;
-    const reduction = Math.max(0, assessableIncome - rules.incomeFreeAreaCoupleAnnual) *
+    const set = pensionRuleSet(status);
+    const reduction = Math.max(0, assessableIncome - set.incomeFreeAreaAnnual) *
       rules.incomeTaperCouple;
-    return Math.max(0, rules.agePensionMaxCoupleAnnual - reduction);
+    return Math.max(0, set.maxAnnual - reduction);
+  }
+
+  function agePensionRate({ status = 'couple', assets, assessableIncome }) {
+    return Math.min(
+      agePensionAssetsRate(assets, status),
+      agePensionIncomeRate(assessableIncome, status)
+    );
   }
 
   function agePensionCouple({ assets, assessableIncome }) {
-    return Math.min(
-      agePensionAssetsRate(assets),
-      agePensionIncomeRate(assessableIncome)
-    );
+    return agePensionRate({ status: 'couple', assets, assessableIncome });
   }
 
   function agePensionForAges({
@@ -545,14 +576,44 @@
     };
   }
 
-  function cshcEstimate({ adjustedTaxableIncome, accountBasedPensionBalance }) {
-    const deemedAbpIncome = deemedIncome(accountBasedPensionBalance);
+  function agePensionForHousehold({
+    ages,
+    alive = [true, true],
+    survivorIndex = null,
+    assets,
+    assessableIncome,
+    included = true
+  }) {
+    if (!included) {
+      return { eligibleCount: 0, household: 0, byPerson: [0, 0], status: 'off' };
+    }
+    if (survivorIndex !== null) {
+      if (!alive[survivorIndex] || ages[survivorIndex] < 67) {
+        return { eligibleCount: 0, household: 0, byPerson: [0, 0], status: 'single' };
+      }
+      const household = agePensionRate({
+        status: 'single', assets, assessableIncome
+      });
+      const byPerson = [0, 0];
+      byPerson[survivorIndex] = household;
+      return { eligibleCount: 1, household, byPerson, status: 'single' };
+    }
+    return {
+      ...agePensionForAges({ ages, assets, assessableIncome, included }),
+      status: 'couple'
+    };
+  }
+
+  function cshcEstimate({
+    adjustedTaxableIncome, accountBasedPensionBalance, status = 'couple'
+  }) {
+    const deemedAbpIncome = deemedIncome(accountBasedPensionBalance, status);
     const assessedIncome = adjustedTaxableIncome + deemedAbpIncome;
     return {
       assessedIncome,
       deemedAbpIncome,
-      threshold: SERVICES_AUSTRALIA_2026.cshcCoupleThreshold,
-      eligible: assessedIncome < SERVICES_AUSTRALIA_2026.cshcCoupleThreshold
+      threshold: pensionRuleSet(status).cshcThreshold,
+      eligible: assessedIncome < pensionRuleSet(status).cshcThreshold
     };
   }
 
@@ -584,6 +645,16 @@
     return superFirst ? [superTier, potTier] : [potTier, superTier];
   }
 
+  function defaultFirstDeath() {
+    return {
+      enabled: false,
+      deceasedPerson: 'p0',
+      deathAge: 80,
+      survivorPreferredPct: 70,
+      survivorEssentialPct: 70
+    };
+  }
+
   function makeSampleScenario() {
     return {
       schemaVersion: SCHEMA_VERSION,
@@ -603,6 +674,7 @@
           accumulationReturnPct: 5.5,
           retirementReturnPct: 6.5,
           ukStateAnnualGbp: 0,
+          ukStateSurvivorPct: 0,
           ukStateStartAge: 67,
           ukPrivateAmountGbp: 0,
           ukPrivateTakeAge: 67,
@@ -621,6 +693,7 @@
           accumulationReturnPct: 5.5,
           retirementReturnPct: 6.5,
           ukStateAnnualGbp: 0,
+          ukStateSurvivorPct: 0,
           ukStateStartAge: 67,
           ukPrivateAmountGbp: 0,
           ukPrivateTakeAge: 67,
@@ -643,7 +716,8 @@
         ],
         applyMinimumDrawdown: true,
         includeAgePension: true,
-        showSurvival: true
+        showSurvival: true,
+        firstDeath: defaultFirstDeath()
       },
       assumptions: {
         inflationMode: 'manual',
@@ -715,6 +789,19 @@
       }
       current = migrated;
     }
+    if (current.schemaVersion === 3) {
+      const migrated = structuredClone(current);
+      migrated.schemaVersion = 4;
+      migrated.household = {
+        ...migrated.household,
+        firstDeath: defaultFirstDeath()
+      };
+      migrated.people = migrated.people.map(person => ({
+        ...person,
+        ukStateSurvivorPct: 0
+      }));
+      current = migrated;
+    }
     if (current.schemaVersion !== SCHEMA_VERSION) {
       throw new Error(`Unsupported schema version: ${raw.schemaVersion}.`);
     }
@@ -728,9 +815,9 @@
   }
 
   function adaptV1ScenarioForExperimentalMonteCarlo(scenario) {
-    if (![6, 7, 8, 9, 10, 11].includes(scenario.schemaVersion)) return scenario;
+    if (![6, 7, 8, 9, 10, 11, 12].includes(scenario.schemaVersion)) return scenario;
     if (scenario.people?.some(person => Number(person.salaryGrowthPct) > 0)) {
-      throw new Error('Monte Carlo v0.6 cannot yet model above-inflation salary growth. Set it to 0% in a fictional copy before importing.');
+      throw new Error('Monte Carlo v0.7 cannot yet model above-inflation salary growth. Set it to 0% in a fictional copy before importing.');
     }
     const activeShareReturns = (scenario.shareholdings ?? []).some(holding =>
       Number(holding.priceGrowthPct) !== 0 ||
@@ -738,18 +825,18 @@
       Number(holding.frankedPct) !== 0 ||
       holding.frankingEligible === true);
     if (activeShareReturns) {
-      throw new Error('Monte Carlo v0.6 cannot yet model v1.06 share price growth, dividends or franking. Set those fields to zero/off in a fictional copy before importing.');
+      throw new Error('Monte Carlo v0.7 cannot yet model v1.06 share price growth, dividends or franking. Set those fields to zero/off in a fictional copy before importing.');
     }
     if ((scenario.otherIncomes ?? []).length || (scenario.otherAssets ?? []).length) {
-      throw new Error('Monte Carlo v0.6 cannot yet model populated Other income or Other assets. Remove them from a fictional copy before importing.');
+      throw new Error('Monte Carlo v0.7 cannot yet model populated Other income or Other assets. Remove them from a fictional copy before importing.');
     }
     if ((scenario.lumpSumWithdrawals ?? []).some(item => item.enabled !== false)) {
-      throw new Error('Monte Carlo v0.6 cannot yet model lump-sum withdrawals. Remove them from a fictional copy before importing.');
+      throw new Error('Monte Carlo v0.7 cannot yet model lump-sum withdrawals. Remove them from a fictional copy before importing.');
     }
     const hasPensionIncome = scenario.people?.some(person =>
       Number(person.ukStateAnnualGbp) > 0);
     if (scenario.assumptions?.ukPensionsEnabled !== false && hasPensionIncome) {
-      throw new Error('Monte Carlo v0.6 cannot yet preserve v1.00 Defined Benefit/UK Pension treatment. Use a fictional copy with those pensions excluded.');
+      throw new Error('Monte Carlo v0.7 cannot yet preserve v1.00 Defined Benefit/UK Pension treatment. Use a fictional copy with those pensions excluded.');
     }
     const adapted = structuredClone(scenario);
     adapted.schemaVersion = SCHEMA_VERSION;
@@ -758,11 +845,19 @@
       return {
         ...rest,
         ukStateAnnualGbp: 0,
+        ukStateSurvivorPct: person.ukStateSurvivorPct ?? 0,
         ukPrivateAmountGbp: 0,
         ukPrivateTakeAge: person.ukStateStartAge ?? 67,
         ukPrivateType: 'lump'
       };
     });
+    adapted.household = {
+      ...adapted.household,
+      firstDeath: {
+        ...defaultFirstDeath(),
+        ...(adapted.household?.firstDeath ?? {})
+      }
+    };
     delete adapted.otherIncomes;
     delete adapted.otherAssets;
     delete adapted.lumpSumWithdrawals;
@@ -865,6 +960,18 @@
       superTransitioned: splits.map(split => split.transitioned),
       cash: scenario.cash.amount,
       savings: scenario.savings.amount,
+      lifecycle: {
+        householdStatus: 'couple',
+        alive: [true, true],
+        survivorIndex: null,
+        deceasedIndex: null,
+        transitionYear: null
+      },
+      ownership: {
+        cash: scenario.cash.owner,
+        savings: scenario.savings.owner
+      },
+      inheritedSuper: { accum: 0, retire: 0, ownerIndex: null },
       holdings: scenario.shareholdings.map(holding => ({ ...holding, sold: false })),
       ukPrivateBalances: scenario.people.map(person =>
         person.ukPrivateType === 'lump'
@@ -874,21 +981,103 @@
     };
   }
 
+  function lifecycleContext(scenario, state, transitionedThisYear = false) {
+    const firstDeath = scenario.household.firstDeath;
+    return {
+      householdStatus: state.lifecycle.householdStatus,
+      alive: [...state.lifecycle.alive],
+      survivorIndex: state.lifecycle.survivorIndex,
+      deceasedIndex: state.lifecycle.deceasedIndex,
+      transitionYear: state.lifecycle.transitionYear,
+      transitionedThisYear,
+      preferredTargetPct: state.lifecycle.householdStatus === 'survivor'
+        ? firstDeath.survivorPreferredPct : 100,
+      essentialTargetPct: state.lifecycle.householdStatus === 'survivor'
+        ? firstDeath.survivorEssentialPct : 100,
+      event: null
+    };
+  }
+
+  function applyFirstDeathTransition({ scenario, state, year, ages }) {
+    const firstDeath = scenario.household.firstDeath;
+    if (!firstDeath.enabled || state.lifecycle.householdStatus === 'survivor') {
+      return lifecycleContext(scenario, state, false);
+    }
+    const deceasedIndex = firstDeath.deceasedPerson === 'p1' ? 1 : 0;
+    if (ages[deceasedIndex] !== firstDeath.deathAge) {
+      return lifecycleContext(scenario, state, false);
+    }
+    const survivorIndex = 1 - deceasedIndex;
+    const survivorOwner = `p${survivorIndex}`;
+    const deceasedOwner = `p${deceasedIndex}`;
+    const transferredAccum = state.superAccum[deceasedIndex];
+    const transferredRetire = state.superRetire[deceasedIndex];
+    state.inheritedSuper.accum += transferredAccum;
+    state.inheritedSuper.retire += transferredRetire;
+    state.inheritedSuper.ownerIndex = survivorIndex;
+    state.superAccum[deceasedIndex] = 0;
+    state.superRetire[deceasedIndex] = 0;
+    state.superTransitioned[deceasedIndex] = true;
+    state.ukPrivateBalances[survivorIndex] +=
+      state.ukPrivateBalances[deceasedIndex];
+    state.ukPrivateBalances[deceasedIndex] = 0;
+    if ([deceasedOwner, 'joint'].includes(state.ownership.cash)) {
+      state.ownership.cash = survivorOwner;
+    }
+    if ([deceasedOwner, 'joint'].includes(state.ownership.savings)) {
+      state.ownership.savings = survivorOwner;
+    }
+    state.holdings.forEach(holding => {
+      if ([deceasedOwner, 'joint'].includes(holding.owner)) {
+        holding.owner = survivorOwner;
+      }
+    });
+    state.lifecycle = {
+      householdStatus: 'survivor',
+      alive: deceasedIndex === 0 ? [false, true] : [true, false],
+      survivorIndex,
+      deceasedIndex,
+      transitionYear: year
+    };
+    const event = {
+      type: 'first-death',
+      year,
+      deceasedIndex,
+      survivorIndex,
+      transferredSuper: transferredAccum + transferredRetire,
+      preferredTargetPct: firstDeath.survivorPreferredPct,
+      essentialTargetPct: firstDeath.survivorEssentialPct,
+      label: `First death: ${scenario.people[deceasedIndex].name}; ` +
+        `${scenario.people[survivorIndex].name} becomes survivor`
+    };
+    return { ...lifecycleContext(scenario, state, true), event };
+  }
+
   function totalSuper(state, index) {
     return state.superAccum[index] + state.superRetire[index];
   }
 
   function sourceBalance(state, source) {
-    if (source === 'p0Super') return state.superRetire[0];
-    if (source === 'p1Super') return state.superRetire[1];
+    if (source === 'p0Super') return state.lifecycle?.deceasedIndex === 0
+      ? state.inheritedSuper.retire : state.superRetire[0];
+    if (source === 'p1Super') return state.lifecycle?.deceasedIndex === 1
+      ? state.inheritedSuper.retire : state.superRetire[1];
     if (source === 'cash') return state.cash;
     if (source === 'savings') return state.savings;
     throw new Error(`Invalid drawdown source: ${source}`);
   }
 
   function setSourceBalance(state, source, value) {
-    if (source === 'p0Super') { state.superRetire[0] = value; return; }
-    if (source === 'p1Super') { state.superRetire[1] = value; return; }
+    if (source === 'p0Super') {
+      if (state.lifecycle?.deceasedIndex === 0) state.inheritedSuper.retire = value;
+      else state.superRetire[0] = value;
+      return;
+    }
+    if (source === 'p1Super') {
+      if (state.lifecycle?.deceasedIndex === 1) state.inheritedSuper.retire = value;
+      else state.superRetire[1] = value;
+      return;
+    }
     if (source === 'cash') { state.cash = value; return; }
     if (source === 'savings') { state.savings = value; return; }
     throw new Error(`Invalid drawdown source: ${source}`);
@@ -1387,6 +1576,11 @@
             person.superAccessPct < 0 || person.superAccessPct > 100) {
           add(`people.${index}.superAccessPct`, 'Super access % must be between 0 and 100.');
         }
+        if (!Number.isFinite(person.ukStateSurvivorPct) ||
+            person.ukStateSurvivorPct < 0 || person.ukStateSurvivorPct > 100) {
+          add(`people.${index}.ukStateSurvivorPct`,
+            'UK State Pension survivor % must be between 0 and 100.');
+        }
       });
     }
     ['cash', 'savings'].forEach(key => {
@@ -1441,8 +1635,44 @@
     if (!(scenario.household?.annualBudget >= 0)) {
       add('household.annualBudget', 'General budget must be zero or greater.');
     }
-    if (!(scenario.household?.modelEndAge >= scenario.people?.[0]?.age)) {
-      add('household.modelEndAge', 'Model end age cannot be below Person 1 current age.');
+    const firstDeath = scenario.household?.firstDeath;
+    const horizonIndex = firstDeath?.enabled
+      ? 1 - (firstDeath.deceasedPerson === 'p1' ? 1 : 0) : 0;
+    if (!(scenario.household?.modelEndAge >= scenario.people?.[horizonIndex]?.age)) {
+      add('household.modelEndAge', firstDeath?.enabled
+        ? 'Model end age cannot be below the survivor current age.'
+        : 'Model end age cannot be below Person 1 current age.');
+    }
+    if (!firstDeath || typeof firstDeath.enabled !== 'boolean') {
+      add('household.firstDeath.enabled',
+        'First-death inclusion must be true or false.');
+    } else if (firstDeath.enabled) {
+      const validDeceased = ['p0', 'p1'].includes(firstDeath.deceasedPerson);
+      if (!validDeceased) {
+        add('household.firstDeath.deceasedPerson',
+          'Select the person who dies first.');
+      }
+      const deceasedIndex = firstDeath.deceasedPerson === 'p1' ? 1 : 0;
+      const survivorIndex = 1 - deceasedIndex;
+      const deceased = scenario.people?.[deceasedIndex];
+      const survivor = scenario.people?.[survivorIndex];
+      if (!deceased || !Number.isInteger(firstDeath.deathAge) ||
+          firstDeath.deathAge <= deceased.age) {
+        add('household.firstDeath.deathAge',
+          'Death age must be above the current age.');
+      } else if (survivor &&
+          survivor.age + firstDeath.deathAge - deceased.age >=
+            scenario.household.modelEndAge) {
+        add('household.firstDeath.deathAge',
+          'Death must occur before the survivor reaches Model End Age.');
+      }
+      for (const field of ['survivorPreferredPct', 'survivorEssentialPct']) {
+        if (!Number.isFinite(firstDeath[field]) ||
+            firstDeath[field] < 0 || firstDeath[field] > 100) {
+          add(`household.firstDeath.${field}`,
+            'Survivor percentage must be from 0% to 100%.');
+        }
+      }
     }
     if (!Array.isArray(scenario.household?.drawdownPriority) ||
         scenario.household.drawdownPriority.length === 0) {
@@ -1503,11 +1733,13 @@
     litoOffset,
     saptoOffset,
     netTax,
+    pensionRuleSet,
     deemedIncome,
     agePensionAssetsRate,
     agePensionIncomeRate,
     agePensionCouple,
     agePensionForAges,
+    agePensionForHousehold,
     cshcEstimate,
     assessableFinancialAssets,
     makeProjectionState,
@@ -1517,6 +1749,9 @@
     setSourceBalance,
     drawFromTiers,
     defaultDrawdownPriority,
+    defaultFirstDeath,
+    lifecycleContext,
+    applyFirstDeathTransition,
     migrateScenario,
     inflationFactors,
     applyShareSales,
@@ -1532,8 +1767,9 @@
   'use strict';
 
   const core = globalThis.RetirementSimulatorCore;
-  const STORAGE_KEY = 'family-retirement-simulator:v0.6:scenario';
+  const STORAGE_KEY = 'family-retirement-simulator:v0.7:scenario';
   const LEGACY_STORAGE_KEYS = [
+    'family-retirement-simulator:v0.6:scenario',
     'family-retirement-simulator:v0.95:scenario'
   ];
   const THEME_STORAGE_KEY = 'retirement-simulator-theme';
