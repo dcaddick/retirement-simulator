@@ -92,6 +92,8 @@ Monte Carlo v0.7 accepts the standard fictional sample and scenarios using the f
 
 The unreleased schema-5 core supports above-inflation salary growth using the deterministic year-by-year formula. The remaining import guards stay explicit until their separate parity slices are complete.
 
+Other income is converted to AUD, CPI-indexed, allocated to person-level taxable or non-taxable ledgers, included in the Age Pension income test and continued after first death using the configured survivor continuation percentage. Zero-volatility tests compare the resulting tax, pension, drawdown and assets with the deterministic engine.
+
 The reported success rate is conditional on the selected model and assumptions. It is not a personal forecast. The model does not make every material retirement risk stochastic, and deterministic stresses do not alter the Monte Carlo probability denominator.
 
 ## Important exclusions

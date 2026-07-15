@@ -51,6 +51,14 @@ assert.ok(testingGuide.includes('schema-4 to schema-5 migration') &&
   testingGuide.includes('salary-growth parity'));
 assert.ok(changelog.includes('Monte Carlo schema 5') &&
   changelog.includes('salary-growth parity'));
+assert.ok(readme.includes('Other-income parity') &&
+  readme.includes('Other assets, pension, lump-sum and share-return guards'));
+assert.ok(methodology.includes('person-level taxable or non-taxable ledgers') &&
+  methodology.includes('survivor continuation percentage'));
+assert.ok(testingGuide.includes('Other-income ownership, tax, Age Pension') &&
+  testingGuide.includes('survivor parity'));
+assert.ok(changelog.includes('Other-income parity') &&
+  changelog.includes('second issue #1'));
 assert.ok(readme.includes('experimental') && html.includes('experimental'),
   'salary parity must not remove the experimental label');
 assert.ok(
