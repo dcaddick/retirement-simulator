@@ -1334,6 +1334,18 @@
     return { rows, firstShortfall };
   }
 
+  function salaryForProjectionYear({
+    person, age, year, startYear, inflationFactor, alive = true
+  }) {
+    if (!alive || age >= person.retireAge) return 0;
+    const yearsElapsed = year - startYear;
+    const salaryGrowthFactor = Math.pow(
+      1 + (person.salaryGrowthPct ?? 0) / 100,
+      yearsElapsed
+    );
+    return person.salary * inflationFactor * salaryGrowthFactor;
+  }
+
   function projectYear({
     scenario,
     state,
@@ -1371,7 +1383,14 @@
       }
 
       const working = ages[index] < person.retireAge;
-      const salary = working ? person.salary * inflationFactor : 0;
+      const salary = salaryForProjectionYear({
+        person,
+        age: ages[index],
+        year,
+        startYear: scenario.startYear,
+        inflationFactor,
+        alive: state.lifecycle.alive[index]
+      });
       salaries[index] = salary;
 
       state.superRetire[index] *=
@@ -1893,6 +1912,7 @@
     projectionYearCount,
     validateAnnualPath,
     annualReturnsForYear,
+    salaryForProjectionYear,
     projectScenario
   });
 })();

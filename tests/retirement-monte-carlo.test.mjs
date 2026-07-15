@@ -521,6 +521,159 @@ const deterministicContext = vm.createContext({
 deterministicContext.globalThis = deterministicContext;
 vm.runInContext(deterministicCoreSource, deterministicContext);
 const deterministic = deterministicContext.RetirementSimulatorCore;
+const salaryPerson = {
+  ...adaptedSchema10.people[0],
+  age: 63,
+  retireAge: 65,
+  salary: 100000,
+  salaryGrowthPct: 5
+};
+assert.equal(simulator.salaryForProjectionYear({
+  person: salaryPerson, age: 63, year: 2026, startYear: 2026,
+  inflationFactor: 1, alive: true
+}), 100000);
+assert.equal(simulator.salaryForProjectionYear({
+  person: salaryPerson, age: 64, year: 2027, startYear: 2026,
+  inflationFactor: 1, alive: true
+}), 105000);
+assert.equal(simulator.salaryForProjectionYear({
+  person: salaryPerson, age: 65, year: 2028, startYear: 2026,
+  inflationFactor: 1, alive: true
+}), 0);
+
+const monteCarloSalaryParity = structuredClone(adaptedSchema10);
+monteCarloSalaryParity.assumptions.inflationMode = 'manual';
+monteCarloSalaryParity.assumptions.manualInflationPct = 0;
+monteCarloSalaryParity.assumptions.ukPensionsEnabled = false;
+monteCarloSalaryParity.household.includeAgePension = false;
+monteCarloSalaryParity.household.applyMinimumDrawdown = false;
+monteCarloSalaryParity.household.targetAfterTax = 0;
+monteCarloSalaryParity.household.annualBudget = 0;
+monteCarloSalaryParity.household.modelEndAge = 67;
+monteCarloSalaryParity.household.firstDeath.enabled = false;
+monteCarloSalaryParity.cash.amount = 0;
+monteCarloSalaryParity.savings.amount = 0;
+monteCarloSalaryParity.shareholdings = [];
+monteCarloSalaryParity.people.forEach((person, index) => Object.assign(person, {
+  age: index === 0 ? 63 : 61,
+  retireAge: 65,
+  superAccessAge: 65,
+  salary: index === 0 ? 100000 : 50000,
+  salaryGrowthPct: index === 0 ? 5 : 0,
+  sgPct: 12,
+  accumulationReturnPct: 0,
+  retirementReturnPct: 0,
+  super: index === 0 ? 100000 : 50000,
+  ukStateAnnualGbp: 0
+}));
+const salaryPath = {
+  schemaVersion: 1,
+  years: Array.from(
+    { length: simulator.projectionYearCount(monteCarloSalaryParity) },
+    (_, index) => ({
+      year: monteCarloSalaryParity.startYear + index,
+      superAccumulationReturnPct: [0, 0],
+      superRetirementReturnPct: [0, 0]
+    })
+  )
+};
+const monteCarloSalaryRows = simulator.projectScenario(
+  monteCarloSalaryParity, salaryPath).rows;
+
+const deterministicSalaryParity = deterministic.makeSampleScenario();
+deterministicSalaryParity.assumptions.inflationMode = 'manual';
+deterministicSalaryParity.assumptions.manualInflationPct = 0;
+deterministicSalaryParity.assumptions.ukPensionsEnabled = false;
+deterministicSalaryParity.household = structuredClone(
+  monteCarloSalaryParity.household);
+deterministicSalaryParity.cash.amount = 0;
+deterministicSalaryParity.savings.amount = 0;
+deterministicSalaryParity.shareholdings = [];
+deterministicSalaryParity.otherIncomes = [];
+deterministicSalaryParity.otherAssets = [];
+deterministicSalaryParity.lumpSumWithdrawals = [];
+deterministicSalaryParity.people.forEach((person, index) => Object.assign(person, {
+  age: monteCarloSalaryParity.people[index].age,
+  retireAge: 65,
+  superAccessAge: 65,
+  salary: monteCarloSalaryParity.people[index].salary,
+  salaryGrowthPct: monteCarloSalaryParity.people[index].salaryGrowthPct,
+  sgPct: 12,
+  accumulationReturnPct: 0,
+  retirementReturnPct: 0,
+  super: monteCarloSalaryParity.people[index].super,
+  ukStateAnnualGbp: 0
+}));
+const deterministicSalaryRows = deterministic.projectScenario(
+  deterministicSalaryParity).rows;
+const round6 = value => Math.round(value * 1e6) / 1e6;
+const salaryParityShape = row => ({
+  year: row.year,
+  workNet: round6(row.components.workNet),
+  totalIncome: round6(row.totalIncome),
+  totalAssets: round6(row.totalAssets),
+  superBalances: row.superBalances.map(round6)
+});
+assert.deepEqual(
+  plain(monteCarloSalaryRows.map(salaryParityShape)),
+  plain(deterministicSalaryRows.map(salaryParityShape)),
+  'zero-volatility salary growth should match deterministic cash flows and balances'
+);
+
+const salaryStochasticProfiles = {
+  p0Accum: { expectedReturnPct: 4, volatilityPct: 8 },
+  p0Retire: { expectedReturnPct: 4, volatilityPct: 8 },
+  p1Accum: { expectedReturnPct: 4, volatilityPct: 8 },
+  p1Retire: { expectedReturnPct: 4, volatilityPct: 8 }
+};
+const salaryStochasticA = core.simulatePaths({
+  scenario: monteCarloSalaryParity,
+  pathCount: 3,
+  seed: 24680,
+  profiles: salaryStochasticProfiles,
+  projectScenario: simulator.projectScenario
+});
+const salaryStochasticB = core.simulatePaths({
+  scenario: monteCarloSalaryParity,
+  pathCount: 3,
+  seed: 24680,
+  profiles: salaryStochasticProfiles,
+  projectScenario: simulator.projectScenario
+});
+assert.deepEqual(
+  plain(salaryStochasticA.map(result => result.projection.rows.map(row => ({
+    year: row.year,
+    workNet: row.components.workNet,
+    totalAssets: row.totalAssets
+  })))),
+  plain(salaryStochasticB.map(result => result.projection.rows.map(row => ({
+    year: row.year,
+    workNet: row.components.workNet,
+    totalAssets: row.totalAssets
+  })))),
+  'salary-growth paths should remain seed-reproducible'
+);
+assert.ok(salaryStochasticA.every(result =>
+  result.engineError === null && result.projection.rows.every(row =>
+    Number.isFinite(row.totalIncome) && Number.isFinite(row.totalAssets) &&
+    row.totalAssets >= 0)),
+'salary-growth stochastic paths should preserve accounting invariants');
+
+const noGrowthStochastic = structuredClone(monteCarloSalaryParity);
+noGrowthStochastic.people[0].salaryGrowthPct = 0;
+const noGrowthPaths = core.simulatePaths({
+  scenario: noGrowthStochastic,
+  pathCount: 3,
+  seed: 24680,
+  profiles: salaryStochasticProfiles,
+  projectScenario: simulator.projectScenario
+});
+assert.ok(
+  salaryStochasticA[0].projection.rows[1].components.workNet >
+    noGrowthPaths[0].projection.rows[1].components.workNet,
+  'positive salary growth must not be silently omitted from stochastic paths'
+);
+
 const deterministicFixedDeath = deterministic.makeSampleScenario();
 deterministicFixedDeath.assumptions.inflationMode = 'manual';
 deterministicFixedDeath.assumptions.manualInflationPct = 0;
