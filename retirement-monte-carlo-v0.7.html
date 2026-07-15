@@ -394,7 +394,7 @@
 <script id="simulator-core">
 (function () {
   'use strict';
-  const SCHEMA_VERSION = 4;
+  const SCHEMA_VERSION = 5;
   const VALID_OWNERS = new Set(['p0', 'p1', 'joint']);
   const DRAWDOWN_SOURCES = new Set(['p0Super', 'p1Super', 'cash', 'savings']);
   const TREASURY_INFLATION = Object.freeze({
@@ -670,6 +670,7 @@
           superAccessAge: 65,
           superAccessPct: 100,
           salary: 85000,
+          salaryGrowthPct: 0,
           sgPct: 12,
           accumulationReturnPct: 5.5,
           retirementReturnPct: 6.5,
@@ -689,6 +690,7 @@
           superAccessAge: 65,
           superAccessPct: 100,
           salary: 45000,
+          salaryGrowthPct: 0,
           sgPct: 12,
           accumulationReturnPct: 5.5,
           retirementReturnPct: 6.5,
@@ -703,6 +705,9 @@
       cash: { amount: 25000, interestPct: 0, owner: 'joint' },
       savings: { amount: 60000, interestPct: 4.5, owner: 'p1' },
       shareholdings: [],
+      otherIncomes: [],
+      otherAssets: [],
+      lumpSumWithdrawals: [],
       household: {
         targetAfterTax: 80000,
         annualBudget: 70000,
@@ -723,7 +728,8 @@
         inflationMode: 'manual',
         manualInflationPct: 3,
         gbpAud: 1.95,
-        uppPct: 8
+        uppPct: 8,
+        ukPensionsEnabled: true
       }
     };
   }
@@ -802,6 +808,39 @@
       }));
       current = migrated;
     }
+    if (current.schemaVersion === 4) {
+      const migrated = structuredClone(current);
+      migrated.schemaVersion = 5;
+      migrated.people = migrated.people.map(person => ({
+        ...person,
+        salaryGrowthPct: Number.isFinite(person.salaryGrowthPct)
+          ? person.salaryGrowthPct : 0
+      }));
+      migrated.otherIncomes = Array.isArray(migrated.otherIncomes)
+        ? migrated.otherIncomes : [];
+      migrated.otherAssets = Array.isArray(migrated.otherAssets)
+        ? migrated.otherAssets : [];
+      migrated.lumpSumWithdrawals = Array.isArray(migrated.lumpSumWithdrawals)
+        ? migrated.lumpSumWithdrawals : [];
+      migrated.shareholdings = (migrated.shareholdings ?? []).map(holding => ({
+        ...holding,
+        priceGrowthPct: Number.isFinite(holding.priceGrowthPct)
+          ? holding.priceGrowthPct : 0,
+        dividendYieldPct: Number.isFinite(holding.dividendYieldPct)
+          ? holding.dividendYieldPct : 0,
+        frankedPct: Number.isFinite(holding.frankedPct) ? holding.frankedPct : 0,
+        companyTaxRatePct: [25, 30].includes(holding.companyTaxRatePct)
+          ? holding.companyTaxRatePct : 30,
+        frankingEligible: holding.frankingEligible === true
+      }));
+      migrated.assumptions = {
+        ...migrated.assumptions,
+        ukPensionsEnabled:
+          typeof migrated.assumptions?.ukPensionsEnabled === 'boolean'
+            ? migrated.assumptions.ukPensionsEnabled : true
+      };
+      current = migrated;
+    }
     if (current.schemaVersion !== SCHEMA_VERSION) {
       throw new Error(`Unsupported schema version: ${raw.schemaVersion}.`);
     }
@@ -814,8 +853,7 @@
     return JSON.stringify(scenario, null, 2);
   }
 
-  function adaptV1ScenarioForExperimentalMonteCarlo(scenario) {
-    if (![6, 7, 8, 9, 10, 11, 12].includes(scenario.schemaVersion)) return scenario;
+  function assertExperimentalFeatureSupport(scenario) {
     if (scenario.people?.some(person => Number(person.salaryGrowthPct) > 0)) {
       throw new Error('Monte Carlo v0.7 cannot yet model above-inflation salary growth. Set it to 0% in a fictional copy before importing.');
     }
@@ -838,19 +876,21 @@
     if (scenario.assumptions?.ukPensionsEnabled !== false && hasPensionIncome) {
       throw new Error('Monte Carlo v0.7 cannot yet preserve v1.00 Defined Benefit/UK Pension treatment. Use a fictional copy with those pensions excluded.');
     }
+  }
+
+  function adaptV1ScenarioForExperimentalMonteCarlo(scenario) {
+    if (![6, 7, 8, 9, 10, 11, 12].includes(scenario.schemaVersion)) return scenario;
     const adapted = structuredClone(scenario);
     adapted.schemaVersion = SCHEMA_VERSION;
-    adapted.people = adapted.people.map(person => {
-      const { salaryGrowthPct, ...rest } = person;
-      return {
-        ...rest,
-        ukStateAnnualGbp: 0,
-        ukStateSurvivorPct: person.ukStateSurvivorPct ?? 0,
-        ukPrivateAmountGbp: 0,
-        ukPrivateTakeAge: person.ukStateStartAge ?? 67,
-        ukPrivateType: 'lump'
-      };
-    });
+    adapted.people = adapted.people.map(person => ({
+      ...person,
+      salaryGrowthPct: person.salaryGrowthPct ?? 0,
+      ukStateAnnualGbp: person.ukStateAnnualGbp ?? 0,
+      ukStateSurvivorPct: person.ukStateSurvivorPct ?? 0,
+      ukPrivateAmountGbp: 0,
+      ukPrivateTakeAge: person.ukStateStartAge ?? 67,
+      ukPrivateType: 'lump'
+    }));
     adapted.household = {
       ...adapted.household,
       firstDeath: {
@@ -858,16 +898,17 @@
         ...(adapted.household?.firstDeath ?? {})
       }
     };
-    delete adapted.otherIncomes;
-    delete adapted.otherAssets;
-    delete adapted.lumpSumWithdrawals;
-    adapted.shareholdings = (adapted.shareholdings ?? []).map(holding => {
-      const {
-        priceGrowthPct, dividendYieldPct, frankedPct,
-        companyTaxRatePct, frankingEligible, ...supported
-      } = holding;
-      return supported;
-    });
+    adapted.otherIncomes = adapted.otherIncomes ?? [];
+    adapted.otherAssets = adapted.otherAssets ?? [];
+    adapted.lumpSumWithdrawals = adapted.lumpSumWithdrawals ?? [];
+    adapted.shareholdings = (adapted.shareholdings ?? []).map(holding => ({
+      ...holding,
+      priceGrowthPct: holding.priceGrowthPct ?? 0,
+      dividendYieldPct: holding.dividendYieldPct ?? 0,
+      frankedPct: holding.frankedPct ?? 0,
+      companyTaxRatePct: holding.companyTaxRatePct ?? 30,
+      frankingEligible: holding.frankingEligible === true
+    }));
     return adapted;
   }
 
@@ -879,6 +920,7 @@
       throw new Error('Scenario file is not valid JSON.');
     }
     const scenario = migrateScenario(adaptV1ScenarioForExperimentalMonteCarlo(parsed));
+    assertExperimentalFeatureSupport(scenario);
     const errors = validateScenario(scenario);
     if (errors.length) {
       throw new Error(`${errors[0].path}: ${errors[0].message}`);
@@ -1351,24 +1393,26 @@
           inflationFactor;
       }
 
-      const uk = ukPensionFlows(
-        person,
-        ages[index],
-        scenario.assumptions.gbpAud,
-        inflationFactor
-      );
-      ukState[index] = uk.stateAnnuity;
-      ukPrivateAnnuity[index] = uk.privateAnnuity;
-      ukPrivateLump[index] = uk.privateLump;
+      if (scenario.assumptions.ukPensionsEnabled !== false) {
+        const uk = ukPensionFlows(
+          person,
+          ages[index],
+          scenario.assumptions.gbpAud,
+          inflationFactor
+        );
+        ukState[index] = uk.stateAnnuity;
+        ukPrivateAnnuity[index] = uk.privateAnnuity;
+        ukPrivateLump[index] = uk.privateLump;
 
-      if (uk.privateLump > 0 && state.ukPrivateBalances[index] > 0) {
-        state.savings += uk.privateLump;
-        state.ukPrivateBalances[index] = 0;
-        events.push({
-          type: 'uk-private-lump',
-          label: `${person.name} UK private pension lump sum`,
-          amount: uk.privateLump / inflationFactor
-        });
+        if (uk.privateLump > 0 && state.ukPrivateBalances[index] > 0) {
+          state.savings += uk.privateLump;
+          state.ukPrivateBalances[index] = 0;
+          events.push({
+            type: 'uk-private-lump',
+            label: `${person.name} UK private pension lump sum`,
+            amount: uk.privateLump / inflationFactor
+          });
+        }
       }
     });
 
@@ -1386,13 +1430,15 @@
         1 + annualReturns.superAccumulationReturnPct[deceasedIndex] / 100;
       state.inheritedSuper.retire *=
         1 + annualReturns.superRetirementReturnPct[deceasedIndex] / 100;
-      const inheritedUk = ukPensionFlows(
-        deceased,
-        ages[deceasedIndex],
-        scenario.assumptions.gbpAud,
-        inflationFactor
-      ).stateAnnuity * deceased.ukStateSurvivorPct / 100;
-      ukState[survivorIndex] += inheritedUk;
+      if (scenario.assumptions.ukPensionsEnabled !== false) {
+        const inheritedUk = ukPensionFlows(
+          deceased,
+          ages[deceasedIndex],
+          scenario.assumptions.gbpAud,
+          inflationFactor
+        ).stateAnnuity * deceased.ukStateSurvivorPct / 100;
+        ukState[survivorIndex] += inheritedUk;
+      }
     }
 
     const cashInterest = state.cash * scenario.cash.interestPct / 100;

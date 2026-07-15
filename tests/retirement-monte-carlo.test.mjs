@@ -72,6 +72,8 @@ assert.ok(simulatorCoreScript, 'embedded deterministic core should exist');
 vm.runInContext(simulatorCoreScript, context);
 const simulator = context.RetirementSimulatorCore;
 const plain = value => JSON.parse(JSON.stringify(value));
+assert.equal(simulator.SCHEMA_VERSION, 5,
+  'the v0.8 parity programme should use native schema 5');
 const monteCarloDemo = simulator.makeSampleScenario();
 assert.equal(monteCarloDemo.people[0].name, 'John');
 assert.equal(monteCarloDemo.people[0].super, 220000);
@@ -81,6 +83,70 @@ assert.equal(monteCarloDemo.household.targetAfterTax, 80000);
 assert.equal(monteCarloDemo.household.annualBudget, 70000);
 assert.equal(monteCarloDemo.assumptions.inflationMode, 'manual');
 assert.equal(monteCarloDemo.assumptions.manualInflationPct, 3);
+assert.equal(monteCarloDemo.schemaVersion, 5);
+assert.ok(monteCarloDemo.people.every(person => person.salaryGrowthPct === 0));
+assert.deepEqual(plain(monteCarloDemo.otherIncomes), []);
+assert.deepEqual(plain(monteCarloDemo.otherAssets), []);
+assert.deepEqual(plain(monteCarloDemo.lumpSumWithdrawals), []);
+
+const nativeSchema4 = structuredClone(monteCarloDemo);
+nativeSchema4.schemaVersion = 4;
+nativeSchema4.people.forEach(person => { delete person.salaryGrowthPct; });
+delete nativeSchema4.otherIncomes;
+delete nativeSchema4.otherAssets;
+delete nativeSchema4.lumpSumWithdrawals;
+delete nativeSchema4.assumptions.ukPensionsEnabled;
+nativeSchema4.shareholdings = [{
+  id: 'legacy-share', symbol: 'BHP', quantity: 10,
+  quoteCurrency: 'AUD', price: 40, fxToAud: 1,
+  owner: 'joint', costBaseAud: 300, cgtDiscountEligible: true,
+  saleYear: 2035, saleMonth: 1
+}];
+const migratedSchema5 = simulator.migrateScenario(nativeSchema4);
+assert.equal(migratedSchema5.schemaVersion, 5);
+assert.ok(migratedSchema5.people.every(person => person.salaryGrowthPct === 0));
+assert.deepEqual(plain(migratedSchema5.otherIncomes), []);
+assert.deepEqual(plain(migratedSchema5.otherAssets), []);
+assert.deepEqual(plain(migratedSchema5.lumpSumWithdrawals), []);
+assert.equal(migratedSchema5.assumptions.ukPensionsEnabled, true,
+  'legacy native pensions should retain their previous enabled behaviour');
+assert.deepEqual(
+  plain(migratedSchema5.shareholdings[0]),
+  {
+    ...plain(nativeSchema4.shareholdings[0]),
+    priceGrowthPct: 0,
+    dividendYieldPct: 0,
+    frankedPct: 0,
+    companyTaxRatePct: 30,
+    frankingEligible: false
+  }
+);
+
+for (const [label, mutate, pattern] of [
+  ['Other income', scenario => {
+    scenario.otherIncomes = [{ label: 'Rent', amount: 1000 }];
+  }, /cannot yet model populated Other income or Other assets/],
+  ['lump sum', scenario => {
+    scenario.lumpSumWithdrawals = [{ enabled: true }];
+  }, /cannot yet model lump-sum withdrawals/],
+  ['pension', scenario => {
+    scenario.assumptions.ukPensionsEnabled = true;
+    scenario.people[0].ukStateAnnualGbp = 1000;
+  }, /cannot yet preserve v1\.00 Defined Benefit\/UK Pension treatment/],
+  ['share returns', scenario => {
+    scenario.shareholdings = [{
+      ...migratedSchema5.shareholdings[0], priceGrowthPct: 1
+    }];
+  }, /cannot yet model v1\.06 share price growth, dividends or franking/]
+]) {
+  const nativeUnsupported = structuredClone(migratedSchema5);
+  mutate(nativeUnsupported);
+  assert.throws(
+    () => simulator.importScenario(JSON.stringify(nativeUnsupported)),
+    pattern,
+    `native schema 5 ${label} must remain explicitly guarded`
+  );
+}
 
 const nativeBelowMinimumSuperAccess = structuredClone(monteCarloDemo);
 nativeBelowMinimumSuperAccess.people[0].superAccessAge = 59;
@@ -109,7 +175,7 @@ v1Scenario.people = v1Scenario.people.map(person => {
   return rest;
 });
 const adaptedV1Scenario = simulator.importScenario(JSON.stringify(v1Scenario));
-assert.equal(adaptedV1Scenario.schemaVersion, 4,
+assert.equal(adaptedV1Scenario.schemaVersion, 5,
   'v1.00 schema should adapt to the experimental engine schema');
 assert.ok(adaptedV1Scenario.people.every(person => person.ukPrivateAmountGbp === 0),
   'v1.00 adapter should install inert legacy pension fields');
@@ -135,9 +201,9 @@ assert.throws(
 const disabledSchema9 = structuredClone(activeSchema9);
 disabledSchema9.lumpSumWithdrawals[0].enabled = false;
 const adaptedSchema9 = simulator.importScenario(JSON.stringify(disabledSchema9));
-assert.equal(adaptedSchema9.schemaVersion, 4);
-assert.ok(!('lumpSumWithdrawals' in adaptedSchema9),
-  'schema 9 disabled lump sums should be discarded by the adapter');
+assert.equal(adaptedSchema9.schemaVersion, 5);
+assert.equal(adaptedSchema9.lumpSumWithdrawals[0].enabled, false,
+  'schema 9 disabled lump sums should survive native schema adaptation');
 
 const activeSchema10 = structuredClone(disabledSchema9);
 activeSchema10.schemaVersion = 10;
@@ -151,9 +217,9 @@ assert.throws(
 const zeroGrowthSchema10 = structuredClone(activeSchema10);
 zeroGrowthSchema10.people.forEach(person => { person.salaryGrowthPct = 0; });
 const adaptedSchema10 = simulator.importScenario(JSON.stringify(zeroGrowthSchema10));
-assert.equal(adaptedSchema10.schemaVersion, 4);
-assert.ok(adaptedSchema10.people.every(person => !('salaryGrowthPct' in person)),
-  'schema 10 zero salary growth should be removed by the adapter');
+assert.equal(adaptedSchema10.schemaVersion, 5);
+assert.ok(adaptedSchema10.people.every(person => person.salaryGrowthPct === 0),
+  'schema 10 zero salary growth should be preserved in native schema 5');
 
 const activeSchema11 = structuredClone(v1Scenario);
 activeSchema11.schemaVersion = 11;
@@ -176,10 +242,10 @@ Object.assign(inertSchema11.shareholdings[0], {
   companyTaxRatePct: 30, frankingEligible: false
 });
 const adaptedSchema11 = simulator.importScenario(JSON.stringify(inertSchema11));
-assert.equal(adaptedSchema11.schemaVersion, 4);
+assert.equal(adaptedSchema11.schemaVersion, 5);
 for (const key of ['priceGrowthPct', 'dividendYieldPct', 'frankedPct',
   'companyTaxRatePct', 'frankingEligible']) {
-  assert.ok(!(key in adaptedSchema11.shareholdings[0]), `${key} should be stripped`);
+  assert.ok(key in adaptedSchema11.shareholdings[0], `${key} should be preserved`);
 }
 
 const supportedSchema12 = structuredClone(inertSchema11);
@@ -198,7 +264,7 @@ supportedSchema12.people.forEach(person => {
   person.ukStateSurvivorPct = 0;
 });
 const adaptedSchema12 = simulator.importScenario(JSON.stringify(supportedSchema12));
-assert.equal(adaptedSchema12.schemaVersion, 4);
+assert.equal(adaptedSchema12.schemaVersion, 5);
 assert.deepEqual(plain(adaptedSchema12.household.firstDeath),
   supportedSchema12.household.firstDeath,
   'schema 12 should retain supported first-death settings');
