@@ -2,6 +2,13 @@
 
 This changelog summarizes public, non-personal milestones. Early development used many private prototype snapshots; those files are intentionally not reproduced in the public repository.
 
+## 1.08 - 2026-07-15
+
+- Added an optional fixed first-death event at the start of the selected projection year, with immediate survivor spending targets, ownership transfer, deceased-income cessation and configurable continuing-income percentages ([#7](https://github.com/dcaddick/retirement-simulator/issues/7)).
+- Preserved inherited super separately by phase and source return assumption, moved single-person Age Pension and CSHC rules into the transition year, and exposed the event in charts, tables and audit output.
+- Released the experimental Monte Carlo companion as v0.7; every seeded path applies the same selected first-death event, while probabilistic mortality remains explicitly outside scope.
+- Archived the exact outgoing deterministic v1.0.7 executable.
+
 ## 1.07 - 2026-07-15
 
 - Corrected Age Pension projections for age-gapped couples: the existing combined couple means tests now pay one partnered share when exactly one person has reached age 67, with taxable pension income allocated only to that eligible person ([#6](https://github.com/dcaddick/retirement-simulator/issues/6)).

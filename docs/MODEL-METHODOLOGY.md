@@ -32,6 +32,14 @@ The chart ribbon uses an illustrative Gompertz curve (`A = 5.55e-6`, `G = 0.11`)
 
 The application contains a more detailed step-by-step explanation and shows the dated rates used by the active scenario.
 
+### Fixed first-death and survivor state
+
+When enabled, the selected person's death is applied at the start of the selected projection year, before that year's income, tax, returns and drawdown calculations. It is a user-selected scenario boundary, not a mortality forecast. The deceased person's employment income and super contributions stop immediately; configured UK State Pension and Other income continuation percentages are paid to the survivor. No bereavement payment or temporary concession is modelled.
+
+Cash, savings, shares and Other assets transfer immediately to the survivor while preserving their modelled characteristics. The deceased person's super is reported separately as inherited super, preserving accumulation or retirement phase and the deceased source return assumption until any later phase transition. The deceased person's unused capital losses lapse.
+
+Preferred Retirement Income and Essential Annual Budget step to their configured survivor percentages in the transition year. Single Age Pension rules apply immediately from that year, as do single-person CSHC thresholds and survivor-only tax allocation. The projection horizon follows the survivor's age. The model does not represent probate timing, binding nominations, estate disputes, tax on death benefits or detailed super death-benefit law.
+
 ## Main modelling areas
 
 ### Superannuation
@@ -80,7 +88,7 @@ Calculations run using nominal values. Today's-dollar views divide future nomina
 
 The companion report imports a validated scenario and applies synthetic investment-return paths. Seeded runs support reproducibility, while deterministic stress cases are reported separately.
 
-Monte Carlo v0.6 accepts the standard fictional sample and scenarios using the fields its experimental engine supports. It uses the same Age Pension eligibility boundary and person-level tax allocation as the deterministic simulator. It rejects, with a visible explanation, imports containing populated Other income/Other assets, active Defined Benefit/UK Pension income, or active v1.06 share growth, dividend or franking assumptions; it does not silently discard those cash flows.
+Monte Carlo v0.7 accepts the standard fictional sample and scenarios using the fields its experimental engine supports. It uses the same Age Pension eligibility boundary, survivor-state transition and person-level tax allocation as the deterministic simulator. An enabled first-death event is fixed at the selected age and start-of-year boundary in every Monte Carlo path; mortality itself is not stochastic. It rejects, with a visible explanation, imports containing populated Other income/Other assets, active Defined Benefit/UK Pension income, active lump sums, or active v1.06 share growth, dividend or franking assumptions; it does not silently discard those cash flows.
 
 The reported success rate is conditional on the selected model and assumptions. It is not a personal forecast. The model does not make every material retirement risk stochastic, and deterministic stresses do not alter the Monte Carlo probability denominator.
 

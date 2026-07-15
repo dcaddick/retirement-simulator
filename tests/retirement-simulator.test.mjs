@@ -23,12 +23,19 @@ const DEFERRED_REVIEW = fileURLToPath(
 const METHODOLOGY = fileURLToPath(
   new URL('../docs/MODEL-METHODOLOGY.md', import.meta.url)
 );
+const TESTING = fileURLToPath(
+  new URL('../docs/TESTING.md', import.meta.url)
+);
+const SCREENSHOT_108 = fileURLToPath(
+  new URL('../docs/assets/retirement-simulator-v1.08.png', import.meta.url)
+);
 const README = fileURLToPath(new URL('../README.md', import.meta.url));
 const html = readFileSync(FILE, 'utf8');
 const deferredReview = existsSync(DEFERRED_REVIEW)
   ? readFileSync(DEFERRED_REVIEW, 'utf8')
   : '';
 const methodology = readFileSync(METHODOLOGY, 'utf8');
+const testingGuide = readFileSync(TESTING, 'utf8');
 const readme = readFileSync(README, 'utf8');
 
 function extract(id) {
@@ -201,11 +208,25 @@ check('deferred review covers all approved out-of-scope items', [
 ].every(id => deferredReview.includes(id)));
 check('methodology discloses fixed nominal brackets',
   methodology.includes('fixed nominal') && methodology.includes('bracket creep'));
-check('README identifies v1.07 and Monte Carlo v0.6',
-  readme.includes('v1.07') &&
-  readme.includes('retirement-monte-carlo-v0.6.html') &&
+check('README identifies v1.08 and Monte Carlo v0.7',
+  readme.includes('v1.08') &&
+  readme.includes('retirement-monte-carlo-v0.7.html') &&
   readme.includes('one partner') && readme.includes('franking') &&
   readme.includes('capital-loss') && readme.includes('docs/DEFERRED-REVIEW.md'));
+check('release docs define the fixed first-death boundary',
+  methodology.includes('start of the selected projection year') &&
+  methodology.includes('No bereavement payment') &&
+  methodology.includes('Single Age Pension rules apply immediately'));
+check('deferred register resolves the survivor-state item',
+  deferredReview.includes('AIPR-003-MORTALITY') &&
+  deferredReview.includes('Resolved in v1.0.8/v0.7'));
+check('Monte Carlo scope issue remains linked as open work',
+  readme.includes('issues/1') &&
+  readme.includes('still tracked'));
+check('browser checklist covers survivor state in both tools',
+  testingGuide.includes('fixed first-death') &&
+  testingGuide.includes('every Monte Carlo path'));
+check('v1.08 release screenshot exists', existsSync(SCREENSHOT_108));
 check('deferred register records the four v1.0.6 resolutions',
   ['#5', '#9', '#10', '#11'].every(issue => deferredReview.includes(issue)) &&
   (deferredReview.match(/Resolved in v1\.0\.6/g) ?? []).length >= 4);

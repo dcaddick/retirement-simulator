@@ -9,9 +9,9 @@ node tests/retirement-simulator.test.mjs
 node tests/retirement-monte-carlo.test.mjs
 ```
 
-The deterministic suite checks core-engine extraction, script syntax, schema migration, validation and calculation invariants across the supported household model. It also covers the archived-release baseline, safe CSV serialisation, projection-critical numeric validation, the Age Pension couple taper, zero/half/full age-gap boundaries, reversed partner order, eligible-person tax allocation, younger-partner super assessment, bracket creep, share growth, holding-period dividends, franking refunds, capital-loss carry-forward and CGT expense funding.
+The deterministic suite checks core-engine extraction, script syntax, schema migration, validation and calculation invariants across the supported household model. It also covers the archived-release baseline, safe CSV serialisation, projection-critical numeric validation, the Age Pension couple taper, zero/half/full age-gap boundaries, fixed first-death transition ordering, survivor ownership and inherited super, single-person Age Pension, reversed partner order, eligible-person tax allocation, younger-partner super assessment, bracket creep, share growth, holding-period dividends, franking refunds, capital-loss carry-forward and CGT expense funding.
 
-The Monte Carlo v0.6 suite checks imported-scenario handling, matching age-gap Age Pension treatment, person-level tax allocation, risk-mode behaviour, deterministic stress overrides and invariants that keep stress results outside the stochastic probability denominator.
+The Monte Carlo v0.7 suite checks imported-scenario handling, matching age-gap and survivor Age Pension treatment, person-level tax allocation, the same fixed first-death event in every Monte Carlo path, deterministic parity under zero volatility, reproducibility, risk-mode behaviour, deterministic stress overrides and invariants that keep stress results outside the stochastic probability denominator.
 
 The repository workflow at `.github/workflows/test.yml` runs both commands with Node 20 for pull requests and pushes to `main`.
 
@@ -57,6 +57,8 @@ Automated tests do not replace a real-browser pass. For user-interface changes, 
 - Other income Tax owner allocation and the disabled selector for non-taxable income;
 - conditional Share dividends, Franking credits and CGT output, capital-loss/CGT Event details, and the Lump sum withdrawal legend item;
 - a large scheduled sale and a named partial sale, confirming CGT draws are not charted as retirement income and unfunded tax is explicit;
+- fixed first-death scenarios for each possible deceased person, confirming the start-of-year marker, stepped Preferred/Essential amounts, deceased em dashes and zero tax, inherited super, survivor horizon and immediate single Age Pension treatment;
+- the same fixed first-death scenario in the Monte Carlo report, confirming the assumptions disclosure and the same transition year in every Monte Carlo path;
 
 ### iPad Safari release check
 

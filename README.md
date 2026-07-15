@@ -15,9 +15,9 @@ The repository contains two self-contained browser tools:
 
 Single HTML file · no installation · opens locally in a modern browser.
 
-![Retirement Income Simulator v1.07 in its default dark theme, with the projection chart as the main hero item](docs/assets/retirement-simulator-v1.07.png)
+![Retirement Income Simulator v1.08 showing a first-death survivor transition in its default dark theme](docs/assets/retirement-simulator-v1.08.png)
 
-*Shown in the default dark theme with the projection chart as the main hero item. The deterministic v1.07 simulator combines editable household assumptions, age-gap Age Pension treatment, share price growth and dividends, ownership-aware tax and franking credits, capital-loss carry-forward, compact lump-sum planning, inspectable charts and CSV export of the visible table.*
+*Shown in the default dark theme with a fixed first-death transition. The deterministic v1.08 simulator combines editable survivor spending and continuing-income assumptions, immediate single-person Age Pension treatment, inherited-super audit output, ownership-aware tax, inspectable charts and CSV export of the visible table.*
 
 ## Yours to download and use
 
@@ -42,7 +42,7 @@ No server, account or build step is required.
 1. Clone or download the repository.
 2. Open `retirement-simulator.html` in a modern browser.
 3. Start with the fictional sample, create a new scenario or import your own JSON file.
-4. Optionally export the scenario and import it into `retirement-monte-carlo-v0.6.html`.
+4. Optionally export the scenario and import it into `retirement-monte-carlo-v0.7.html`.
 
 The stable live filename is always `retirement-simulator.html`. Exact sanitized public releases are also retained under [`archive/`](archive/) for regression testing and comparison.
 
@@ -61,6 +61,7 @@ The deterministic simulator models a reusable two-person household and includes:
 - per-person capital-loss netting and carry-forward, with CGT funded from assets rather than counted as retirement income;
 - Australian income-tax estimates, Medicare, LITO/SAPTO, Age Pension and CSHC estimates, including one partnered share when only one partner has reached Age Pension age;
 - Australian defined-benefit and UK State Pension support;
+- an optional fixed first-death scenario with immediate survivor spending, ownership, inherited-super, continuing-income, tax and single Age Pension transitions;
 - optional per-person salary growth above inflation, defaulting to 0%;
 - account-based pension minimum drawdowns;
 - Preferred Retirement Income, Essential Annual Budget and surplus banking;
@@ -80,7 +81,7 @@ It does **not** calculate a dependable personal probability of retirement succes
 
 Use it as a sensitivity and comparison tool, not a forecast or recommendation.
 
-Monte Carlo v0.6 can import the standard deterministic sample and uses the same zero/half/full Age Pension eligibility boundary as the deterministic simulator. Because its experimental engine does not yet reproduce every deterministic cash flow, it explicitly rejects imports containing active lump-sum withdrawals, populated Other income/Other assets, active Defined Benefit/UK Pension income, or active v1.06 share growth/dividend/franking assumptions instead of silently omitting them. Disabled or inert fields may remain in the saved scenario because they do not affect the model.
+Monte Carlo v0.7 can import the standard deterministic sample, uses the same zero/half/full Age Pension eligibility boundary, and applies an enabled fixed first-death event in the same selected year in every path. It does not model probabilistic mortality. Because its experimental engine does not yet reproduce every deterministic cash flow, it explicitly rejects imports containing active lump-sum withdrawals, populated Other income/Other assets, active Defined Benefit/UK Pension income, or active v1.06 share growth/dividend/franking assumptions instead of silently omitting them. That broader import support is still tracked in [issue #1](https://github.com/dcaddick/retirement-simulator/issues/1); disabled or inert fields may remain because they do not affect the model.
 
 ## Privacy
 
