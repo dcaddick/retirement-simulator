@@ -779,6 +779,69 @@ check('single deeming threshold is applied',
 check('single CSHC threshold is current',
   core.SERVICES_AUSTRALIA_2026.cshcSingleThreshold === 101105);
 
+console.log('\nfirst-death lifecycle transition');
+check('first-death lifecycle helper is exported',
+  typeof core.applyFirstDeathTransition === 'function');
+if (typeof core.applyFirstDeathTransition === 'function') {
+  const deathScenario = structuredClone(sample);
+  deathScenario.household.firstDeath = {
+    enabled: true,
+    deceasedPerson: 'p0',
+    deathAge: 65,
+    survivorPreferredPct: 70,
+    survivorEssentialPct: 70
+  };
+  deathScenario.cash.owner = 'p0';
+  deathScenario.savings.owner = 'joint';
+  deathScenario.shareholdings = [{
+    ...core.makeShareholding(0),
+    id: 'death-share', symbol: 'TEST', quantity: 10, price: 100,
+    costBaseAud: 650, owner: 'p0'
+  }];
+  const deathState = core.makeProjectionState(deathScenario);
+  deathState.capitalLossCarryForward = [5000, 2000];
+  const openingDeceasedSuper =
+    deathState.superAccum[0] + deathState.superRetire[0];
+  const transition = core.applyFirstDeathTransition({
+    scenario: deathScenario,
+    state: deathState,
+    year: deathScenario.startYear + 2,
+    ages: [65, 63]
+  });
+  check('transition selects the correct survivor',
+    transition.survivorIndex === 1 &&
+    deathState.lifecycle.householdStatus === 'survivor' &&
+    deathState.lifecycle.alive[0] === false);
+  check('deceased super moves to inherited super',
+    deathState.superAccum[0] === 0 && deathState.superRetire[0] === 0 &&
+    deathState.inheritedSuper.ownerIndex === 1 &&
+    deathState.inheritedSuper.accum + deathState.inheritedSuper.retire ===
+      openingDeceasedSuper);
+  check('deceased capital losses lapse and survivor losses remain',
+    transition.lapsedCapitalLoss === 5000 &&
+    deathState.capitalLossCarryForward[0] === 0 &&
+    deathState.capitalLossCarryForward[1] === 2000);
+  check('owned and joint assets become survivor-owned',
+    deathState.ownership.cash === 'p1' &&
+    deathState.ownership.savings === 'p1' &&
+    deathState.holdings[0].owner === 'p1');
+  check('share cost base survives ownership transfer',
+    deathState.holdings[0].costBaseAud === 650);
+  check('transition exposes survivor spending percentages',
+    transition.preferredTargetPct === 70 &&
+    transition.essentialTargetPct === 70);
+  const repeat = core.applyFirstDeathTransition({
+    scenario: deathScenario,
+    state: deathState,
+    year: deathScenario.startYear + 3,
+    ages: [66, 64]
+  });
+  check('transition is idempotent',
+    repeat.transitionedThisYear === false &&
+    deathState.inheritedSuper.accum + deathState.inheritedSuper.retire ===
+      openingDeceasedSuper);
+}
+
 console.log('\nprojection tax basis');
 const projectionNetTax = core.projectionNetTax ?? (() => NaN);
 const taxNow = projectionNetTax({
