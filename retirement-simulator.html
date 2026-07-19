@@ -1274,6 +1274,16 @@
     return item.currency === 'AUD' ? 1 : item.fxToAud;
   }
 
+  function otherAssetAssessmentBalances(otherAssets) {
+    return otherAssets.reduce((balances, asset) => {
+      if (asset.sold) return balances;
+      const value = Number.isFinite(asset.value) ? Math.max(0, asset.value) : 0;
+      balances.totalNominal += value;
+      if (asset.agePensionDeemed) balances.deemableNominal += value;
+      return balances;
+    }, { totalNominal: 0, deemableNominal: 0 });
+  }
+
   function ukPensionFlows(person, age, gbpAud, inflationFactor) {
     // Frozen: no uprating for AU residents. Nominal GBP fixed, real value erodes.
     const stateIndexFactor =
@@ -1764,7 +1774,6 @@
 
     // Other assets: grow at each asset's own nominal rate, then move the value
     // into the savings pot in the disposal year.
-    let otherAssetsNominal = 0;
     state.otherAssets.forEach(asset => {
       if (asset.sold) return;
       asset.value *= 1 + (asset.growthPct || 0) / 100;
@@ -1779,7 +1788,6 @@
         asset.value = 0;
         return;
       }
-      otherAssetsNominal += asset.value;
     });
 
     const lumpSumDrawsNominal = { p0Super: 0, p1Super: 0, cash: 0, savings: 0 };
@@ -1792,7 +1800,6 @@
           state, withdrawal.source, requestedNominal, inflationFactor, withdrawal.month);
         if (named.event) events.push(named.event);
         saleRecords.push(...named.saleRecords);
-        if (withdrawal.source.startsWith('asset:')) otherAssetsNominal = Math.max(0, otherAssetsNominal - named.drawn);
         const result = drawForLumpSum(
           state, scenario.household.drawdownPriority, requestedNominal - named.drawn,
           DRAWDOWN_SOURCES.has(withdrawal.source) ? withdrawal.source : 'automatic');
@@ -1826,6 +1833,11 @@
           label: lumpSumEventLabel(event, scenario.people)
         });
       });
+
+    const {
+      totalNominal: otherAssetsNominal,
+      deemableNominal: deemableOtherAssetsNominal
+    } = otherAssetAssessmentBalances(state.otherAssets);
 
     const capitalLedger = capitalLedgerForPeople(
       saleRecords, state.capitalLossCarryForward);
@@ -1905,14 +1917,14 @@
       ) / inflationFactor),
       ages
     });
-    // Other assets count in the assets test but are excluded from deeming
-    // (they may be non-financial, e.g. property).
     const otherAssetsReal = otherAssetsNominal / inflationFactor;
+    const deemableOtherAssetsReal = deemableOtherAssetsNominal / inflationFactor;
     const agePensionIncomeReal =
       salaries.reduce((sum, value) => sum + value, 0) / inflationFactor +
       ukState.reduce((sum, value) => sum + value, 0) / inflationFactor +
       (otherTaxableNominal + otherNonTaxableNominal) / inflationFactor +
-      deemedIncome(assessableAssetsReal, state.lifecycle.householdStatus === 'survivor'
+      deemedIncome(assessableAssetsReal + deemableOtherAssetsReal,
+        state.lifecycle.householdStatus === 'survivor'
         ? 'single' : 'couple');
     const agePension = agePensionForHousehold({
       ages,
@@ -2549,6 +2561,7 @@
     makeOtherIncome,
     makeOtherAsset,
     otherItemFx,
+    otherAssetAssessmentBalances,
     ukPensionFlows,
     TREASURY_INFLATION,
     realReturnPct,

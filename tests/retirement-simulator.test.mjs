@@ -1059,6 +1059,24 @@ const survivorPensionRow = core.projectScenario(survivorPensionScenario).rows[1]
 check('transition-year projection uses the single Age Pension rules',
   survivorPensionRow.agePensionStatus === 'single' &&
   survivorPensionRow.components.agePensionNet === 1200.90 * 26);
+const unflaggedSurvivorDeemingScenario = structuredClone(survivorPensionScenario);
+unflaggedSurvivorDeemingScenario.otherAssets = [{
+  id: 'survivor-loan', label: 'Survivor private loan',
+  currency: 'AUD', fxToAud: 1, amount: 300000,
+  agePensionDeemed: false, growthPct: 0,
+  disposalYear: unflaggedSurvivorDeemingScenario.startYear + 20
+}];
+const flaggedSurvivorDeemingScenario =
+  structuredClone(unflaggedSurvivorDeemingScenario);
+flaggedSurvivorDeemingScenario.otherAssets[0].agePensionDeemed = true;
+const unflaggedSurvivorRow =
+  core.projectScenario(unflaggedSurvivorDeemingScenario).rows[1];
+const flaggedSurvivorRow =
+  core.projectScenario(flaggedSurvivorDeemingScenario).rows[1];
+check('survivor projection applies single-person deeming to flagged assets',
+  flaggedSurvivorRow.agePensionStatus === 'single' &&
+  flaggedSurvivorRow.components.agePensionNet <
+    unflaggedSurvivorRow.components.agePensionNet);
 const survivorRoundTrip = core.importScenario(
   core.exportScenario(survivorProjectionScenario));
 check('JSON round-trip retains all schema-v13 survivor fields',
@@ -1198,6 +1216,15 @@ check('invalid other income owner is rejected',
     error.path === 'otherIncomes.0.owner'));
 
 console.log('\nother assets');
+const assessmentBalances = core.otherAssetAssessmentBalances([
+  { value: 500000, sold: false, agePensionDeemed: true },
+  { value: 80000, sold: false, agePensionDeemed: false },
+  { value: 40000, sold: true, agePensionDeemed: true }
+]);
+check('Other Asset assessment balances separate total and deemable value',
+  assessmentBalances.totalNominal === 580000 &&
+  assessmentBalances.deemableNominal === 500000,
+  JSON.stringify(assessmentBalances));
 const withAsset = structuredClone(sample);
 const disposalYear = sample.startYear + 5;
 withAsset.otherAssets = [
@@ -1223,6 +1250,100 @@ check('no double disposal', afterRow.events.every(e => e.type !== 'asset-disposa
 check('savings jump at disposal vs baseline',
   disposalRow.savings > base.rows.find(r => r.year === disposalYear).savings + 50000,
   `${disposalRow.savings}`);
+
+function privateLoanScenario(agePensionDeemed) {
+  const scenario = structuredClone(sample);
+  scenario.people.forEach(person => {
+    person.age = 67;
+    person.retireAge = 67;
+    person.superAccessAge = 67;
+    person.super = 0;
+    person.salary = 0;
+    person.ukStateAnnualGbp = 0;
+  });
+  scenario.cash.amount = 0;
+  scenario.savings.amount = 0;
+  scenario.shareholdings = [];
+  scenario.otherIncomes = [];
+  scenario.lumpSumWithdrawals = [];
+  scenario.household.targetAfterTax = 100000;
+  scenario.household.annualBudget = 100000;
+  scenario.household.includeAgePension = true;
+  scenario.otherAssets = [{
+    id: 'private-loan', label: 'Private loan', currency: 'AUD', fxToAud: 1,
+    amount: 500000, agePensionDeemed, growthPct: 0,
+    disposalYear: scenario.startYear + 20
+  }];
+  return scenario;
+}
+
+const unflaggedLoanRow = core.projectScenario(privateLoanScenario(false)).rows[0];
+const flaggedLoanRow = core.projectScenario(privateLoanScenario(true)).rows[0];
+check('flagged private loan reduces Age Pension through deemed income',
+  flaggedLoanRow.components.agePensionNet <
+    unflaggedLoanRow.components.agePensionNet,
+  `${flaggedLoanRow.components.agePensionNet} vs ${unflaggedLoanRow.components.agePensionNet}`);
+check('classification does not change asset value',
+  flaggedLoanRow.otherAssets === unflaggedLoanRow.otherAssets &&
+  flaggedLoanRow.totalAssets === unflaggedLoanRow.totalAssets);
+
+const unflaggedCshcScenario = privateLoanScenario(false);
+unflaggedCshcScenario.household.includeAgePension = false;
+const flaggedCshcScenario = privateLoanScenario(true);
+flaggedCshcScenario.household.includeAgePension = false;
+const unflaggedCshcRow = core.projectScenario(unflaggedCshcScenario).rows[0];
+const flaggedCshcRow = core.projectScenario(flaggedCshcScenario).rows[0];
+check('classification does not change CSHC assessed income',
+  flaggedCshcRow.cshc.assessedIncome ===
+    unflaggedCshcRow.cshc.assessedIncome);
+
+const flaggedLoanRoundTrip = core.importScenario(
+  core.exportScenario(privateLoanScenario(true)));
+check('JSON round-trip preserves Other Asset deeming classification',
+  flaggedLoanRoundTrip.otherAssets[0].agePensionDeemed === true);
+
+const disposedLoan = privateLoanScenario(true);
+disposedLoan.otherAssets[0].disposalYear = disposedLoan.startYear;
+const disposedLoanRow = core.projectScenario(disposedLoan).rows[0];
+const disposedUnflaggedLoan = privateLoanScenario(false);
+disposedUnflaggedLoan.otherAssets[0].disposalYear = disposedUnflaggedLoan.startYear;
+const disposedUnflaggedLoanRow = core.projectScenario(disposedUnflaggedLoan).rows[0];
+check('disposed deemed asset is assessed once through savings',
+  disposedLoanRow.otherAssets === 0 &&
+  disposedLoanRow.savings > 0 &&
+  disposedLoanRow.components.agePensionNet ===
+    disposedUnflaggedLoanRow.components.agePensionNet);
+
+const partialLoan = privateLoanScenario(true);
+partialLoan.otherAssets[0].amount = 700000;
+partialLoan.lumpSumWithdrawals = [{
+  id: 'loan-draw', enabled: true, amount: 200000,
+  reason: 'Capital repayment', month: 1, year: partialLoan.startYear,
+  source: 'asset:private-loan'
+}];
+const partialLoanRow = core.projectScenario(partialLoan).rows[0];
+check('partial named liquidation leaves only the residual asset',
+  partialLoanRow.otherAssets === 500000 &&
+  partialLoanRow.lumpSumTotal === 200000 &&
+  partialLoanRow.components.agePensionNet ===
+    flaggedLoanRow.components.agePensionNet);
+
+const fullLoan = privateLoanScenario(true);
+fullLoan.lumpSumWithdrawals = [{
+  id: 'loan-close', enabled: true, amount: 500000,
+  reason: 'Loan repaid', month: 1, year: fullLoan.startYear,
+  source: 'asset:private-loan'
+}];
+const fullLoanRow = core.projectScenario(fullLoan).rows[0];
+const noLoan = structuredClone(fullLoan);
+noLoan.otherAssets = [];
+noLoan.lumpSumWithdrawals = [];
+const noLoanRow = core.projectScenario(noLoan).rows[0];
+check('full named liquidation removes the deemed asset balance',
+  fullLoanRow.otherAssets === 0 &&
+  fullLoanRow.lumpSumTotal === 500000 &&
+  fullLoanRow.components.agePensionNet ===
+    noLoanRow.components.agePensionNet);
 
 console.log('\nnegative growth');
 const shrink = structuredClone(withAsset);
