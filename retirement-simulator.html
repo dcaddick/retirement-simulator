@@ -468,7 +468,7 @@
 <script id="simulator-core">
 (function () {
   'use strict';
-  const SCHEMA_VERSION = 12;
+  const SCHEMA_VERSION = 13;
   const VALID_OWNERS = new Set(['p0', 'p1', 'joint']);
   const DRAWDOWN_SOURCES = new Set(['p0Super', 'p1Super', 'cash', 'savings']);
   const OTHER_CURRENCIES = new Set(['AUD', 'GBP', 'USD']);
@@ -1052,6 +1052,15 @@
       };
       current = migrated;
     }
+    if (current.schemaVersion === 12) {
+      const migrated = structuredClone(current);
+      migrated.schemaVersion = 13;
+      migrated.otherAssets = (migrated.otherAssets ?? []).map(asset => ({
+        ...asset,
+        agePensionDeemed: false
+      }));
+      current = migrated;
+    }
     if (current.schemaVersion !== SCHEMA_VERSION) {
       throw new Error(`Unsupported schema version: ${raw.schemaVersion}.`);
     }
@@ -1255,6 +1264,7 @@
       currency: 'AUD',
       fxToAud: 1,
       amount: 0,
+      agePensionDeemed: false,
       growthPct: 0,
       disposalYear: new Date().getFullYear() + 5
     };
@@ -2354,6 +2364,10 @@
         }
         if (!finiteNonNegative(item.amount)) {
           add(`${path}.amount`, 'Value must be zero or greater.');
+        }
+        if (typeof item.agePensionDeemed !== 'boolean') {
+          add(`${path}.agePensionDeemed`,
+            'Age Pension deeming selection must be true or false.');
         }
         if (!(Number.isFinite(item.growthPct) &&
             item.growthPct >= -100 && item.growthPct <= 100)) {

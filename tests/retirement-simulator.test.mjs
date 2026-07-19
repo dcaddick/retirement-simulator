@@ -71,10 +71,32 @@ vm.runInContext(extract('simulator-core'), context, { filename: 'simulator-core.
 const core = context.RetirementSimulatorCore;
 
 console.log('\nschema + sample');
-check('schema version is 12', core.SCHEMA_VERSION === 12);
+check('schema version is 13', core.SCHEMA_VERSION === 13);
 const sample = core.makeSampleScenario();
 check('sample validates', core.validateScenario(sample).length === 0,
   JSON.stringify(core.validateScenario(sample)[0] ?? null));
+check('new Other Assets default outside Age Pension deeming',
+  core.makeOtherAsset(0).agePensionDeemed === false);
+
+const schema12 = structuredClone(sample);
+schema12.schemaVersion = 12;
+schema12.otherAssets = [{
+  id: 'legacy-asset', label: 'Boat', currency: 'AUD', fxToAud: 1,
+  amount: 100000, growthPct: 0, disposalYear: schema12.startYear + 10
+}];
+const migrated13 = core.migrateScenario(schema12);
+check('schema 12 Other Assets migrate outside Age Pension deeming',
+  migrated13.schemaVersion === 13 &&
+  migrated13.otherAssets[0].agePensionDeemed === false);
+
+const invalidDeemingFlag = structuredClone(sample);
+invalidDeemingFlag.otherAssets = [{
+  ...core.makeOtherAsset(0), id: 'bad-deeming', label: 'Private loan',
+  agePensionDeemed: 'yes'
+}];
+check('Other Asset deeming classification must be boolean',
+  core.validateScenario(invalidDeemingFlag).some(error =>
+    error.path === 'otherAssets.0.agePensionDeemed'));
 const belowMinimumSuperAccess = structuredClone(sample);
 belowMinimumSuperAccess.people[0].superAccessAge = 59;
 const belowMinimumSuperAccessError = core.validateScenario(belowMinimumSuperAccess)
@@ -182,7 +204,7 @@ delete schema10.shareholdings[0].companyTaxRatePct;
 delete schema10.shareholdings[0].frankingEligible;
 const migrated11 = core.migrateScenario(schema10);
 check('schema 10 migrates inert v1.06 tax and share defaults',
-  migrated11.schemaVersion === 12 &&
+  migrated11.schemaVersion === 13 &&
   migrated11.otherIncomes[0].owner === 'joint' &&
   migrated11.otherIncomes[0].survivorPct === 0 &&
   migrated11.household.firstDeath.enabled === false &&
@@ -203,7 +225,7 @@ schema11.otherIncomes = [{
 delete schema11.otherIncomes[0].survivorPct;
 const migrated12 = core.migrateScenario(schema11);
 check('schema 11 migrates inert first-death defaults',
-  migrated12.schemaVersion === 12 &&
+  migrated12.schemaVersion === 13 &&
   migrated12.household.firstDeath.enabled === false &&
   migrated12.household.firstDeath.survivorPreferredPct === 70 &&
   migrated12.household.firstDeath.survivorEssentialPct === 70 &&
@@ -1039,7 +1061,7 @@ check('transition-year projection uses the single Age Pension rules',
   survivorPensionRow.components.agePensionNet === 1200.90 * 26);
 const survivorRoundTrip = core.importScenario(
   core.exportScenario(survivorProjectionScenario));
-check('JSON round-trip retains all schema-v12 survivor fields',
+check('JSON round-trip retains all schema-v13 survivor fields',
   JSON.stringify(survivorRoundTrip.household.firstDeath) ===
     JSON.stringify(survivorProjectionScenario.household.firstDeath) &&
   survivorRoundTrip.people[0].ukStateSurvivorPct === 50 &&
@@ -1179,7 +1201,8 @@ console.log('\nother assets');
 const withAsset = structuredClone(sample);
 const disposalYear = sample.startYear + 5;
 withAsset.otherAssets = [
-  { id: 'a1', label: 'Boat', currency: 'AUD', fxToAud: 1, amount: 100000, growthPct: 3, disposalYear }
+  { id: 'a1', label: 'Boat', currency: 'AUD', fxToAud: 1, amount: 100000,
+    agePensionDeemed: false, growthPct: 3, disposalYear }
 ];
 check('scenario with asset validates', core.validateScenario(withAsset).length === 0,
   JSON.stringify(core.validateScenario(withAsset)[0] ?? null));
@@ -1350,7 +1373,7 @@ check('disabled lump sum does not block validation', core.validateScenario(disab
 const assetFunded = structuredClone(withLump);
 assetFunded.cash.amount = 0;
 assetFunded.savings.amount = 0;
-assetFunded.otherAssets = [{ id: 'car-fund', label: 'Investment property', currency: 'AUD', fxToAud: 1, amount: 40000, growthPct: 0, disposalYear: assetFunded.startYear + 10 }];
+assetFunded.otherAssets = [{ id: 'car-fund', label: 'Investment property', currency: 'AUD', fxToAud: 1, amount: 40000, agePensionDeemed: false, growthPct: 0, disposalYear: assetFunded.startYear + 10 }];
 assetFunded.lumpSumWithdrawals = [{ id: 'l2', amount: 25000, reason: 'Help kids', month: 1, year: assetFunded.startYear, source: 'asset:car-fund' }];
 const assetFundedRow = core.projectScenario(assetFunded).rows[0];
 check('named asset can fund a lump sum', assetFundedRow.lumpSumTotal === 25000 &&
@@ -1382,7 +1405,7 @@ const incomeErrors = core.validateScenario(badIncome);
 check('bad income: label/currency/fx/amount/taxable all flagged', incomeErrors.length >= 5,
   JSON.stringify(incomeErrors));
 const badAsset = structuredClone(sample);
-badAsset.otherAssets = [{ id: 'y', label: 'ok', currency: 'AUD', fxToAud: 1, amount: 100, growthPct: 500, disposalYear: 1999 }];
+badAsset.otherAssets = [{ id: 'y', label: 'ok', currency: 'AUD', fxToAud: 1, amount: 100, agePensionDeemed: false, growthPct: 500, disposalYear: 1999 }];
 const assetErrors = core.validateScenario(badAsset);
 check('bad asset: growth + disposal year flagged', assetErrors.length >= 2,
   JSON.stringify(assetErrors));
@@ -1452,7 +1475,7 @@ v5.people[1].ukPrivateAmountGbp = 20000;
 v5.people[1].ukPrivateTakeAge = 66;
 v5.people[1].ukPrivateType = 'lump';
 const migrated = core.migrateScenario(structuredClone(v5));
-check('migrates to v12', migrated.schemaVersion === 12);
+check('migrates to v13', migrated.schemaVersion === 13);
 check('annuity becomes other income', migrated.otherIncomes.length === 1 &&
   migrated.otherIncomes[0].amount === 5000 && migrated.otherIncomes[0].currency === 'GBP');
 check('lump becomes other asset with disposal year',
@@ -1472,14 +1495,14 @@ schema7.schemaVersion = 7;
 schema7.lumpSumWithdrawals.forEach(item => delete item.enabled);
 const migrated8 = core.migrateScenario(schema7);
 check('schema 7 lump sums migrate enabled',
-  migrated8.schemaVersion === 12 && migrated8.lumpSumWithdrawals.every(item => item.enabled === true));
+  migrated8.schemaVersion === 13 && migrated8.lumpSumWithdrawals.every(item => item.enabled === true));
 
 const schema8 = structuredClone(sample);
 schema8.schemaVersion = 8;
 schema8.lumpSumWithdrawals.forEach(item => delete item.month);
 const migrated9 = core.migrateScenario(schema8);
 check('schema 8 lump sums migrate to January and salary growth defaults to zero',
-  migrated9.schemaVersion === 12 &&
+  migrated9.schemaVersion === 13 &&
   migrated9.lumpSumWithdrawals.every(item => item.month === 1) &&
   migrated9.people.every(person => person.salaryGrowthPct === 0));
 
@@ -1488,14 +1511,14 @@ schema9.schemaVersion = 9;
 schema9.people.forEach(person => delete person.salaryGrowthPct);
 const migrated10 = core.migrateScenario(schema9);
 check('schema 9 migrates salary growth to zero',
-  migrated10.schemaVersion === 12 && migrated10.people.every(person => person.salaryGrowthPct === 0));
+  migrated10.schemaVersion === 13 && migrated10.people.every(person => person.salaryGrowthPct === 0));
 
 const invalidMonth = structuredClone(sample);
 invalidMonth.lumpSumWithdrawals[0].month = 13;
 check('invalid lump-sum month is reported',
   core.validateScenario(invalidMonth).some(error => error.path === 'lumpSumWithdrawals.0.month'));
 
-console.log('\nmigration v1 -> v12 (full chain)');
+console.log('\nmigration v1 -> v13 (full chain)');
 const v1 = structuredClone(v5);
 v1.schemaVersion = 1;
 delete v1.lumpSumWithdrawals;
@@ -1503,7 +1526,7 @@ delete v1.household.annualBudget;
 v1.people = v1.people.map(({ superAccessAge, superAccessPct, ukStateIndexation, ...rest }) => rest);
 delete v1.assumptions.ukPensionsEnabled;
 const chained = core.migrateScenario(structuredClone(v1));
-check('v1 chains to v12', chained.schemaVersion === 12);
+check('v1 chains to v13', chained.schemaVersion === 13);
 check('migration adds empty lump sums', Array.isArray(chained.lumpSumWithdrawals) && chained.lumpSumWithdrawals.length === 0);
 check('chained validates', core.validateScenario(chained).length === 0,
   JSON.stringify(core.validateScenario(chained)[0] ?? null));
