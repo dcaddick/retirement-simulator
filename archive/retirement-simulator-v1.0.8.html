@@ -4,7 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src https://api.frankfurter.app https://stooq.com; base-uri 'none'; form-action 'none'" />
-<title>Family Retirement Income Simulator v1.09</title>
+<title>Family Retirement Income Simulator v1.08</title>
 <style>
   :root{
     --bg:#0f1720; --panel:#18232f; --panel2:#1e2c3a; --line:#2b3d4f;
@@ -190,7 +190,7 @@
 <div class="disclaimer-banner top" role="note">Local, reproducible retirement-risk analysis. Estimate only; not financial or tax advice.</div>
 <header>
   <div class="header-row">
-  <h1>Family Retirement Income Simulator <span class="version">v1.09</span></h1>
+  <h1>Family Retirement Income Simulator <span class="version">v1.08</span></h1>
   <nav class="header-actions" aria-label="Scenario actions">
     <button type="button" id="newScenario">New</button>
     <button type="button" id="resetSample">Reset sample</button>
@@ -355,7 +355,7 @@
             <li>Capital losses are tracked per person, applied before discounts and carried forward from a zero opening balance. CGT is funded from assets and never counts as retirement income.</li>
             <li>The survival band remains illustrative. The optional first-death scenario is a separate fixed event at the start of the selected year; it is not a mortality simulation and includes no bereavement payment.</li>
             <li>Other income is CPI-indexed. Ownership controls tax allocation and survivor continuation; deceased-owned income continues at its entered percentage, while joint and survivor-owned income continue in full. Other assets count in the Age Pension assets test but are not deemed, and no CGT is modelled on their disposal.</li>
-            <li>Super access age is limited to 60 or older. The simulator treats super withdrawals as tax-free and does not model the additional tax rules that may apply before age 60.</li>
+            <li>Early super access is simplified, not full Transition-to-Retirement (TTR). There is no 10%-of-balance annual payment cap, no commutation restriction, and no automatic cessation rule. Tax treatment assumes the member is over 60, where TTR and full retirement-phase withdrawals are both tax-free; the model will misstate results for anyone under 60 drawing super while still working.</li>
           </ul>
         </div>
       </details>
@@ -413,7 +413,7 @@
       </details>
     </div>
     <div class="note">
-      <b>v1.09.</b> Fictional Australian couple sample data is stored locally on this device and can be imported or exported as JSON. Calculations are transparent estimates and are not financial or tax advice. The Display toggle switches the whole dashboard &mdash; table, chart and headline figures &mdash; between today&rsquo;s dollars and nominal (future) dollars, except the CSHC estimate which stays in today&rsquo;s dollars against its fixed threshold. Numeric inputs recalculate live as you type without moving your modelling position; the &ldquo;Recalculated&rdquo; stamp above the table confirms each run.
+      <b>v1.08.</b> Fictional Australian couple sample data is stored locally on this device and can be imported or exported as JSON. Calculations are transparent estimates and are not financial or tax advice. The Display toggle switches the whole dashboard &mdash; table, chart and headline figures &mdash; between today&rsquo;s dollars and nominal (future) dollars, except the CSHC estimate which stays in today&rsquo;s dollars against its fixed threshold. Numeric inputs recalculate live as you type without moving your modelling position; the &ldquo;Recalculated&rdquo; stamp above the table confirms each run.
     </div>
   </div>
 </div>
@@ -1503,18 +1503,6 @@
       .map(([source]) => lumpSourceLabel(source, people)).join(' + ') || 'Unfunded';
   }
 
-  function lumpSumEventLabel(event, people) {
-    const funding = event.funded > 0.005
-      ? `${formatMoney(event.funded)} funded from ` +
-        sourceSummary(event.drawsBySource, people)
-      : `${formatMoney(0)} funded`;
-    const shortfall = event.unfunded > 0.005
-      ? `; ${formatMoney(event.unfunded)} unfunded`
-      : '';
-    return `${event.reason} - requested ${formatMoney(event.requested)}; ` +
-      `${funding}${shortfall}`;
-  }
-
   function liquidateNamedSource(state, source, amount, inflationFactor, saleMonth = 12) {
     if (source.startsWith('share:')) {
       const holding = state.holdings.find(item => item.id === source.slice(6));
@@ -1654,16 +1642,7 @@
     }
 
     const firstShortfall = rows.find(row => row.shortfall > 1) ?? null;
-    const lumpSumEvents = rows.flatMap(row =>
-      row.events.filter(event =>
-        event.type === 'lump-sum' && event.unfunded > 0.005)
-    );
-    const lumpSumFunding = {
-      totalUnfunded: lumpSumEvents.reduce(
-        (sum, event) => sum + event.unfunded, 0),
-      count: lumpSumEvents.length
-    };
-    return { rows, firstShortfall, lumpSumFunding };
+    return { rows, firstShortfall };
   }
 
   function projectYear({
@@ -1774,7 +1753,6 @@
 
     const lumpSumDrawsNominal = { p0Super: 0, p1Super: 0, cash: 0, savings: 0 };
     let lumpSumTotalNominal = 0;
-    let lumpSumFundingShortfallNominal = 0;
     (scenario.lumpSumWithdrawals ?? []).filter(item => item.enabled !== false && item.year === year)
       .forEach(withdrawal => {
         const requestedNominal = withdrawal.amount * inflationFactor;
@@ -1791,29 +1769,14 @@
         Object.keys(lumpSumDrawsNominal).forEach(source => {
           lumpSumDrawsNominal[source] += result.drawsBySource[source];
         });
-        const fundedNominal = named.drawn + result.drawn;
-        const unfundedNominal = Math.max(0, requestedNominal - fundedNominal);
-        const requested = requestedNominal / inflationFactor;
-        const funded = fundedNominal / inflationFactor;
-        const unfunded = unfundedNominal / inflationFactor;
-        lumpSumTotalNominal += fundedNominal;
-        if (unfunded > 0.005) {
-          lumpSumFundingShortfallNominal += unfundedNominal;
-        }
-        const event = {
+        lumpSumTotalNominal += result.drawn + named.drawn;
+        events.push({
           type: 'lump-sum',
           reason: withdrawal.reason,
-          month: withdrawal.month,
           requestedSource: withdrawal.source,
           drawsBySource: actualDraws,
-          requested,
-          funded,
-          unfunded,
-          amount: funded
-        };
-        events.push({
-          ...event,
-          label: lumpSumEventLabel(event, scenario.people)
+          amount: (result.drawn + named.drawn) / inflationFactor,
+          label: `Lump sum - ${withdrawal.reason}: ${formatMoney((result.drawn + named.drawn) / inflationFactor)} (${sourceSummary(actualDraws, scenario.people)})`
         });
       });
 
@@ -2161,8 +2124,6 @@
       shares: unsoldShares / inflationFactor,
       otherAssets: otherAssetsNominal / inflationFactor,
       lumpSumTotal: lumpSumTotalNominal / inflationFactor,
-      lumpSumFundingShortfall:
-        lumpSumFundingShortfallNominal / inflationFactor,
       lumpSumDraws: Object.fromEntries(Object.entries(lumpSumDrawsNominal)
         .map(([source, amount]) => [source, amount / inflationFactor])),
       shareSaleProceeds: saleRecords.reduce(
@@ -2226,10 +2187,8 @@
         if (!finiteNonNegative(person.retireAge) || person.retireAge < person.age) {
           add(`people.${index}.retireAge`, 'Retirement age cannot be below current age.');
         }
-        if (!Number.isFinite(person.superAccessAge) ||
-            person.superAccessAge < 60 || person.superAccessAge > 120) {
-          add(`people.${index}.superAccessAge`,
-            'Super access age must be 60 or older because this simulator does not model taxation of withdrawals before age 60.');
+        if (!finiteNonNegative(person.superAccessAge) || person.superAccessAge > 120) {
+          add(`people.${index}.superAccessAge`, 'Super access age must be between 0 and 120.');
         }
         if (!Number.isFinite(person.superAccessPct) ||
             person.superAccessPct < 0 || person.superAccessPct > 100) {
@@ -2485,7 +2444,7 @@
     const context = `${row.year} · ages ${ages[0]} and ${ages[1]}`;
     if (segment.key === 'lumpSum') {
       const detail = row.events.filter(event => event.type === 'lump-sum')
-        .map(event => lumpSumEventLabel(event, scenario.people))
+        .map(event => `${formatMoney(event.amount)} for ${event.reason} from ${sourceSummary(event.drawsBySource, scenario.people)}`)
         .join(' · ');
       return [context, detail];
     }
@@ -2510,7 +2469,6 @@
     survivalMilestones,
     lumpSourceLabel,
     sourceSummary,
-    lumpSumEventLabel,
     chartTooltipLines,
     validateScenario,
     parseMoney,
@@ -2583,12 +2541,11 @@
   'use strict';
 
   const core = globalThis.RetirementSimulatorCore;
-  const STORAGE_KEY = 'family-retirement-simulator:v1.09:scenario';
+  const STORAGE_KEY = 'family-retirement-simulator:v1.08:scenario';
   const THEME_STORAGE_KEY = 'retirement-simulator-theme';
   // Read-only fallbacks so scenarios saved under earlier versions carry over
   // on first load (they migrate to the current schema automatically).
   const LEGACY_STORAGE_KEYS = [
-    'family-retirement-simulator:v1.08:scenario',
     'family-retirement-simulator:v1.07:scenario',
     'family-retirement-simulator:v1.06:scenario',
     'family-retirement-simulator:v1.05:scenario',
@@ -2769,9 +2726,9 @@
       ${numberField('Salary growth above inflation %', `${path}.salaryGrowthPct`,
         person.salaryGrowthPct ?? 0, 'min="0" step="0.1"')}
       ${numberField('SG %', `${path}.sgPct`, person.sgPct, 'min="0" max="30" step="0.1"')}
-      ${numberField('Super access age', `${path}.superAccessAge`, person.superAccessAge, 'min="60" max="120"')}
+      ${numberField('Super access age', `${path}.superAccessAge`, person.superAccessAge, 'min="0" max="120"')}
       ${numberField('Super access %', `${path}.superAccessPct`, person.superAccessPct, 'min="0" max="100" step="1"')}
-      <p class="sub">Age and % of super balance moved into drawdown phase. The simulator treats super withdrawals as tax-free and does not model the additional tax rules that may apply before age 60.</p>
+      <p class="sub">Age and % of super balance moved into drawdown phase. Independent of retire age &mdash; simplified early-access modelling, not full TTR (see Model assumptions).</p>
     </fieldset>`;
   }
 
@@ -3946,13 +3903,6 @@
             'Model period',
             'No projected shortfall in the selected period.'
           ),
-      ...(result.lumpSumFunding.count > 0 ? [statusCard(
-        'warn',
-        'Projected lump-sum shortfall',
-        `${core.formatMoney(result.lumpSumFunding.totalUnfunded)} unfunded across ` +
-          `${result.lumpSumFunding.count} planned ` +
-          `${result.lumpSumFunding.count === 1 ? 'withdrawal' : 'withdrawals'}.`
-      )] : []),
       ...(firstDeathRow ? [statusCard(
         'warn',
         'First-death scenario',

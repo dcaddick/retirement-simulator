@@ -47,7 +47,9 @@ Automated tests do not replace a real-browser pass. For user-interface changes, 
 - manual share pricing and explicitly selected US Stooq lookup;
 - collapse/expand behavior for every left-panel section after People.
 - both chart/table and table-height splitters, including persistence after reload;
-- lump-sum include/exclude toggles, concise tooltips and Event-column updates;
+- fully funded, partially and completely unfunded lump sums, including multiple-shortfall aggregation and disabled-item exclusion;
+- separate green/red annual-budget and amber lump-sum status, including both warnings appearing together;
+- requested, funded and unfunded Event and tooltip reconciliation, including Event inspection when a zero-funded withdrawal has no chart block;
 - preservation of active tab, open sections, focus and panel/table scroll positions after recalculation.
 - per-person salary growth at 0% and a positive percentage, including retirement cutoff;
 - super access validation in both tools, confirming age 59 is rejected with the concise tax explanation and age 60 is accepted;

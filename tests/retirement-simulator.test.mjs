@@ -17,6 +17,9 @@ const ARCHIVE_106 = fileURLToPath(
 const ARCHIVE_107 = fileURLToPath(
   new URL('../archive/retirement-simulator-v1.0.7.html', import.meta.url)
 );
+const ARCHIVE_108 = fileURLToPath(
+  new URL('../archive/retirement-simulator-v1.0.8.html', import.meta.url)
+);
 const DEFERRED_REVIEW = fileURLToPath(
   new URL('../docs/DEFERRED-REVIEW.md', import.meta.url)
 );
@@ -27,8 +30,8 @@ const TESTING = fileURLToPath(
   new URL('../docs/TESTING.md', import.meta.url)
 );
 const CHANGELOG = fileURLToPath(new URL('../CHANGELOG.md', import.meta.url));
-const SCREENSHOT_108 = fileURLToPath(
-  new URL('../docs/assets/retirement-simulator-v1.08.png', import.meta.url)
+const SCREENSHOT_109 = fileURLToPath(
+  new URL('../docs/assets/retirement-simulator-v1.09.png', import.meta.url)
 );
 const README = fileURLToPath(new URL('../README.md', import.meta.url));
 const html = readFileSync(FILE, 'utf8');
@@ -148,15 +151,16 @@ check('return assumptions are explained below the table',
 check('assumptions and methodology moved out of the controls panel',
   html.indexOf('<summary>Model assumptions and sources</summary>') > html.indexOf('<div class="tblwrap">') &&
   html.indexOf('id="methodologySection"') > html.indexOf('<div class="tblwrap">'));
-check('v1.08 document version is consistent',
-  html.includes('<title>Family Retirement Income Simulator v1.08</title>') &&
-  html.includes('<span class="version">v1.08</span>') &&
-  html.includes("const STORAGE_KEY = 'family-retirement-simulator:v1.08:scenario'") &&
-  html.includes("'family-retirement-simulator:v1.07:scenario'"));
+check('v1.09 document version is consistent',
+  html.includes('<title>Family Retirement Income Simulator v1.09</title>') &&
+  html.includes('<span class="version">v1.09</span>') &&
+  html.includes("const STORAGE_KEY = 'family-retirement-simulator:v1.09:scenario'") &&
+  html.includes("'family-retirement-simulator:v1.08:scenario'"));
 check('outgoing v1.04 executable is archived', existsSync(ARCHIVE_104));
 check('outgoing v1.0.5 executable is archived', existsSync(ARCHIVE_105));
 check('outgoing v1.0.6 executable is archived', existsSync(ARCHIVE_106));
 check('outgoing v1.0.7 executable is archived', existsSync(ARCHIVE_107));
+check('outgoing v1.0.8 executable is archived', existsSync(ARCHIVE_108));
 
 const schema10 = structuredClone(sample);
 schema10.schemaVersion = 10;
@@ -229,11 +233,18 @@ check('deferred review covers all approved out-of-scope items', [
 ].every(id => deferredReview.includes(id)));
 check('methodology discloses fixed nominal brackets',
   methodology.includes('fixed nominal') && methodology.includes('bracket creep'));
-check('README identifies v1.08 and Monte Carlo v0.7',
-  readme.includes('v1.08') &&
+check('README identifies v1.09 and Monte Carlo v0.7',
+  readme.includes('v1.09') &&
   readme.includes('retirement-monte-carlo-v0.7.html') &&
   readme.includes('one partner') && readme.includes('franking') &&
   readme.includes('capital-loss') && readme.includes('docs/DEFERRED-REVIEW.md'));
+check('v1.09 documents lump-sum affordability warnings',
+  readme.includes('unfunded lump-sum') &&
+  methodology.includes('requested, funded and unfunded') &&
+  testingGuide.includes('partially and completely unfunded'));
+check('Monte Carlo remains unreleased and experimental',
+  readme.includes('Unreleased v0.8 work') &&
+  readme.includes('retirement-monte-carlo-v0.7.html'));
 check('release docs define the fixed first-death boundary',
   methodology.includes('start of the selected projection year') &&
   methodology.includes('No bereavement payment') &&
@@ -247,7 +258,7 @@ check('Monte Carlo scope issue remains linked as open work',
 check('browser checklist covers survivor state in both tools',
   testingGuide.includes('fixed first-death') &&
   testingGuide.includes('every Monte Carlo path'));
-check('v1.08 release screenshot exists', existsSync(SCREENSHOT_108));
+check('v1.09 release screenshot exists', existsSync(SCREENSHOT_109));
 check('deferred register records the four v1.0.6 resolutions',
   ['#5', '#9', '#10', '#11'].every(issue => deferredReview.includes(issue)) &&
   (deferredReview.match(/Resolved in v1\.0\.6/g) ?? []).length >= 4);
@@ -266,7 +277,8 @@ check('public docs explain the supported age-60 super boundary',
   testingGuide.includes('age 59 is rejected') &&
   testingGuide.includes('age 60 is accepted'));
 check('changelog records the super access validation decision',
-  changelog.includes('Reject super access ages below 60') &&
+  changelog.includes('Reject deterministic simulator super access ages below 60') &&
+  changelog.includes('Reject experimental Monte Carlo super access ages below 60') &&
   changelog.includes('issues/8'));
 check('deferred register resolves the pre-60 taxation item',
   deferredReview.includes('| AIPR-003-SUPER-TAXFREE |') &&
@@ -1209,10 +1221,89 @@ check('explicit source falls back through household order',
   JSON.stringify(lumpRow.lumpSumDraws));
 check('lump sum is recorded in Event data', lumpRow.events.some(event =>
   event.type === 'lump-sum' && event.label.includes('New car') && event.label.includes('Cash') && event.label.includes('Savings')));
+const partialLump = structuredClone(withLump);
+partialLump.cash.amount = 10000;
+partialLump.savings.amount = 5000;
+partialLump.lumpSumWithdrawals = [{
+  id: 'partial-lump', amount: 25000, reason: 'European holiday',
+  month: 1, year: partialLump.startYear, source: 'cash', enabled: true
+}];
+const partialResult = core.projectScenario(partialLump);
+const partialRow = partialResult.rows[0];
+const partialEvent = partialRow.events.find(event => event.type === 'lump-sum');
+check('partial lump sum retains requested funded and unfunded amounts',
+  partialEvent?.requested === 25000 &&
+  partialEvent?.funded === 15000 &&
+  partialEvent?.unfunded === 10000 &&
+  partialEvent?.amount === 15000,
+  JSON.stringify(partialEvent));
+check('partial lump sum exposes row and projection aggregates',
+  partialRow.lumpSumFundingShortfall === 10000 &&
+  partialResult.lumpSumFunding?.totalUnfunded === 10000 &&
+  partialResult.lumpSumFunding?.count === 1,
+  JSON.stringify(partialResult.lumpSumFunding));
+check('lump-sum warning state is independent of annual-budget shortfall',
+  partialResult.firstShortfall === null &&
+  partialResult.lumpSumFunding?.count === 1,
+  JSON.stringify({
+    firstShortfall: partialResult.firstShortfall,
+    lumpSumFunding: partialResult.lumpSumFunding
+  }));
+const combinedShortfalls = structuredClone(partialLump);
+combinedShortfalls.household.annualBudget = 100000;
+const combinedResult = core.projectScenario(combinedShortfalls);
+check('annual-budget and lump-sum warnings can appear together',
+  combinedResult.firstShortfall !== null &&
+  combinedResult.lumpSumFunding?.count === 1,
+  JSON.stringify({
+    firstShortfall: combinedResult.firstShortfall,
+    lumpSumFunding: combinedResult.lumpSumFunding
+  }));
+
+const zeroFundedLump = structuredClone(withLump);
+zeroFundedLump.cash.amount = 0;
+zeroFundedLump.savings.amount = 0;
+zeroFundedLump.lumpSumWithdrawals = [{
+  id: 'zero-lump', amount: 20000, reason: 'Gift', month: 1,
+  year: zeroFundedLump.startYear, source: 'automatic', enabled: true
+}];
+const zeroResult = core.projectScenario(zeroFundedLump);
+const zeroRow = zeroResult.rows[0];
+const zeroEvent = zeroRow.events.find(event => event.type === 'lump-sum');
+check('completely unfunded lump sum remains auditable without charted money',
+  zeroEvent?.requested === 20000 && zeroEvent?.funded === 0 &&
+  zeroEvent?.unfunded === 20000 && zeroRow.lumpSumTotal === 0 &&
+  zeroResult.lumpSumFunding?.count === 1,
+  JSON.stringify(zeroEvent));
+
+const multipleLumps = structuredClone(zeroFundedLump);
+multipleLumps.lumpSumWithdrawals = [
+  { id: 'm1', amount: 10000, reason: 'Gift one', month: 1,
+    year: multipleLumps.startYear, source: 'automatic', enabled: true },
+  { id: 'm2', amount: 15000, reason: 'Gift two', month: 1,
+    year: multipleLumps.startYear, source: 'automatic', enabled: true },
+  { id: 'm3', amount: 50000, reason: 'Disabled', month: 1,
+    year: multipleLumps.startYear, source: 'automatic', enabled: false }
+];
+const multipleResult = core.projectScenario(multipleLumps);
+check('multiple shortfalls aggregate while disabled withdrawals stay inert',
+  multipleResult.lumpSumFunding?.totalUnfunded === 25000 &&
+  multipleResult.lumpSumFunding?.count === 2 &&
+  multipleResult.rows[0].events.filter(event => event.type === 'lump-sum').length === 2,
+  JSON.stringify(multipleResult.lumpSumFunding));
 const lumpTooltip = core.chartTooltipLines(
   { key: 'lumpSum', value: 25000, label: 'Lump sum withdrawal', displayFactor: 1 }, lumpRow, withLump);
 check('lump tooltip contains only context and essential funding sentence',
-  lumpTooltip.length === 2 && lumpTooltip[1] === '$25,000 for New car from Cash + Savings');
+  lumpTooltip.length === 2 &&
+  lumpTooltip[1] === 'New car - requested $25,000; $25,000 funded from Cash + Savings');
+const partialTooltip = core.chartTooltipLines(
+  { key: 'lumpSum', value: 15000, label: 'Lump sum withdrawal', displayFactor: 1 },
+  partialRow,
+  partialLump);
+check('partial lump tooltip discloses requested funded and unfunded amounts',
+  partialTooltip.length === 2 &&
+  partialTooltip[1] === 'European holiday - requested $25,000; $15,000 funded from Cash + Savings; $10,000 unfunded',
+  JSON.stringify(partialTooltip));
 const normalTooltip = core.chartTooltipLines(
   { key: 'person1Super', value: 17475, label: 'Jane super drawdown', displayFactor: 1 },
   { ...lumpRow, totalIncome: 80000 }, withLump);
@@ -1236,6 +1327,11 @@ check('nominal UK pension tooltip applies the display factor to gross',
   JSON.stringify(nominalPensionTooltip));
 check('tooltip markup removes target and per-year noise',
   !html.includes('Target met</span>') && !html.includes('per year</span>'));
+check('dashboard keeps lump-sum and annual-budget warning contracts distinct',
+  html.includes('result.lumpSumFunding.count > 0') &&
+  html.includes('Projected lump-sum shortfall') &&
+  html.includes('result.firstShortfall') &&
+  html.includes('Projected shortfall'));
 const disabledLump = structuredClone(withLump);
 disabledLump.lumpSumWithdrawals[0].enabled = false;
 const disabledRow = core.projectScenario(disabledLump).rows[0];
@@ -1256,6 +1352,20 @@ const assetFundedRow = core.projectScenario(assetFunded).rows[0];
 check('named asset can fund a lump sum', assetFundedRow.lumpSumTotal === 25000 &&
   assetFundedRow.events.some(event => event.type === 'lump-sum' && event.label.includes('Investment property')),
   JSON.stringify(assetFundedRow.events));
+const assetShortfall = structuredClone(assetFunded);
+assetShortfall.lumpSumWithdrawals[0].amount = 50000;
+const namedShortfallResult = core.projectScenario(assetShortfall);
+const namedShortfallRow = namedShortfallResult.rows[0];
+const namedShortfallEvent = namedShortfallRow.events.find(event => event.type === 'lump-sum');
+check('named source shortfall reconciles after fallback funding',
+  namedShortfallEvent?.requested === 50000 &&
+  namedShortfallEvent?.funded === 40000 &&
+  namedShortfallEvent?.unfunded === 10000 &&
+  namedShortfallEvent?.label.includes('Investment property'),
+  JSON.stringify(namedShortfallEvent));
+check('unaffordable lump sums never create negative liquid balances',
+  namedShortfallRow.cash >= 0 && namedShortfallRow.savings >= 0 &&
+  namedShortfallRow.superBalances.every(value => value >= 0));
 check('survival milestones are ordered', (() => {
   const m = core.survivalMilestones(63, 110);
   return m[0.8] < m[0.5] && m[0.5] < m[0.2] && m[0.2] < m[0.05];

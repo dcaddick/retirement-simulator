@@ -24,7 +24,7 @@ Each projection row represents one year. At a high level the simulator:
 
 ### Lump-sum withdrawals
 
-Lump-sum withdrawals are one-off spending for items such as a car, holiday or family assistance. Enabled items reduce the selected assets in the nominated year, do not count as retirement income and do not satisfy the annual income target. An explicit liquid source is used first; any remainder follows the household drawdown order. The Event column records the reason, amount and sources actually used. Disabled items remain saved in the scenario but are excluded from validation, calculations, charts and Event entries.
+Lump-sum withdrawals are one-off spending for items such as a car, holiday or family assistance. Enabled items reduce the selected assets in the nominated year, do not count as retirement income and do not satisfy the annual income target. An explicit liquid source is used first; any remainder follows the household drawdown order. The projection retains requested, funded and unfunded amounts for each enabled planned withdrawal. Only the funded amount reduces assets or appears on the chart. An unfunded remainder produces a separate planning warning and does not change the annual-budget shortfall calculation. The Event column records the reason, amount and sources actually used. Disabled items remain saved in the scenario but are excluded from validation, calculations, charts and Event entries.
 
 ### Illustrative survival ribbon
 

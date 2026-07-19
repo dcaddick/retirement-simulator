@@ -1,7 +1,7 @@
 # Monte Carlo Defined Benefit and UK Pension Parity Design
 
-**Date:** 2026-07-15  
-**Status:** Approved for implementation planning  
+**Date:** 2026-07-15
+**Status:** Approved for implementation planning
 **Issue:** [#1](https://github.com/dcaddick/retirement-simulator/issues/1)
 
 ## Objective
