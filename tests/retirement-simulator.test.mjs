@@ -20,6 +20,9 @@ const ARCHIVE_107 = fileURLToPath(
 const ARCHIVE_108 = fileURLToPath(
   new URL('../archive/retirement-simulator-v1.0.8.html', import.meta.url)
 );
+const ARCHIVE_109 = fileURLToPath(
+  new URL('../archive/retirement-simulator-v1.0.9.html', import.meta.url)
+);
 const DEFERRED_REVIEW = fileURLToPath(
   new URL('../docs/DEFERRED-REVIEW.md', import.meta.url)
 );
@@ -161,6 +164,7 @@ check('outgoing v1.0.5 executable is archived', existsSync(ARCHIVE_105));
 check('outgoing v1.0.6 executable is archived', existsSync(ARCHIVE_106));
 check('outgoing v1.0.7 executable is archived', existsSync(ARCHIVE_107));
 check('outgoing v1.0.8 executable is archived', existsSync(ARCHIVE_108));
+check('outgoing v1.0.9 executable is archived', existsSync(ARCHIVE_109));
 
 const schema10 = structuredClone(sample);
 schema10.schemaVersion = 10;
