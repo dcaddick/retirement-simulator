@@ -1234,6 +1234,23 @@ check('partial lump sum exposes row and projection aggregates',
   partialResult.lumpSumFunding?.totalUnfunded === 10000 &&
   partialResult.lumpSumFunding?.count === 1,
   JSON.stringify(partialResult.lumpSumFunding));
+check('lump-sum warning state is independent of annual-budget shortfall',
+  partialResult.firstShortfall === null &&
+  partialResult.lumpSumFunding?.count === 1,
+  JSON.stringify({
+    firstShortfall: partialResult.firstShortfall,
+    lumpSumFunding: partialResult.lumpSumFunding
+  }));
+const combinedShortfalls = structuredClone(partialLump);
+combinedShortfalls.household.annualBudget = 100000;
+const combinedResult = core.projectScenario(combinedShortfalls);
+check('annual-budget and lump-sum warnings can appear together',
+  combinedResult.firstShortfall !== null &&
+  combinedResult.lumpSumFunding?.count === 1,
+  JSON.stringify({
+    firstShortfall: combinedResult.firstShortfall,
+    lumpSumFunding: combinedResult.lumpSumFunding
+  }));
 
 const zeroFundedLump = structuredClone(withLump);
 zeroFundedLump.cash.amount = 0;
@@ -1269,7 +1286,16 @@ check('multiple shortfalls aggregate while disabled withdrawals stay inert',
 const lumpTooltip = core.chartTooltipLines(
   { key: 'lumpSum', value: 25000, label: 'Lump sum withdrawal', displayFactor: 1 }, lumpRow, withLump);
 check('lump tooltip contains only context and essential funding sentence',
-  lumpTooltip.length === 2 && lumpTooltip[1] === '$25,000 for New car from Cash + Savings');
+  lumpTooltip.length === 2 &&
+  lumpTooltip[1] === 'New car - requested $25,000; $25,000 funded from Cash + Savings');
+const partialTooltip = core.chartTooltipLines(
+  { key: 'lumpSum', value: 15000, label: 'Lump sum withdrawal', displayFactor: 1 },
+  partialRow,
+  partialLump);
+check('partial lump tooltip discloses requested funded and unfunded amounts',
+  partialTooltip.length === 2 &&
+  partialTooltip[1] === 'European holiday - requested $25,000; $15,000 funded from Cash + Savings; $10,000 unfunded',
+  JSON.stringify(partialTooltip));
 const normalTooltip = core.chartTooltipLines(
   { key: 'person1Super', value: 17475, label: 'Jane super drawdown', displayFactor: 1 },
   { ...lumpRow, totalIncome: 80000 }, withLump);
@@ -1293,6 +1319,11 @@ check('nominal UK pension tooltip applies the display factor to gross',
   JSON.stringify(nominalPensionTooltip));
 check('tooltip markup removes target and per-year noise',
   !html.includes('Target met</span>') && !html.includes('per year</span>'));
+check('dashboard keeps lump-sum and annual-budget warning contracts distinct',
+  html.includes('result.lumpSumFunding.count > 0') &&
+  html.includes('Projected lump-sum shortfall') &&
+  html.includes('result.firstShortfall') &&
+  html.includes('Projected shortfall'));
 const disabledLump = structuredClone(withLump);
 disabledLump.lumpSumWithdrawals[0].enabled = false;
 const disabledRow = core.projectScenario(disabledLump).rows[0];

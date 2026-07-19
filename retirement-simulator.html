@@ -2485,7 +2485,7 @@
     const context = `${row.year} · ages ${ages[0]} and ${ages[1]}`;
     if (segment.key === 'lumpSum') {
       const detail = row.events.filter(event => event.type === 'lump-sum')
-        .map(event => `${formatMoney(event.amount)} for ${event.reason} from ${sourceSummary(event.drawsBySource, scenario.people)}`)
+        .map(event => lumpSumEventLabel(event, scenario.people))
         .join(' · ');
       return [context, detail];
     }
@@ -3945,6 +3945,13 @@
             'Model period',
             'No projected shortfall in the selected period.'
           ),
+      ...(result.lumpSumFunding.count > 0 ? [statusCard(
+        'warn',
+        'Projected lump-sum shortfall',
+        `${core.formatMoney(result.lumpSumFunding.totalUnfunded)} unfunded across ` +
+          `${result.lumpSumFunding.count} planned ` +
+          `${result.lumpSumFunding.count === 1 ? 'withdrawal' : 'withdrawals'}.`
+      )] : []),
       ...(firstDeathRow ? [statusCard(
         'warn',
         'First-death scenario',
