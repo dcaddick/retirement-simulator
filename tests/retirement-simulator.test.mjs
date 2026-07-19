@@ -1213,6 +1213,59 @@ check('explicit source falls back through household order',
   JSON.stringify(lumpRow.lumpSumDraws));
 check('lump sum is recorded in Event data', lumpRow.events.some(event =>
   event.type === 'lump-sum' && event.label.includes('New car') && event.label.includes('Cash') && event.label.includes('Savings')));
+const partialLump = structuredClone(withLump);
+partialLump.cash.amount = 10000;
+partialLump.savings.amount = 5000;
+partialLump.lumpSumWithdrawals = [{
+  id: 'partial-lump', amount: 25000, reason: 'European holiday',
+  month: 1, year: partialLump.startYear, source: 'cash', enabled: true
+}];
+const partialResult = core.projectScenario(partialLump);
+const partialRow = partialResult.rows[0];
+const partialEvent = partialRow.events.find(event => event.type === 'lump-sum');
+check('partial lump sum retains requested funded and unfunded amounts',
+  partialEvent?.requested === 25000 &&
+  partialEvent?.funded === 15000 &&
+  partialEvent?.unfunded === 10000 &&
+  partialEvent?.amount === 15000,
+  JSON.stringify(partialEvent));
+check('partial lump sum exposes row and projection aggregates',
+  partialRow.lumpSumFundingShortfall === 10000 &&
+  partialResult.lumpSumFunding?.totalUnfunded === 10000 &&
+  partialResult.lumpSumFunding?.count === 1,
+  JSON.stringify(partialResult.lumpSumFunding));
+
+const zeroFundedLump = structuredClone(withLump);
+zeroFundedLump.cash.amount = 0;
+zeroFundedLump.savings.amount = 0;
+zeroFundedLump.lumpSumWithdrawals = [{
+  id: 'zero-lump', amount: 20000, reason: 'Gift', month: 1,
+  year: zeroFundedLump.startYear, source: 'automatic', enabled: true
+}];
+const zeroResult = core.projectScenario(zeroFundedLump);
+const zeroRow = zeroResult.rows[0];
+const zeroEvent = zeroRow.events.find(event => event.type === 'lump-sum');
+check('completely unfunded lump sum remains auditable without charted money',
+  zeroEvent?.requested === 20000 && zeroEvent?.funded === 0 &&
+  zeroEvent?.unfunded === 20000 && zeroRow.lumpSumTotal === 0 &&
+  zeroResult.lumpSumFunding?.count === 1,
+  JSON.stringify(zeroEvent));
+
+const multipleLumps = structuredClone(zeroFundedLump);
+multipleLumps.lumpSumWithdrawals = [
+  { id: 'm1', amount: 10000, reason: 'Gift one', month: 1,
+    year: multipleLumps.startYear, source: 'automatic', enabled: true },
+  { id: 'm2', amount: 15000, reason: 'Gift two', month: 1,
+    year: multipleLumps.startYear, source: 'automatic', enabled: true },
+  { id: 'm3', amount: 50000, reason: 'Disabled', month: 1,
+    year: multipleLumps.startYear, source: 'automatic', enabled: false }
+];
+const multipleResult = core.projectScenario(multipleLumps);
+check('multiple shortfalls aggregate while disabled withdrawals stay inert',
+  multipleResult.lumpSumFunding?.totalUnfunded === 25000 &&
+  multipleResult.lumpSumFunding?.count === 2 &&
+  multipleResult.rows[0].events.filter(event => event.type === 'lump-sum').length === 2,
+  JSON.stringify(multipleResult.lumpSumFunding));
 const lumpTooltip = core.chartTooltipLines(
   { key: 'lumpSum', value: 25000, label: 'Lump sum withdrawal', displayFactor: 1 }, lumpRow, withLump);
 check('lump tooltip contains only context and essential funding sentence',
@@ -1260,6 +1313,20 @@ const assetFundedRow = core.projectScenario(assetFunded).rows[0];
 check('named asset can fund a lump sum', assetFundedRow.lumpSumTotal === 25000 &&
   assetFundedRow.events.some(event => event.type === 'lump-sum' && event.label.includes('Investment property')),
   JSON.stringify(assetFundedRow.events));
+const assetShortfall = structuredClone(assetFunded);
+assetShortfall.lumpSumWithdrawals[0].amount = 50000;
+const namedShortfallResult = core.projectScenario(assetShortfall);
+const namedShortfallRow = namedShortfallResult.rows[0];
+const namedShortfallEvent = namedShortfallRow.events.find(event => event.type === 'lump-sum');
+check('named source shortfall reconciles after fallback funding',
+  namedShortfallEvent?.requested === 50000 &&
+  namedShortfallEvent?.funded === 40000 &&
+  namedShortfallEvent?.unfunded === 10000 &&
+  namedShortfallEvent?.label.includes('Investment property'),
+  JSON.stringify(namedShortfallEvent));
+check('unaffordable lump sums never create negative liquid balances',
+  namedShortfallRow.cash >= 0 && namedShortfallRow.savings >= 0 &&
+  namedShortfallRow.superBalances.every(value => value >= 0));
 check('survival milestones are ordered', (() => {
   const m = core.survivalMilestones(63, 110);
   return m[0.8] < m[0.5] && m[0.5] < m[0.2] && m[0.2] < m[0.05];

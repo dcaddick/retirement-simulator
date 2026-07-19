@@ -1503,6 +1503,18 @@
       .map(([source]) => lumpSourceLabel(source, people)).join(' + ') || 'Unfunded';
   }
 
+  function lumpSumEventLabel(event, people) {
+    const funding = event.funded > 0.005
+      ? `${formatMoney(event.funded)} funded from ` +
+        sourceSummary(event.drawsBySource, people)
+      : `${formatMoney(0)} funded`;
+    const shortfall = event.unfunded > 0.005
+      ? `; ${formatMoney(event.unfunded)} unfunded`
+      : '';
+    return `${event.reason} - requested ${formatMoney(event.requested)}; ` +
+      `${funding}${shortfall}`;
+  }
+
   function liquidateNamedSource(state, source, amount, inflationFactor, saleMonth = 12) {
     if (source.startsWith('share:')) {
       const holding = state.holdings.find(item => item.id === source.slice(6));
@@ -1642,7 +1654,16 @@
     }
 
     const firstShortfall = rows.find(row => row.shortfall > 1) ?? null;
-    return { rows, firstShortfall };
+    const lumpSumEvents = rows.flatMap(row =>
+      row.events.filter(event =>
+        event.type === 'lump-sum' && event.unfunded > 0.005)
+    );
+    const lumpSumFunding = {
+      totalUnfunded: lumpSumEvents.reduce(
+        (sum, event) => sum + event.unfunded, 0),
+      count: lumpSumEvents.length
+    };
+    return { rows, firstShortfall, lumpSumFunding };
   }
 
   function projectYear({
@@ -1753,6 +1774,7 @@
 
     const lumpSumDrawsNominal = { p0Super: 0, p1Super: 0, cash: 0, savings: 0 };
     let lumpSumTotalNominal = 0;
+    let lumpSumFundingShortfallNominal = 0;
     (scenario.lumpSumWithdrawals ?? []).filter(item => item.enabled !== false && item.year === year)
       .forEach(withdrawal => {
         const requestedNominal = withdrawal.amount * inflationFactor;
@@ -1769,14 +1791,29 @@
         Object.keys(lumpSumDrawsNominal).forEach(source => {
           lumpSumDrawsNominal[source] += result.drawsBySource[source];
         });
-        lumpSumTotalNominal += result.drawn + named.drawn;
-        events.push({
+        const fundedNominal = named.drawn + result.drawn;
+        const unfundedNominal = Math.max(0, requestedNominal - fundedNominal);
+        const requested = requestedNominal / inflationFactor;
+        const funded = fundedNominal / inflationFactor;
+        const unfunded = unfundedNominal / inflationFactor;
+        lumpSumTotalNominal += fundedNominal;
+        if (unfunded > 0.005) {
+          lumpSumFundingShortfallNominal += unfundedNominal;
+        }
+        const event = {
           type: 'lump-sum',
           reason: withdrawal.reason,
+          month: withdrawal.month,
           requestedSource: withdrawal.source,
           drawsBySource: actualDraws,
-          amount: (result.drawn + named.drawn) / inflationFactor,
-          label: `Lump sum - ${withdrawal.reason}: ${formatMoney((result.drawn + named.drawn) / inflationFactor)} (${sourceSummary(actualDraws, scenario.people)})`
+          requested,
+          funded,
+          unfunded,
+          amount: funded
+        };
+        events.push({
+          ...event,
+          label: lumpSumEventLabel(event, scenario.people)
         });
       });
 
@@ -2124,6 +2161,8 @@
       shares: unsoldShares / inflationFactor,
       otherAssets: otherAssetsNominal / inflationFactor,
       lumpSumTotal: lumpSumTotalNominal / inflationFactor,
+      lumpSumFundingShortfall:
+        lumpSumFundingShortfallNominal / inflationFactor,
       lumpSumDraws: Object.fromEntries(Object.entries(lumpSumDrawsNominal)
         .map(([source, amount]) => [source, amount / inflationFactor])),
       shareSaleProceeds: saleRecords.reduce(
@@ -2471,6 +2510,7 @@
     survivalMilestones,
     lumpSourceLabel,
     sourceSummary,
+    lumpSumEventLabel,
     chartTooltipLines,
     validateScenario,
     parseMoney,
