@@ -15,9 +15,9 @@ The repository contains two self-contained browser tools:
 
 Single HTML file · no installation · opens locally in a modern browser.
 
-![Retirement Income Simulator v1.08 showing a first-death survivor transition in its default dark theme](docs/assets/retirement-simulator-v1.08.png)
+![Retirement Income Simulator v1.09 showing a separate lump-sum affordability warning in its default dark theme](docs/assets/retirement-simulator-v1.09.png)
 
-*Shown in the default dark theme with a fixed first-death transition. The deterministic v1.09 simulator combines editable survivor spending and continuing-income assumptions, immediate single-person Age Pension treatment, inherited-super audit output, ownership-aware tax, inspectable charts and CSV export of the visible table.*
+*Shown with fictional data in the default dark theme. The deterministic v1.09 simulator keeps the green annual-budget result separate from an amber warning for an unfunded planned lump sum, while retaining inspectable charts, Event audit output and CSV export of the visible table.*
 
 ## Yours to download and use
 

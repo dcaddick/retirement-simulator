@@ -30,8 +30,8 @@ const TESTING = fileURLToPath(
   new URL('../docs/TESTING.md', import.meta.url)
 );
 const CHANGELOG = fileURLToPath(new URL('../CHANGELOG.md', import.meta.url));
-const SCREENSHOT_108 = fileURLToPath(
-  new URL('../docs/assets/retirement-simulator-v1.08.png', import.meta.url)
+const SCREENSHOT_109 = fileURLToPath(
+  new URL('../docs/assets/retirement-simulator-v1.09.png', import.meta.url)
 );
 const README = fileURLToPath(new URL('../README.md', import.meta.url));
 const html = readFileSync(FILE, 'utf8');
@@ -258,7 +258,7 @@ check('Monte Carlo scope issue remains linked as open work',
 check('browser checklist covers survivor state in both tools',
   testingGuide.includes('fixed first-death') &&
   testingGuide.includes('every Monte Carlo path'));
-check('v1.08 release screenshot exists', existsSync(SCREENSHOT_108));
+check('v1.09 release screenshot exists', existsSync(SCREENSHOT_109));
 check('deferred register records the four v1.0.6 resolutions',
   ['#5', '#9', '#10', '#11'].every(issue => deferredReview.includes(issue)) &&
   (deferredReview.match(/Resolved in v1\.0\.6/g) ?? []).length >= 4);
