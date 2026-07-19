@@ -295,7 +295,7 @@
       </div>
       <div id="otherIncomeList"></div>
       <div id="otherAssetList"></div>
-      <p class="sub">Income items are annual amounts, indexed to inflation. Taxable income follows the selected tax owner; non-taxable income remains a household cash flow. Assets grow (or shrink) at their own rate and their value moves into the savings pot in the disposal year; they count toward the Age Pension assets test but are not deemed, and CGT on disposal is not modelled.</p>
+      <p class="sub">Income items are annual amounts, indexed to inflation. Taxable income follows the selected tax owner; non-taxable income remains a household cash flow. Assets grow (or shrink) at their own rate. All Other Assets count in the Age Pension assets test. Select “Treat as financial investment for Age Pension deeming” only when appropriate; the selection does not change CSHC treatment, and you should enter actual returns separately under Other Income—for example, interest or rent. Disposal proceeds move to savings and CGT is not modelled.</p>
     </details>
     <details class="group" id="householdSection">
       <summary class="group-toggle"><h3>Household</h3></summary>
@@ -354,7 +354,7 @@
             <li>Dividends and optional franking credits follow ownership. Eligibility is a user assumption; integrity rules are not automated.</li>
             <li>Capital losses are tracked per person, applied before discounts and carried forward from a zero opening balance. CGT is funded from assets and never counts as retirement income.</li>
             <li>The survival band remains illustrative. The optional first-death scenario is a separate fixed event at the start of the selected year; it is not a mortality simulation and includes no bereavement payment.</li>
-            <li>Other income is CPI-indexed. Ownership controls tax allocation and survivor continuation; deceased-owned income continues at its entered percentage, while joint and survivor-owned income continue in full. Other assets count in the Age Pension assets test but are not deemed, and no CGT is modelled on their disposal.</li>
+            <li>Other income is CPI-indexed. Ownership controls tax allocation and survivor continuation; deceased-owned income continues at its entered percentage, while joint and survivor-owned income continue in full. All Other Assets count in the Age Pension assets test. Select “Treat as financial investment for Age Pension deeming” only when appropriate; the selection does not change CSHC treatment, and you should enter actual returns separately under Other Income—for example, interest or rent. Disposal proceeds move to savings and CGT is not modelled.</li>
             <li>Super access age is limited to 60 or older. The simulator treats super withdrawals as tax-free and does not model the additional tax rules that may apply before age 60.</li>
           </ul>
         </div>
@@ -3135,6 +3135,9 @@
           data-path="${path}.fxToAud" value="${item.fxToAud}">
       </label>
       ${moneyField('Current value', `${path}.amount`, item.amount, item.currency)}
+      <label><span class="k">Treat as financial investment for Age Pension deeming</span>
+        <input type="checkbox" data-path="${path}.agePensionDeemed"${item.agePensionDeemed ? ' checked' : ''}>
+      </label>
       ${numberField('Est. growth +/- %/yr', `${path}.growthPct`, item.growthPct, 'min="-100" max="100" step="0.5"')}
       ${numberField('Est. disposal year', `${path}.disposalYear`, item.disposalYear, `min="${new Date().getFullYear()}" max="2100" step="1"`)}
       <button type="button" class="remove-other" data-kind="otherAssets" data-index="${index}">Remove asset</button>
@@ -4055,11 +4058,14 @@
     ];
     const otherIncomeCount = (scenario.otherIncomes ?? []).length;
     const otherAssetCount = (scenario.otherAssets ?? []).length;
+    const deemedOtherAssetCount = (scenario.otherAssets ?? [])
+      .filter(asset => asset.agePensionDeemed === true).length;
     if (otherIncomeCount || otherAssetCount) {
       items.push(
         `Other items: ${otherIncomeCount} income (CPI-indexed; taxable items follow their selected owner) ` +
-        `and ${otherAssetCount} asset (own growth rate; in the assets test, not deemed; ` +
-        'disposal proceeds to savings, no CGT modelled)'
+        `and ${otherAssetCount} asset (own growth rate; all in the assets test; ` +
+        `${deemedOtherAssetCount} selected for Age Pension deeming; disposal proceeds ` +
+        'to savings; actual returns entered separately; no CGT modelled)'
       );
     }
     list.innerHTML = items.map(item => `<li>${item}</li>`).join('');
@@ -4072,6 +4078,7 @@
       ['ATO Medicare levy thresholds', core.MEDICARE_BASE.sourceUrl],
       ['Services Australia Age Pension assets test', core.SERVICES_AUSTRALIA_2026.assetsTestUrl],
       ['Services Australia Age Pension income test', core.SERVICES_AUSTRALIA_2026.incomeTestUrl],
+      ['Services Australia deeming', core.SERVICES_AUSTRALIA_2026.deemingUrl],
       ['Services Australia CSHC income test', core.SERVICES_AUSTRALIA_2026.cshcUrl]
     ];
     $('#sourceList').innerHTML = sources.map(([label, url]) =>

@@ -57,6 +57,7 @@ The deterministic simulator models a reusable two-person household and includes:
 - super access from age 60 and ordered drawdown tiers;
 - planned lump-sum withdrawals with requested, funded and unfunded audit output plus a separate affordability warning;
 - cash, savings, shareholdings, other income and other assets;
+- individual Other Asset selection as a financial investment for Age Pension deeming, while every Other Asset remains in the assets test;
 - nominal share-price growth, holding-period dividends and optional franking credits by owner;
 - per-person capital-loss netting and carry-forward, with CGT funded from assets rather than counted as retirement income;
 - Australian income-tax estimates, Medicare, LITO/SAPTO, Age Pension and CSHC estimates, including one partnered share when only one partner has reached Age Pension age;

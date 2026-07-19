@@ -116,6 +116,22 @@ check('deterministic super access control exposes the age-60 minimum',
   html.includes("numberField('Super access age', `${path}.superAccessAge`, person.superAccessAge, 'min=\"60\" max=\"120\"')"));
 check('deterministic assumptions explain the age-60 boundary',
   html.includes('The simulator treats super withdrawals as tax-free and does not model the additional tax rules that may apply before age 60.'));
+check('Other Asset editor exposes the Age Pension deeming option',
+  html.includes('data-path="${path}.agePensionDeemed"') &&
+  html.includes('Treat as financial investment for Age Pension deeming'));
+check('Other Asset copy separates Age Pension deeming from CSHC',
+  html.includes('does not change CSHC treatment') &&
+  html.includes('enter actual returns separately under Other Income'));
+check('assumptions disclose selected deemed Other Assets',
+  html.includes('agePensionDeemed === true') &&
+  html.includes('selected for Age Pension deeming'));
+check('public methodology documents Other Asset assessment classification',
+  methodology.includes('financial investment for Age Pension deeming') &&
+  methodology.includes('account-based income streams') &&
+  methodology.includes('Other Income'));
+check('browser checklist covers Other Asset deeming',
+  testingGuide.includes('flagged and unflagged Other Assets') &&
+  testingGuide.includes('CSHC assessed income remains unchanged'));
 check('sample has otherIncomes/otherAssets arrays',
   Array.isArray(sample.otherIncomes) && Array.isArray(sample.otherAssets));
 check('sample lump sums include valid intended months',
