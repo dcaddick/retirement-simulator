@@ -1,7 +1,7 @@
 # Super Access Age Validation Design
 
-**Date:** 2026-07-15  
-**Issue:** [#8 Review taxation of super drawdowns before age 60](https://github.com/dcaddick/retirement-simulator/issues/8)  
+**Date:** 2026-07-15
+**Issue:** [#8 Review taxation of super drawdowns before age 60](https://github.com/dcaddick/retirement-simulator/issues/8)
 **Status:** Approved for implementation planning
 
 ## Purpose
