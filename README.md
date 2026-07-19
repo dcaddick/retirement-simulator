@@ -17,7 +17,7 @@ Single HTML file · no installation · opens locally in a modern browser.
 
 ![Retirement Income Simulator v1.08 showing a first-death survivor transition in its default dark theme](docs/assets/retirement-simulator-v1.08.png)
 
-*Shown in the default dark theme with a fixed first-death transition. The deterministic v1.08 simulator combines editable survivor spending and continuing-income assumptions, immediate single-person Age Pension treatment, inherited-super audit output, ownership-aware tax, inspectable charts and CSV export of the visible table.*
+*Shown in the default dark theme with a fixed first-death transition. The deterministic v1.09 simulator combines editable survivor spending and continuing-income assumptions, immediate single-person Age Pension treatment, inherited-super audit output, ownership-aware tax, inspectable charts and CSV export of the visible table.*
 
 ## Yours to download and use
 
@@ -55,7 +55,7 @@ The deterministic simulator models a reusable two-person household and includes:
 - salaries, retirement ages and superannuation contributions;
 - accumulation and retirement-phase super balances;
 - super access from age 60 and ordered drawdown tiers;
-- planned one-off withdrawals with intended month/year, compact modelling rows and include/exclude toggles;
+- planned lump-sum withdrawals with requested, funded and unfunded audit output plus a separate affordability warning;
 - cash, savings, shareholdings, other income and other assets;
 - nominal share-price growth, holding-period dividends and optional franking credits by owner;
 - per-person capital-loss netting and carry-forward, with CGT funded from assets rather than counted as retirement income;
@@ -70,6 +70,8 @@ The deterministic simulator models a reusable two-person household and includes:
 - local autosave plus JSON import and export.
 
 Return assumptions and inflation are shown together. The interface calculates the nominal-minus-inflation spread live, showing both the long-run 2.5% view and the near-term Treasury rate when they differ.
+
+An amber dashboard warning makes any unfunded lump-sum amount visible without changing the separate annual-budget status.
 
 Both tools require a super access age of 60 or older. They treat super withdrawals as tax-free and do not model the additional tax rules that may apply before age 60.
 
