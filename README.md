@@ -15,9 +15,9 @@ The repository contains two self-contained browser tools:
 
 Single HTML file · no installation · opens locally in a modern browser.
 
-![Retirement Income Simulator v1.02 overview showing fictional lump-sum withdrawals and the income dashboard](docs/assets/retirement-simulator-v1.02-overview.jpg)
+![Retirement Income Simulator v1.10 showing a fictional private loan selected for Age Pension deeming](docs/assets/retirement-simulator-v1.10.png)
 
-*Historical v1.02 overview shown with fictional data in the default dark theme. The current deterministic v1.10 release candidate also lets an Other Asset be classified as a financial investment for Age Pension deeming while every Other Asset remains in the assets test. This is a modelling classification, not financial advice.*
+*Shown with fictional data in the default dark theme. The deterministic v1.10 simulator lets the fictional private-loan example be classified as a financial investment for Age Pension deeming while every Other Asset remains in the assets test. This is a modelling classification, not financial advice.*
 
 ## Yours to download and use
 
