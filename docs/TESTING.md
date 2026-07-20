@@ -24,6 +24,7 @@ archive/retirement-simulator-v1.0.1.html
 archive/retirement-simulator-v1.0.2.html
 archive/retirement-simulator-v1.0.5.html
 archive/retirement-simulator-v1.0.6.html
+archive/retirement-simulator-v1.0.9.html
 ```
 
 For the lump-sum regression, use fictional demo values, disable **Include Aged Pension estimate**, add a withdrawal and confirm no script-error banner appears. CI verifies each archived file against its release-tag Git blob.

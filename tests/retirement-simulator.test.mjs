@@ -33,8 +33,8 @@ const TESTING = fileURLToPath(
   new URL('../docs/TESTING.md', import.meta.url)
 );
 const CHANGELOG = fileURLToPath(new URL('../CHANGELOG.md', import.meta.url));
-const SCREENSHOT_109 = fileURLToPath(
-  new URL('../docs/assets/retirement-simulator-v1.09.png', import.meta.url)
+const SCREENSHOT_110 = fileURLToPath(
+  new URL('../docs/assets/retirement-simulator-v1.10.png', import.meta.url)
 );
 const README = fileURLToPath(new URL('../README.md', import.meta.url));
 const html = readFileSync(FILE, 'utf8');
@@ -192,11 +192,11 @@ check('return assumptions are explained below the table',
 check('assumptions and methodology moved out of the controls panel',
   html.indexOf('<summary>Model assumptions and sources</summary>') > html.indexOf('<div class="tblwrap">') &&
   html.indexOf('id="methodologySection"') > html.indexOf('<div class="tblwrap">'));
-check('v1.09 document version is consistent',
-  html.includes('<title>Family Retirement Income Simulator v1.09</title>') &&
-  html.includes('<span class="version">v1.09</span>') &&
-  html.includes("const STORAGE_KEY = 'family-retirement-simulator:v1.09:scenario'") &&
-  html.includes("'family-retirement-simulator:v1.08:scenario'"));
+check('v1.10 document version is consistent',
+  html.includes('<title>Family Retirement Income Simulator v1.10</title>') &&
+  html.includes('<span class="version">v1.10</span>') &&
+  html.includes("const STORAGE_KEY = 'family-retirement-simulator:v1.10:scenario'") &&
+  html.includes("'family-retirement-simulator:v1.09:scenario'"));
 check('outgoing v1.04 executable is archived', existsSync(ARCHIVE_104));
 check('outgoing v1.0.5 executable is archived', existsSync(ARCHIVE_105));
 check('outgoing v1.0.6 executable is archived', existsSync(ARCHIVE_106));
@@ -275,8 +275,9 @@ check('deferred review covers all approved out-of-scope items', [
 ].every(id => deferredReview.includes(id)));
 check('methodology discloses fixed nominal brackets',
   methodology.includes('fixed nominal') && methodology.includes('bracket creep'));
-check('README identifies v1.09 and Monte Carlo v0.7',
-  readme.includes('v1.09') &&
+check('README identifies deterministic v1.10',
+  readme.includes('v1.10') &&
+  readme.includes('financial investment for Age Pension deeming') &&
   readme.includes('retirement-monte-carlo-v0.7.html') &&
   readme.includes('one partner') && readme.includes('franking') &&
   readme.includes('capital-loss') && readme.includes('docs/DEFERRED-REVIEW.md'));
@@ -300,7 +301,11 @@ check('Monte Carlo scope issue remains linked as open work',
 check('browser checklist covers survivor state in both tools',
   testingGuide.includes('fixed first-death') &&
   testingGuide.includes('every Monte Carlo path'));
-check('v1.09 release screenshot exists', existsSync(SCREENSHOT_109));
+check('v1.10 release screenshot exists', existsSync(SCREENSHOT_110));
+check('changelog records deterministic v1.10 and Issue #18',
+  changelog.includes('## 1.10 - 2026-07-19') &&
+  changelog.includes('issues/18') &&
+  changelog.includes('Archived the exact outgoing deterministic v1.0.9 executable'));
 check('deferred register records the four v1.0.6 resolutions',
   ['#5', '#9', '#10', '#11'].every(issue => deferredReview.includes(issue)) &&
   (deferredReview.match(/Resolved in v1\.0\.6/g) ?? []).length >= 4);

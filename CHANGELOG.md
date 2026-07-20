@@ -9,6 +9,12 @@ This changelog summarizes public, non-personal milestones. Early development use
 - Added Other-income parity as the second issue #1 Monte Carlo import-support slice, including currency conversion, CPI indexation, ownership, tax treatment and survivor continuation; four compatibility guards remain active ([#1](https://github.com/dcaddick/retirement-simulator/issues/1)).
 - Added Defined Benefit/UK Pension parity as the third issue #1 Monte Carlo slice, replacing obsolete private-pension controls and preserving legacy values through migration; three compatibility guards remain active ([#1](https://github.com/dcaddick/retirement-simulator/issues/1)).
 
+## 1.10 - 2026-07-19
+
+- Added a per-asset option to include selected Other Assets as financial investments in Age Pension deeming while preserving assets-test treatment and leaving CSHC unchanged ([#18](https://github.com/dcaddick/retirement-simulator/issues/18)).
+- Added schema 13 migration with existing Other Assets defaulted outside deeming.
+- Archived the exact outgoing deterministic v1.0.9 executable.
+
 ## 1.09 - 2026-07-19
 
 - Reject deterministic simulator super access ages below 60 because pre-60 withdrawal taxation is outside the simplified model ([#8](https://github.com/dcaddick/retirement-simulator/issues/8)).
