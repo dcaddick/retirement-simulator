@@ -20,6 +20,9 @@ const ARCHIVE_107 = fileURLToPath(
 const ARCHIVE_108 = fileURLToPath(
   new URL('../archive/retirement-simulator-v1.0.8.html', import.meta.url)
 );
+const ARCHIVE_109 = fileURLToPath(
+  new URL('../archive/retirement-simulator-v1.0.9.html', import.meta.url)
+);
 const DEFERRED_REVIEW = fileURLToPath(
   new URL('../docs/DEFERRED-REVIEW.md', import.meta.url)
 );
@@ -30,8 +33,8 @@ const TESTING = fileURLToPath(
   new URL('../docs/TESTING.md', import.meta.url)
 );
 const CHANGELOG = fileURLToPath(new URL('../CHANGELOG.md', import.meta.url));
-const SCREENSHOT_109 = fileURLToPath(
-  new URL('../docs/assets/retirement-simulator-v1.09.png', import.meta.url)
+const SCREENSHOT_110 = fileURLToPath(
+  new URL('../docs/assets/retirement-simulator-v1.10.png', import.meta.url)
 );
 const README = fileURLToPath(new URL('../README.md', import.meta.url));
 const html = readFileSync(FILE, 'utf8');
@@ -68,10 +71,32 @@ vm.runInContext(extract('simulator-core'), context, { filename: 'simulator-core.
 const core = context.RetirementSimulatorCore;
 
 console.log('\nschema + sample');
-check('schema version is 12', core.SCHEMA_VERSION === 12);
+check('schema version is 13', core.SCHEMA_VERSION === 13);
 const sample = core.makeSampleScenario();
 check('sample validates', core.validateScenario(sample).length === 0,
   JSON.stringify(core.validateScenario(sample)[0] ?? null));
+check('new Other Assets default outside Age Pension deeming',
+  core.makeOtherAsset(0).agePensionDeemed === false);
+
+const schema12 = structuredClone(sample);
+schema12.schemaVersion = 12;
+schema12.otherAssets = [{
+  id: 'legacy-asset', label: 'Boat', currency: 'AUD', fxToAud: 1,
+  amount: 100000, growthPct: 0, disposalYear: schema12.startYear + 10
+}];
+const migrated13 = core.migrateScenario(schema12);
+check('schema 12 Other Assets migrate outside Age Pension deeming',
+  migrated13.schemaVersion === 13 &&
+  migrated13.otherAssets[0].agePensionDeemed === false);
+
+const invalidDeemingFlag = structuredClone(sample);
+invalidDeemingFlag.otherAssets = [{
+  ...core.makeOtherAsset(0), id: 'bad-deeming', label: 'Private loan',
+  agePensionDeemed: 'yes'
+}];
+check('Other Asset deeming classification must be boolean',
+  core.validateScenario(invalidDeemingFlag).some(error =>
+    error.path === 'otherAssets.0.agePensionDeemed'));
 const belowMinimumSuperAccess = structuredClone(sample);
 belowMinimumSuperAccess.people[0].superAccessAge = 59;
 const belowMinimumSuperAccessError = core.validateScenario(belowMinimumSuperAccess)
@@ -91,6 +116,22 @@ check('deterministic super access control exposes the age-60 minimum',
   html.includes("numberField('Super access age', `${path}.superAccessAge`, person.superAccessAge, 'min=\"60\" max=\"120\"')"));
 check('deterministic assumptions explain the age-60 boundary',
   html.includes('The simulator treats super withdrawals as tax-free and does not model the additional tax rules that may apply before age 60.'));
+check('Other Asset editor exposes the Age Pension deeming option',
+  html.includes('data-path="${path}.agePensionDeemed"') &&
+  html.includes('Treat as financial investment for Age Pension deeming'));
+check('Other Asset copy separates Age Pension deeming from CSHC',
+  html.includes('does not change CSHC treatment') &&
+  html.includes('enter actual returns separately under Other Income'));
+check('assumptions disclose selected deemed Other Assets',
+  html.includes('agePensionDeemed === true') &&
+  html.includes('selected for Age Pension deeming'));
+check('public methodology documents Other Asset assessment classification',
+  methodology.includes('financial investment for Age Pension deeming') &&
+  methodology.includes('account-based income streams') &&
+  methodology.includes('Other Income'));
+check('browser checklist covers Other Asset deeming',
+  testingGuide.includes('flagged and unflagged Other Assets') &&
+  testingGuide.includes('CSHC assessed income remains unchanged'));
 check('sample has otherIncomes/otherAssets arrays',
   Array.isArray(sample.otherIncomes) && Array.isArray(sample.otherAssets));
 check('sample lump sums include valid intended months',
@@ -151,16 +192,17 @@ check('return assumptions are explained below the table',
 check('assumptions and methodology moved out of the controls panel',
   html.indexOf('<summary>Model assumptions and sources</summary>') > html.indexOf('<div class="tblwrap">') &&
   html.indexOf('id="methodologySection"') > html.indexOf('<div class="tblwrap">'));
-check('v1.09 document version is consistent',
-  html.includes('<title>Family Retirement Income Simulator v1.09</title>') &&
-  html.includes('<span class="version">v1.09</span>') &&
-  html.includes("const STORAGE_KEY = 'family-retirement-simulator:v1.09:scenario'") &&
-  html.includes("'family-retirement-simulator:v1.08:scenario'"));
+check('v1.10 document version is consistent',
+  html.includes('<title>Family Retirement Income Simulator v1.10</title>') &&
+  html.includes('<span class="version">v1.10</span>') &&
+  html.includes("const STORAGE_KEY = 'family-retirement-simulator:v1.10:scenario'") &&
+  html.includes("'family-retirement-simulator:v1.09:scenario'"));
 check('outgoing v1.04 executable is archived', existsSync(ARCHIVE_104));
 check('outgoing v1.0.5 executable is archived', existsSync(ARCHIVE_105));
 check('outgoing v1.0.6 executable is archived', existsSync(ARCHIVE_106));
 check('outgoing v1.0.7 executable is archived', existsSync(ARCHIVE_107));
 check('outgoing v1.0.8 executable is archived', existsSync(ARCHIVE_108));
+check('outgoing v1.0.9 executable is archived', existsSync(ARCHIVE_109));
 
 const schema10 = structuredClone(sample);
 schema10.schemaVersion = 10;
@@ -178,7 +220,7 @@ delete schema10.shareholdings[0].companyTaxRatePct;
 delete schema10.shareholdings[0].frankingEligible;
 const migrated11 = core.migrateScenario(schema10);
 check('schema 10 migrates inert v1.06 tax and share defaults',
-  migrated11.schemaVersion === 12 &&
+  migrated11.schemaVersion === 13 &&
   migrated11.otherIncomes[0].owner === 'joint' &&
   migrated11.otherIncomes[0].survivorPct === 0 &&
   migrated11.household.firstDeath.enabled === false &&
@@ -199,7 +241,7 @@ schema11.otherIncomes = [{
 delete schema11.otherIncomes[0].survivorPct;
 const migrated12 = core.migrateScenario(schema11);
 check('schema 11 migrates inert first-death defaults',
-  migrated12.schemaVersion === 12 &&
+  migrated12.schemaVersion === 13 &&
   migrated12.household.firstDeath.enabled === false &&
   migrated12.household.firstDeath.survivorPreferredPct === 70 &&
   migrated12.household.firstDeath.survivorEssentialPct === 70 &&
@@ -233,8 +275,9 @@ check('deferred review covers all approved out-of-scope items', [
 ].every(id => deferredReview.includes(id)));
 check('methodology discloses fixed nominal brackets',
   methodology.includes('fixed nominal') && methodology.includes('bracket creep'));
-check('README identifies v1.09 and Monte Carlo v0.7',
-  readme.includes('v1.09') &&
+check('README identifies deterministic v1.10',
+  readme.includes('v1.10') &&
+  readme.includes('financial investment for Age Pension deeming') &&
   readme.includes('retirement-monte-carlo-v0.7.html') &&
   readme.includes('one partner') && readme.includes('franking') &&
   readme.includes('capital-loss') && readme.includes('docs/DEFERRED-REVIEW.md'));
@@ -258,7 +301,11 @@ check('Monte Carlo scope issue remains linked as open work',
 check('browser checklist covers survivor state in both tools',
   testingGuide.includes('fixed first-death') &&
   testingGuide.includes('every Monte Carlo path'));
-check('v1.09 release screenshot exists', existsSync(SCREENSHOT_109));
+check('v1.10 release screenshot exists', existsSync(SCREENSHOT_110));
+check('changelog records deterministic v1.10 and Issue #18',
+  changelog.includes('## 1.10 - 2026-07-19') &&
+  changelog.includes('issues/18') &&
+  changelog.includes('Archived the exact outgoing deterministic v1.0.9 executable'));
 check('deferred register records the four v1.0.6 resolutions',
   ['#5', '#9', '#10', '#11'].every(issue => deferredReview.includes(issue)) &&
   (deferredReview.match(/Resolved in v1\.0\.6/g) ?? []).length >= 4);
@@ -1033,9 +1080,27 @@ const survivorPensionRow = core.projectScenario(survivorPensionScenario).rows[1]
 check('transition-year projection uses the single Age Pension rules',
   survivorPensionRow.agePensionStatus === 'single' &&
   survivorPensionRow.components.agePensionNet === 1200.90 * 26);
+const unflaggedSurvivorDeemingScenario = structuredClone(survivorPensionScenario);
+unflaggedSurvivorDeemingScenario.otherAssets = [{
+  id: 'survivor-loan', label: 'Survivor private loan',
+  currency: 'AUD', fxToAud: 1, amount: 300000,
+  agePensionDeemed: false, growthPct: 0,
+  disposalYear: unflaggedSurvivorDeemingScenario.startYear + 20
+}];
+const flaggedSurvivorDeemingScenario =
+  structuredClone(unflaggedSurvivorDeemingScenario);
+flaggedSurvivorDeemingScenario.otherAssets[0].agePensionDeemed = true;
+const unflaggedSurvivorRow =
+  core.projectScenario(unflaggedSurvivorDeemingScenario).rows[1];
+const flaggedSurvivorRow =
+  core.projectScenario(flaggedSurvivorDeemingScenario).rows[1];
+check('survivor projection applies single-person deeming to flagged assets',
+  flaggedSurvivorRow.agePensionStatus === 'single' &&
+  flaggedSurvivorRow.components.agePensionNet <
+    unflaggedSurvivorRow.components.agePensionNet);
 const survivorRoundTrip = core.importScenario(
   core.exportScenario(survivorProjectionScenario));
-check('JSON round-trip retains all schema-v12 survivor fields',
+check('JSON round-trip retains all schema-v13 survivor fields',
   JSON.stringify(survivorRoundTrip.household.firstDeath) ===
     JSON.stringify(survivorProjectionScenario.household.firstDeath) &&
   survivorRoundTrip.people[0].ukStateSurvivorPct === 50 &&
@@ -1172,10 +1237,20 @@ check('invalid other income owner is rejected',
     error.path === 'otherIncomes.0.owner'));
 
 console.log('\nother assets');
+const assessmentBalances = core.otherAssetAssessmentBalances([
+  { value: 500000, sold: false, agePensionDeemed: true },
+  { value: 80000, sold: false, agePensionDeemed: false },
+  { value: 40000, sold: true, agePensionDeemed: true }
+]);
+check('Other Asset assessment balances separate total and deemable value',
+  assessmentBalances.totalNominal === 580000 &&
+  assessmentBalances.deemableNominal === 500000,
+  JSON.stringify(assessmentBalances));
 const withAsset = structuredClone(sample);
 const disposalYear = sample.startYear + 5;
 withAsset.otherAssets = [
-  { id: 'a1', label: 'Boat', currency: 'AUD', fxToAud: 1, amount: 100000, growthPct: 3, disposalYear }
+  { id: 'a1', label: 'Boat', currency: 'AUD', fxToAud: 1, amount: 100000,
+    agePensionDeemed: false, growthPct: 3, disposalYear }
 ];
 check('scenario with asset validates', core.validateScenario(withAsset).length === 0,
   JSON.stringify(core.validateScenario(withAsset)[0] ?? null));
@@ -1196,6 +1271,100 @@ check('no double disposal', afterRow.events.every(e => e.type !== 'asset-disposa
 check('savings jump at disposal vs baseline',
   disposalRow.savings > base.rows.find(r => r.year === disposalYear).savings + 50000,
   `${disposalRow.savings}`);
+
+function privateLoanScenario(agePensionDeemed) {
+  const scenario = structuredClone(sample);
+  scenario.people.forEach(person => {
+    person.age = 67;
+    person.retireAge = 67;
+    person.superAccessAge = 67;
+    person.super = 0;
+    person.salary = 0;
+    person.ukStateAnnualGbp = 0;
+  });
+  scenario.cash.amount = 0;
+  scenario.savings.amount = 0;
+  scenario.shareholdings = [];
+  scenario.otherIncomes = [];
+  scenario.lumpSumWithdrawals = [];
+  scenario.household.targetAfterTax = 100000;
+  scenario.household.annualBudget = 100000;
+  scenario.household.includeAgePension = true;
+  scenario.otherAssets = [{
+    id: 'private-loan', label: 'Private loan', currency: 'AUD', fxToAud: 1,
+    amount: 500000, agePensionDeemed, growthPct: 0,
+    disposalYear: scenario.startYear + 20
+  }];
+  return scenario;
+}
+
+const unflaggedLoanRow = core.projectScenario(privateLoanScenario(false)).rows[0];
+const flaggedLoanRow = core.projectScenario(privateLoanScenario(true)).rows[0];
+check('flagged private loan reduces Age Pension through deemed income',
+  flaggedLoanRow.components.agePensionNet <
+    unflaggedLoanRow.components.agePensionNet,
+  `${flaggedLoanRow.components.agePensionNet} vs ${unflaggedLoanRow.components.agePensionNet}`);
+check('classification does not change asset value',
+  flaggedLoanRow.otherAssets === unflaggedLoanRow.otherAssets &&
+  flaggedLoanRow.totalAssets === unflaggedLoanRow.totalAssets);
+
+const unflaggedCshcScenario = privateLoanScenario(false);
+unflaggedCshcScenario.household.includeAgePension = false;
+const flaggedCshcScenario = privateLoanScenario(true);
+flaggedCshcScenario.household.includeAgePension = false;
+const unflaggedCshcRow = core.projectScenario(unflaggedCshcScenario).rows[0];
+const flaggedCshcRow = core.projectScenario(flaggedCshcScenario).rows[0];
+check('classification does not change CSHC assessed income',
+  flaggedCshcRow.cshc.assessedIncome ===
+    unflaggedCshcRow.cshc.assessedIncome);
+
+const flaggedLoanRoundTrip = core.importScenario(
+  core.exportScenario(privateLoanScenario(true)));
+check('JSON round-trip preserves Other Asset deeming classification',
+  flaggedLoanRoundTrip.otherAssets[0].agePensionDeemed === true);
+
+const disposedLoan = privateLoanScenario(true);
+disposedLoan.otherAssets[0].disposalYear = disposedLoan.startYear;
+const disposedLoanRow = core.projectScenario(disposedLoan).rows[0];
+const disposedUnflaggedLoan = privateLoanScenario(false);
+disposedUnflaggedLoan.otherAssets[0].disposalYear = disposedUnflaggedLoan.startYear;
+const disposedUnflaggedLoanRow = core.projectScenario(disposedUnflaggedLoan).rows[0];
+check('disposed deemed asset is assessed once through savings',
+  disposedLoanRow.otherAssets === 0 &&
+  disposedLoanRow.savings > 0 &&
+  disposedLoanRow.components.agePensionNet ===
+    disposedUnflaggedLoanRow.components.agePensionNet);
+
+const partialLoan = privateLoanScenario(true);
+partialLoan.otherAssets[0].amount = 700000;
+partialLoan.lumpSumWithdrawals = [{
+  id: 'loan-draw', enabled: true, amount: 200000,
+  reason: 'Capital repayment', month: 1, year: partialLoan.startYear,
+  source: 'asset:private-loan'
+}];
+const partialLoanRow = core.projectScenario(partialLoan).rows[0];
+check('partial named liquidation leaves only the residual asset',
+  partialLoanRow.otherAssets === 500000 &&
+  partialLoanRow.lumpSumTotal === 200000 &&
+  partialLoanRow.components.agePensionNet ===
+    flaggedLoanRow.components.agePensionNet);
+
+const fullLoan = privateLoanScenario(true);
+fullLoan.lumpSumWithdrawals = [{
+  id: 'loan-close', enabled: true, amount: 500000,
+  reason: 'Loan repaid', month: 1, year: fullLoan.startYear,
+  source: 'asset:private-loan'
+}];
+const fullLoanRow = core.projectScenario(fullLoan).rows[0];
+const noLoan = structuredClone(fullLoan);
+noLoan.otherAssets = [];
+noLoan.lumpSumWithdrawals = [];
+const noLoanRow = core.projectScenario(noLoan).rows[0];
+check('full named liquidation removes the deemed asset balance',
+  fullLoanRow.otherAssets === 0 &&
+  fullLoanRow.lumpSumTotal === 500000 &&
+  fullLoanRow.components.agePensionNet ===
+    noLoanRow.components.agePensionNet);
 
 console.log('\nnegative growth');
 const shrink = structuredClone(withAsset);
@@ -1346,7 +1515,7 @@ check('disabled lump sum does not block validation', core.validateScenario(disab
 const assetFunded = structuredClone(withLump);
 assetFunded.cash.amount = 0;
 assetFunded.savings.amount = 0;
-assetFunded.otherAssets = [{ id: 'car-fund', label: 'Investment property', currency: 'AUD', fxToAud: 1, amount: 40000, growthPct: 0, disposalYear: assetFunded.startYear + 10 }];
+assetFunded.otherAssets = [{ id: 'car-fund', label: 'Investment property', currency: 'AUD', fxToAud: 1, amount: 40000, agePensionDeemed: false, growthPct: 0, disposalYear: assetFunded.startYear + 10 }];
 assetFunded.lumpSumWithdrawals = [{ id: 'l2', amount: 25000, reason: 'Help kids', month: 1, year: assetFunded.startYear, source: 'asset:car-fund' }];
 const assetFundedRow = core.projectScenario(assetFunded).rows[0];
 check('named asset can fund a lump sum', assetFundedRow.lumpSumTotal === 25000 &&
@@ -1378,7 +1547,7 @@ const incomeErrors = core.validateScenario(badIncome);
 check('bad income: label/currency/fx/amount/taxable all flagged', incomeErrors.length >= 5,
   JSON.stringify(incomeErrors));
 const badAsset = structuredClone(sample);
-badAsset.otherAssets = [{ id: 'y', label: 'ok', currency: 'AUD', fxToAud: 1, amount: 100, growthPct: 500, disposalYear: 1999 }];
+badAsset.otherAssets = [{ id: 'y', label: 'ok', currency: 'AUD', fxToAud: 1, amount: 100, agePensionDeemed: false, growthPct: 500, disposalYear: 1999 }];
 const assetErrors = core.validateScenario(badAsset);
 check('bad asset: growth + disposal year flagged', assetErrors.length >= 2,
   JSON.stringify(assetErrors));
@@ -1448,7 +1617,7 @@ v5.people[1].ukPrivateAmountGbp = 20000;
 v5.people[1].ukPrivateTakeAge = 66;
 v5.people[1].ukPrivateType = 'lump';
 const migrated = core.migrateScenario(structuredClone(v5));
-check('migrates to v12', migrated.schemaVersion === 12);
+check('migrates to v13', migrated.schemaVersion === 13);
 check('annuity becomes other income', migrated.otherIncomes.length === 1 &&
   migrated.otherIncomes[0].amount === 5000 && migrated.otherIncomes[0].currency === 'GBP');
 check('lump becomes other asset with disposal year',
@@ -1468,14 +1637,14 @@ schema7.schemaVersion = 7;
 schema7.lumpSumWithdrawals.forEach(item => delete item.enabled);
 const migrated8 = core.migrateScenario(schema7);
 check('schema 7 lump sums migrate enabled',
-  migrated8.schemaVersion === 12 && migrated8.lumpSumWithdrawals.every(item => item.enabled === true));
+  migrated8.schemaVersion === 13 && migrated8.lumpSumWithdrawals.every(item => item.enabled === true));
 
 const schema8 = structuredClone(sample);
 schema8.schemaVersion = 8;
 schema8.lumpSumWithdrawals.forEach(item => delete item.month);
 const migrated9 = core.migrateScenario(schema8);
 check('schema 8 lump sums migrate to January and salary growth defaults to zero',
-  migrated9.schemaVersion === 12 &&
+  migrated9.schemaVersion === 13 &&
   migrated9.lumpSumWithdrawals.every(item => item.month === 1) &&
   migrated9.people.every(person => person.salaryGrowthPct === 0));
 
@@ -1484,14 +1653,14 @@ schema9.schemaVersion = 9;
 schema9.people.forEach(person => delete person.salaryGrowthPct);
 const migrated10 = core.migrateScenario(schema9);
 check('schema 9 migrates salary growth to zero',
-  migrated10.schemaVersion === 12 && migrated10.people.every(person => person.salaryGrowthPct === 0));
+  migrated10.schemaVersion === 13 && migrated10.people.every(person => person.salaryGrowthPct === 0));
 
 const invalidMonth = structuredClone(sample);
 invalidMonth.lumpSumWithdrawals[0].month = 13;
 check('invalid lump-sum month is reported',
   core.validateScenario(invalidMonth).some(error => error.path === 'lumpSumWithdrawals.0.month'));
 
-console.log('\nmigration v1 -> v12 (full chain)');
+console.log('\nmigration v1 -> v13 (full chain)');
 const v1 = structuredClone(v5);
 v1.schemaVersion = 1;
 delete v1.lumpSumWithdrawals;
@@ -1499,7 +1668,7 @@ delete v1.household.annualBudget;
 v1.people = v1.people.map(({ superAccessAge, superAccessPct, ukStateIndexation, ...rest }) => rest);
 delete v1.assumptions.ukPensionsEnabled;
 const chained = core.migrateScenario(structuredClone(v1));
-check('v1 chains to v12', chained.schemaVersion === 12);
+check('v1 chains to v13', chained.schemaVersion === 13);
 check('migration adds empty lump sums', Array.isArray(chained.lumpSumWithdrawals) && chained.lumpSumWithdrawals.length === 0);
 check('chained validates', core.validateScenario(chained).length === 0,
   JSON.stringify(core.validateScenario(chained)[0] ?? null));

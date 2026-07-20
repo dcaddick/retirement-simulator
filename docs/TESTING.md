@@ -9,7 +9,7 @@ node tests/retirement-simulator.test.mjs
 node tests/retirement-monte-carlo.test.mjs
 ```
 
-The deterministic suite checks core-engine extraction, script syntax, schema migration, validation and calculation invariants across the supported household model. It also covers the archived-release baseline, safe CSV serialisation, projection-critical numeric validation, the Age Pension couple taper, zero/half/full age-gap boundaries, fixed first-death transition ordering, survivor ownership and inherited super, single-person Age Pension, reversed partner order, eligible-person tax allocation, younger-partner super assessment, bracket creep, share growth, holding-period dividends, franking refunds, capital-loss carry-forward and CGT expense funding. The suite also verifies that age 59 is rejected with the approved explanation and age 60 is accepted.
+The deterministic suite checks core-engine extraction, script syntax, schema migration, validation and calculation invariants across the supported household model. It also covers the archived-release baseline, safe CSV serialisation, projection-critical numeric validation, the Age Pension couple taper, zero/half/full age-gap boundaries, fixed first-death transition ordering, survivor ownership and inherited super, single-person Age Pension, reversed partner order, eligible-person tax allocation, younger-partner super assessment, bracket creep, share growth, holding-period dividends, franking refunds, capital-loss carry-forward and CGT expense funding. Other Asset coverage includes flagged and unflagged classifications, mixed balances, scheduled disposal, partial and full named liquidation, survivor deeming thresholds and unchanged CSHC assessed income. The suite also verifies that age 59 is rejected with the approved explanation and age 60 is accepted.
 
 The Monte Carlo v0.7 suite checks imported-scenario handling, matching age-gap and survivor Age Pension treatment, person-level tax allocation, the same fixed first-death event in every Monte Carlo path, deterministic parity under zero volatility, reproducibility, risk-mode behaviour, deterministic stress overrides and invariants that keep stress results outside the stochastic probability denominator. The suite also verifies that age 59 is rejected with the approved explanation and age 60 is accepted. It also covers schema-4 to schema-5 migration and zero-volatility salary-growth parity while confirming the remaining import guards stay active. It also covers Other-income ownership, tax, Age Pension, household-funding and survivor parity under zero volatility, plus seeded stochastic invariants. Defined Benefit and UK State Pension parity tests cover UPP tax treatment, indexation, start-age boundaries and survivor continuation.
 
@@ -24,6 +24,7 @@ archive/retirement-simulator-v1.0.1.html
 archive/retirement-simulator-v1.0.2.html
 archive/retirement-simulator-v1.0.5.html
 archive/retirement-simulator-v1.0.6.html
+archive/retirement-simulator-v1.0.9.html
 ```
 
 For the lump-sum regression, use fictional demo values, disable **Include Aged Pension estimate**, add a withdrawal and confirm no script-error banner appears. CI verifies each archived file against its release-tag Git blob.
@@ -58,6 +59,10 @@ Automated tests do not replace a real-browser pass. For user-interface changes, 
 - Age Pension results for neither, one and both eligible partners, including reversed partner order and the transition when the younger partner reaches 67;
 - share growth/dividend/franking controls inside the existing holding chevron, including disabled eligibility and both company-tax rates;
 - Other income Tax owner allocation and the disabled selector for non-taxable income;
+- flagged and unflagged Other Assets, mixed classifications and the assumptions count, confirming all assets remain in the assets test while only flagged balances enter Age Pension deeming;
+- scheduled disposal plus partial and full named liquidation of a flagged Other Asset, confirming the value is not lost or counted twice;
+- a flagged Other Asset across the fixed first-death transition, confirming the survivor uses single-person deeming thresholds;
+- toggling the Other Asset deeming classification, confirming CSHC assessed income remains unchanged and actual returns remain separate Other Income;
 - conditional Share dividends, Franking credits and CGT output, capital-loss/CGT Event details, and the Lump sum withdrawal legend item;
 - a large scheduled sale and a named partial sale, confirming CGT draws are not charted as retirement income and unfunded tax is explicit;
 - fixed first-death scenarios for each possible deceased person, confirming the start-of-year marker, stepped Preferred/Essential amounts, deceased em dashes and zero tax, inherited super, survivor horizon and immediate single Age Pension treatment;

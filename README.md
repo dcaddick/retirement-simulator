@@ -15,9 +15,9 @@ The repository contains two self-contained browser tools:
 
 Single HTML file · no installation · opens locally in a modern browser.
 
-![Retirement Income Simulator v1.09 showing a separate lump-sum affordability warning in its default dark theme](docs/assets/retirement-simulator-v1.09.png)
+![Retirement Income Simulator v1.10 showing a fictional private loan selected for Age Pension deeming](docs/assets/retirement-simulator-v1.10.png)
 
-*Shown with fictional data in the default dark theme. The deterministic v1.09 simulator keeps the green annual-budget result separate from an amber warning for an unfunded planned lump sum, while retaining inspectable charts, Event audit output and CSV export of the visible table.*
+*Shown with fictional data in the default dark theme. The deterministic v1.10 simulator lets the fictional private-loan example be classified as a financial investment for Age Pension deeming while every Other Asset remains in the assets test. This is a modelling classification, not financial advice.*
 
 ## Yours to download and use
 
@@ -57,6 +57,7 @@ The deterministic simulator models a reusable two-person household and includes:
 - super access from age 60 and ordered drawdown tiers;
 - planned lump-sum withdrawals with requested, funded and unfunded audit output plus a separate affordability warning;
 - cash, savings, shareholdings, other income and other assets;
+- individual Other Asset selection as a financial investment for Age Pension deeming, while every Other Asset remains in the assets test;
 - nominal share-price growth, holding-period dividends and optional franking credits by owner;
 - per-person capital-loss netting and carry-forward, with CGT funded from assets rather than counted as retirement income;
 - Australian income-tax estimates, Medicare, LITO/SAPTO, Age Pension and CSHC estimates, including one partnered share when only one partner has reached Age Pension age;
