@@ -104,9 +104,9 @@ The calculation sequence is:
 2. For a couple, test the combined rebate-income eligibility limit.
 3. Calculate the preliminary offset from each eligible person's own rebate income using the appropriate base amount, cut-in and 12.5% taper.
 4. When both partners qualify, apply the transfer rules in the Income Tax Assessment (1936 Act) Regulations 2025. Do not implement transfer as a combined-income taper or informal swap of unused final offsets.
-5. Record preliminary, transferred and final offsets separately.
+5. Record the preliminary offset, donor base reduction, recipient base increase and final offset separately.
 
-The transfer calculation must use income tax payable before credits, rebates and Medicare levy, follow the prescribed base-rebate adjustment, and never create a negative donor amount. No transfer applies in a survivor year or when only one partner satisfies the approved eligibility proxy.
+The transfer calculation must use income tax payable before credits, rebates and Medicare levy, follow the prescribed base-rebate adjustment, and never create a negative donor amount. Regulation 12 is intentionally asymmetric: the donor's base reduction is the excess of their base rebate over pre-rebate tax, while a donor with taxable income above $6,000 can produce a smaller recipient base increase under the separate 15% formula. These two audit amounts must not be forced to reconcile as if the rule were a dollar-for-dollar transfer. No transfer applies in a survivor year or when only one partner satisfies the approved eligibility proxy.
 
 Reference authorities:
 
@@ -156,7 +156,7 @@ The projection flow becomes:
 5. Return a per-person breakdown to the existing ledger.
 6. Apply refundable franking and existing household reporting.
 
-The helper returns, for each person, gross resident income tax, LITO, preliminary SAPTO, SAPTO transferred in or out, final SAPTO, Medicare before family reduction, Medicare family reduction, final Medicare and net tax before franking. This breakdown is part of the internal audit contract, not a promise to expose a new production-scale calculation UI.
+The helper returns, for each person, gross resident income tax, LITO, preliminary SAPTO, SAPTO donor-base reduction or recipient-base increase, final SAPTO, Medicare before family reduction, Medicare family reduction, final Medicare and net tax before franking. This breakdown is part of the internal audit contract, not a promise to expose a new production-scale calculation UI.
 
 ## Projection and Compatibility Boundaries
 
@@ -188,7 +188,7 @@ Add source-backed tests for:
 3. Couple combined rebate income below and at the eligibility boundary.
 4. Confirmation that individual rebate income, not combined income, determines each preliminary offset amount.
 5. One age-eligible partner and two age-eligible partners.
-6. Unused SAPTO transfer for an uneven-income couple, including donor, recipient and total reconciliation.
+6. Unused SAPTO transfer for an uneven-income couple, including the separately calculated donor base reduction and recipient base increase.
 7. No transfer when only one partner qualifies or after first death.
 8. Ordinary and SAPTO individual Medicare thresholds immediately below, at and above their boundaries.
 9. Confirmation that age 67 alone does not grant the SAPTO Medicare threshold.

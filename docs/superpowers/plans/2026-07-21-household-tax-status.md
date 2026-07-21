@@ -261,19 +261,16 @@ const transferredSapto = core.allocateCoupleSapto({
   taxableIncomes: [8000, 35000],
   grossIncomeTaxes: [0, core.incomeTaxResident(35000, 2026)]
 });
-check('couple transfer records donor and recipient amounts separately',
-  transferredSapto[0].transferredOut === 1302 &&
-  transferredSapto[1].transferredIn === 1302 &&
+check('couple transfer records asymmetric statutory adjustments',
+  transferredSapto[0].baseReduction === 1602 &&
+  transferredSapto[1].baseIncrease === 1302 &&
   transferredSapto[0].final >= 0 &&
   transferredSapto[1].final >= transferredSapto[1].preliminary);
-check('couple transfer reconciles',
-  Math.abs(transferredSapto.reduce((sum, value) =>
-    sum + value.transferredIn - value.transferredOut, 0)) < 0.001);
 check('no transfer occurs when only one partner qualifies',
   core.allocateCoupleSapto({
     eligible: [true, false], rebateIncomes: [8000, 35000],
     taxableIncomes: [8000, 35000], grossIncomeTaxes: [0, 3138]
-  }).every(value => value.transferredIn === 0 && value.transferredOut === 0));
+  }).every(value => value.baseIncrease === 0 && value.baseReduction === 0));
 ```
 
 - [ ] Run the suite and verify the new transfer tests fail.
@@ -286,8 +283,9 @@ Expected: failures naming the two new transfer helpers.
 
 ```js
 function saptoTransferAvailable({ baseAmount, taxableIncome, grossIncomeTax }) {
-  if (baseAmount <= grossIncomeTax) return 0;
-  if (taxableIncome <= SAPTO_RULES.transferIncomeFloor) return baseAmount;
+  const donorExcess = Math.max(0, baseAmount - grossIncomeTax);
+  if (donorExcess === 0) return 0;
+  if (taxableIncome <= SAPTO_RULES.transferIncomeFloor) return donorExcess;
   return Math.max(0, baseAmount -
     (taxableIncome - SAPTO_RULES.transferIncomeFloor) *
       SAPTO_RULES.transferTaxRate);
@@ -299,11 +297,12 @@ function saptoTransferAvailable({ baseAmount, taxableIncome, grossIncomeTax }) {
 1. calculate both original preliminary offsets;
 2. require both eligibility entries to be true;
 3. identify each donor whose base amount exceeds gross income tax before any credits, rebates, or Medicare;
-4. calculate the available transfer with `saptoTransferAvailable`;
-5. reduce the donor base and increase the recipient base by the same amount;
-6. recalculate each affected rebate under regulation 11 using the adjusted base amount and rebate threshold derived under regulation 9;
-7. return `{ preliminary, adjustedBase, transferredIn, transferredOut, final }` for both people;
-8. clamp monetary results to zero and preserve `sum(transferredIn) === sum(transferredOut)` within one cent.
+4. calculate the donor base reduction as `max(0, baseAmount - grossIncomeTax)` under regulation 12(1)(b) and 12(3)(a);
+5. calculate the recipient base increase separately with `saptoTransferAvailable` under regulation 12(3)(b): use the donor excess when taxable income is at or below `$6,000`, otherwise use `max(0, baseAmount - (taxableIncome - 6000) * 0.15)`;
+6. reduce the donor base by the donor reduction and increase the recipient base by the recipient increase; do not force the two statutory adjustments to be equal;
+7. recalculate each affected rebate under regulation 11 using the adjusted base amount and rebate threshold derived under regulation 9;
+8. return `{ preliminary, adjustedBase, baseIncrease, baseReduction, final }` for both people;
+9. clamp monetary results to zero and assert the `$8,000` golden case records a `$1,602` donor reduction and `$1,302` recipient increase.
 
 Implement `saptoRebateThreshold(baseAmount)` from regulation 9 using the fixed current-rule inputs `taxFreeThreshold: 18200`, `rebateMaximumAmount: 445`, `rebateReductionThreshold: 37000`, `rebateReductionRate: 0.015`, `lowestMarginalRate: 0.16`, and `secondLowestMarginalRate: 0.30`. Keep these inputs inside `SAPTO_RULES` so the calculation is auditable.
 
@@ -331,7 +330,7 @@ Add assertions that `saptoRebateThreshold(1602) === 30994`, `saptoRebateThreshol
 
 Run: `node tests/retirement-simulator.test.mjs`
 
-Expected: all deterministic tests pass and no transfer reconciliation differs by more than one cent.
+Expected: all deterministic tests pass and the asymmetric donor/recipient golden audit values are exact to one cent.
 
 - [ ] Commit the transfer slice.
 
@@ -459,7 +458,7 @@ check('non-refundable offsets do not reduce Medicare levy',
       orderingPerson.medicareFinalNominal);
 check('household assessment exposes the complete audit contract',
   ['grossIncomeTaxNominal', 'litoNominal', 'saptoPreliminaryNominal',
-   'saptoTransferredInNominal', 'saptoTransferredOutNominal',
+   'saptoBaseIncreaseNominal', 'saptoBaseReductionNominal',
    'saptoFinalNominal', 'medicareBeforeFamilyNominal',
    'medicareFamilyReductionNominal', 'medicareFinalNominal',
    'netBeforeFrankingNominal', 'frankingNominal', 'netNominal',
@@ -528,12 +527,8 @@ Build a deterministic scenario with both people age 67+, a first-person taxable 
 
 ```js
 check('uneven-income couple records SAPTO transfer in the projection ledger',
-  unevenRow.taxLedger[0].totalTax.saptoTransferredInNominal > 0 &&
-  unevenRow.taxLedger[1].totalTax.saptoTransferredOutNominal > 0);
-check('projection SAPTO transfer reconciles by household',
-  Math.abs(unevenRow.taxLedger.reduce((sum, person) =>
-    sum + person.totalTax.saptoTransferredInNominal -
-      person.totalTax.saptoTransferredOutNominal, 0)) < 0.01);
+  unevenRow.taxLedger[0].totalTax.saptoBaseIncreaseNominal === 1302 &&
+  unevenRow.taxLedger[1].totalTax.saptoBaseReductionNominal === 1602);
 ```
 
 The approved golden calculation confirms person 1 (the `$8,000` earner) is the donor and person 0 (the `$35,000` earner) is the recipient, matching the assertions above.
@@ -543,7 +538,7 @@ The approved golden calculation confirms person 1 (the `$8,000` earner) is the d
 ```js
 check('first-death transition immediately uses single SAPTO status',
   transitionRow.taxLedger[survivorIndex].totalTax.saptoSchedule === 'single' &&
-  transitionRow.taxLedger[survivorIndex].totalTax.saptoTransferredInNominal === 0 &&
+  transitionRow.taxLedger[survivorIndex].totalTax.saptoBaseIncreaseNominal === 0 &&
   transitionRow.taxLedger[survivorIndex].totalTax.medicareFamilyReductionNominal === 0);
 ```
 
@@ -704,7 +699,7 @@ Expected: a bounded deterministic implementation and documentation diff with no 
 
 - [ ] Single/survivor years select the single SAPTO schedule.
 - [ ] Couple eligibility uses combined rebate income while each preliminary amount uses individual rebate income.
-- [ ] Transfer follows regulation 12 and reconciles donor/recipient audit fields.
+- [ ] Transfer follows regulation 12 and records the asymmetric donor reduction and recipient increase without false conservation.
 - [ ] SAPTO Medicare thresholds require at least `$1` final entitlement.
 - [ ] Childless-couple Medicare reduction and spouse allocation reconcile.
 - [ ] LITO and SAPTO reduce income tax only; Medicare remains separate.
