@@ -184,9 +184,28 @@
   @media (prefers-reduced-motion:reduce){
     *,*::before,*::after{scroll-behavior:auto!important;transition-duration:.01ms!important;animation-duration:.01ms!important}
   }
+  /* In-app confirmation modal. Replaces window.confirm(), which iOS/iPadOS
+     Safari can silently suppress (returns false with no dialog shown, e.g. after
+     a prior dialog was dismissed with "Don't show more alerts"), leaving
+     destructive buttons dead. This modal needs no native dialog support. */
+  .modal-overlay{position:fixed;inset:0;z-index:1000;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(4,10,16,.62)}
+  .modal-box{background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:12px;padding:18px 18px 14px;max-width:420px;width:100%;box-shadow:0 12px 40px rgba(0,0,0,.45)}
+  .modal-message{margin:0 0 16px;font-size:15px;line-height:1.45}
+  .modal-actions{display:flex;justify-content:flex-end;gap:10px}
+  .modal-actions button{min-height:44px;padding:8px 16px}
+  .modal-ok{background:var(--accent);color:#08131c;border-color:var(--accent);font-weight:600}
 </style>
 </head>
 <body>
+<div id="confirmModal" class="modal-overlay" hidden>
+  <div class="modal-box" role="alertdialog" aria-modal="true" aria-labelledby="confirmModalMessage">
+    <p id="confirmModalMessage" class="modal-message"></p>
+    <div class="modal-actions">
+      <button type="button" id="confirmModalCancel" class="modal-cancel">Cancel</button>
+      <button type="button" id="confirmModalOk" class="modal-ok">Confirm</button>
+    </div>
+  </div>
+</div>
 <div class="disclaimer-banner top" role="note">Local, reproducible retirement-risk analysis. Estimate only; not financial or tax advice.</div>
 <header>
   <div class="header-row">
@@ -2648,6 +2667,48 @@
   }
   const $ = selector => document.querySelector(selector);
 
+  // In-app replacement for window.confirm(). iOS/iPadOS Safari can suppress the
+  // native dialog (returns false with nothing shown) after a prior dialog is
+  // dismissed, which silently disabled Reset/New/Remove. Returns a Promise<bool>.
+  function confirmDialog(message, { confirmLabel = 'Confirm', cancelLabel = 'Cancel' } = {}) {
+    const overlay = $('#confirmModal');
+    const messageEl = $('#confirmModalMessage');
+    const okButton = $('#confirmModalOk');
+    const cancelButton = $('#confirmModalCancel');
+    if (!overlay || !messageEl || !okButton || !cancelButton) {
+      return Promise.resolve(window.confirm(message));
+    }
+    messageEl.textContent = message;
+    okButton.textContent = confirmLabel;
+    cancelButton.textContent = cancelLabel;
+    const previouslyFocused = document.activeElement;
+    overlay.hidden = false;
+    okButton.focus();
+    return new Promise(resolve => {
+      function cleanup(result) {
+        overlay.hidden = true;
+        okButton.removeEventListener('click', onOk);
+        cancelButton.removeEventListener('click', onCancel);
+        overlay.removeEventListener('click', onBackdrop);
+        document.removeEventListener('keydown', onKey);
+        if (previouslyFocused && typeof previouslyFocused.focus === 'function') {
+          previouslyFocused.focus();
+        }
+        resolve(result);
+      }
+      function onOk() { cleanup(true); }
+      function onCancel() { cleanup(false); }
+      function onBackdrop(event) { if (event.target === overlay) cleanup(false); }
+      function onKey(event) {
+        if (event.key === 'Escape') { event.preventDefault(); cleanup(false); }
+      }
+      okButton.addEventListener('click', onOk);
+      cancelButton.addEventListener('click', onCancel);
+      overlay.addEventListener('click', onBackdrop);
+      document.addEventListener('keydown', onKey);
+    });
+  }
+
   function applyTheme(theme) {
     const resolved = theme === 'light' ? 'light' : 'dark';
     document.documentElement.dataset.theme = resolved;
@@ -4420,7 +4481,7 @@
     showValidation(core.validateScenario(currentScenario));
   });
 
-  $('#controls').addEventListener('click', event => {
+  $('#controls').addEventListener('click', async event => {
     const chevron = event.target.closest('.lump-chevron');
     if (chevron) {
       const id = chevron.dataset.lumpId;
@@ -4438,9 +4499,11 @@
     const removeButton = event.target.closest('.remove-other');
     if (!removeButton) return;
     const kind = removeButton.dataset.kind;
-    if (!confirm(kind === 'otherIncomes'
-      ? 'Remove this income item?'
-      : 'Remove this asset?')) return;
+    const confirmed = await confirmDialog(
+      kind === 'otherIncomes' ? 'Remove this income item?' : 'Remove this asset?',
+      { confirmLabel: 'Remove' }
+    );
+    if (!confirmed) return;
     const index = Number(removeButton.dataset.index);
     currentScenario = {
       ...currentScenario,
@@ -4529,7 +4592,7 @@
     }
     const removeButton = event.target.closest('.remove-share');
     if (!removeButton) return;
-    if (!confirm('Remove this shareholding?')) return;
+    if (!(await confirmDialog('Remove this shareholding?', { confirmLabel: 'Remove' }))) return;
     currentScenario = removeShareholding(
       currentScenario,
       Number(removeButton.dataset.index)
@@ -4583,8 +4646,11 @@
     }
   });
 
-  $('#newScenario').addEventListener('click', () => {
-    if (!confirm('Start a new scenario and replace the locally saved scenario?')) return;
+  $('#newScenario').addEventListener('click', async () => {
+    if (!(await confirmDialog(
+      'Start a new scenario and replace the locally saved scenario?',
+      { confirmLabel: 'Start new' }
+    ))) return;
     const scenario = core.makeSampleScenario();
     scenario.scenarioName = 'Untitled household';
     scenario.people[0].name = 'Person 1';
@@ -4594,8 +4660,11 @@
     saveScenario(scenario);
   });
 
-  $('#resetSample').addEventListener('click', () => {
-    if (!confirm('Reset all inputs to the generic sample?')) return;
+  $('#resetSample').addEventListener('click', async () => {
+    if (!(await confirmDialog(
+      'Reset all inputs to the generic sample?',
+      { confirmLabel: 'Reset' }
+    ))) return;
     const scenario = core.makeSampleScenario();
     renderScenario(scenario);
     saveScenario(scenario);
