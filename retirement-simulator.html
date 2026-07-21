@@ -853,7 +853,7 @@
           };
         });
     const saptoEntitled = sapto.map((record, index) =>
-      living[index] && record.final > 0);
+      living[index] && record.final >= 1);
     const medicareBeforeFamilyReal = taxableReal.map((value, index) =>
       living[index]
         ? medicareIndividualLevy({

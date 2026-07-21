@@ -850,6 +850,29 @@ if (typeof core.medicareIndividualLevy === 'function' &&
       taxableIncome: 44268, saptoEntitled: false
     }) > 0);
 
+  const subDollarSapto = core.householdTaxAssessment({
+    status: 'single', alive: [true, false], ages: [67, 0],
+    taxableNominal: [52758, 0], rebateNominal: [52758, 0],
+    frankingNominal: [0, 0], inflationFactor: 1, year: 2026
+  }).people[0];
+  const oneDollarSapto = core.householdTaxAssessment({
+    status: 'single', alive: [true, false], ages: [67, 0],
+    taxableNominal: [52751, 0], rebateNominal: [52751, 0],
+    frankingNominal: [0, 0], inflationFactor: 1, year: 2026
+  }).people[0];
+  check('SAPTO below one dollar retains the ordinary Medicare category',
+    subDollarSapto.saptoFinalNominal === 0.125 &&
+    subDollarSapto.medicareBeforeFamilyNominal ===
+      core.medicareIndividualLevy({
+        taxableIncome: 52758, saptoEntitled: false
+      }));
+  check('SAPTO of at least one dollar grants the SAPTO Medicare category',
+    oneDollarSapto.saptoFinalNominal === 1 &&
+    oneDollarSapto.medicareBeforeFamilyNominal ===
+      core.medicareIndividualLevy({
+        taxableIncome: 52751, saptoEntitled: true
+      }));
+
   const belowFamily = core.medicareFamilyAssessment({
     taxableIncomes: [24000, 23238],
     individualLevies: [0, 0],
