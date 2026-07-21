@@ -735,6 +735,42 @@ check('single and couple schedules are selected explicitly',
   core.saptoScheduleForStatus('survivor').base === 2230 &&
   core.saptoScheduleForStatus('couple').base === 1602);
 
+const saptoCases = [
+  ['single below cut-in', { rebateIncome: 30000, status: 'single', eligible: true }, 2230],
+  ['single in taper', { rebateIncome: 40000, status: 'single', eligible: true }, 1594.875],
+  ['single at cut-out', { rebateIncome: 52759, status: 'single', eligible: true }, 0],
+  ['couple below cut-in', { rebateIncome: 8000, status: 'couple', eligible: true }, 1602],
+  ['couple in taper', { rebateIncome: 35000, status: 'couple', eligible: true }, 1101.25],
+  ['couple at cut-out', { rebateIncome: 43810, status: 'couple', eligible: true }, 0],
+  ['ineligible returns zero', { rebateIncome: 8000, status: 'couple', eligible: false }, 0]
+];
+for (const [label, input, expected] of saptoCases) {
+  check(label, Math.abs(core.saptoPreliminary(input) - expected) < 0.001);
+}
+
+const eligibleCouple = core.saptoProxyEligibility({
+  status: 'couple', alive: [true, true], ages: [67, 67],
+  rebateIncomes: [43809, 43810]
+});
+const boundaryCouple = core.saptoProxyEligibility({
+  status: 'couple', alive: [true, true], ages: [67, 67],
+  rebateIncomes: [43810, 43810]
+});
+check('combined income below the couple boundary remains eligible',
+  eligibleCouple.every(Boolean));
+check('combined income at the strict couple boundary is ineligible',
+  boundaryCouple.every(value => !value));
+check('single income at the individual cut-out is ineligible',
+  core.saptoProxyEligibility({
+    status: 'single', alive: [true, false], ages: [67, 0],
+    rebateIncomes: [52759, 0]
+  })[0] === false);
+check('age proxy is required for each person',
+  JSON.stringify(core.saptoProxyEligibility({
+    status: 'couple', alive: [true, true], ages: [67, 66],
+    rebateIncomes: [20000, 20000]
+  })) === JSON.stringify([true, false]));
+
 console.log('\nAge Pension income taper');
 const pensionRules = core.SERVICES_AUSTRALIA_2026;
 const freeArea = pensionRules.incomeFreeAreaCoupleAnnual;

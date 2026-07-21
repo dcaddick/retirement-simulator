@@ -592,10 +592,30 @@
     return 0;
   }
 
+  function saptoProxyEligibility({ status, alive, ages, rebateIncomes }) {
+    const isCouple = status === 'couple';
+    const combined = rebateIncomes.reduce((sum, value) =>
+      sum + Math.max(0, Number(value) || 0), 0);
+    return [0, 1].map(index => {
+      const income = Math.max(0, Number(rebateIncomes[index]) || 0);
+      const incomeEligible = isCouple
+        ? combined < SAPTO_RULES.coupleCombinedLimit
+        : income < SAPTO_RULES.single.cutOut;
+      return Boolean(alive[index] && ages[index] >= 67 && incomeEligible);
+    });
+  }
+
+  function saptoPreliminary({ rebateIncome, status, eligible }) {
+    if (!eligible) return 0;
+    const schedule = saptoScheduleForStatus(status);
+    const income = Math.max(0, Number(rebateIncome) || 0);
+    if (income <= schedule.cutIn) return schedule.base;
+    return Math.max(0, schedule.base -
+      (income - schedule.cutIn) * SAPTO_RULES.taper);
+  }
+
   function saptoOffset(rebateIncome) {
-    if (rebateIncome <= 30994) return 1602;
-    if (rebateIncome >= 43810) return 0;
-    return Math.max(0, 1602 - (rebateIncome - 30994) * 0.125);
+    return saptoPreliminary({ rebateIncome, status: 'couple', eligible: true });
   }
 
   function netTax({ taxableIncome, rebateIncome, year, seniorEligible }) {
@@ -2604,6 +2624,8 @@
     medicareLevy,
     litoOffset,
     saptoOffset,
+    saptoPreliminary,
+    saptoProxyEligibility,
     saptoScheduleForStatus,
     netTax,
     projectionNetTax,
