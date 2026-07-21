@@ -275,6 +275,15 @@ check('deferred review covers all approved out-of-scope items', [
 ].every(id => deferredReview.includes(id)));
 check('methodology discloses fixed nominal brackets',
   methodology.includes('fixed nominal') && methodology.includes('bracket creep'));
+check('methodology discloses the SAPTO proxy',
+  methodology.includes('age-and-income proxy') &&
+  methodology.includes('does not establish legal SAPTO eligibility'));
+check('methodology discloses childless Medicare family scope',
+  methodology.includes('childless couple') &&
+  methodology.includes('dependent children are not modelled'));
+check('methodology records prototype architecture rationale',
+  methodology.includes('personal prototype') &&
+  methodology.includes('thousands of users'));
 check('README identifies deterministic v1.10',
   readme.includes('v1.10') &&
   readme.includes('financial investment for Age Pension deeming') &&

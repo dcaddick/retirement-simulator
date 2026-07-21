@@ -356,6 +356,7 @@
             <li>The survival band remains illustrative. The optional first-death scenario is a separate fixed event at the start of the selected year; it is not a mortality simulation and includes no bereavement payment.</li>
             <li>Other income is CPI-indexed. Ownership controls tax allocation and survivor continuation; deceased-owned income continues at its entered percentage, while joint and survivor-owned income continue in full. All Other Assets count in the Age Pension assets test. Select “Treat as financial investment for Age Pension deeming” only when appropriate; the selection does not change CSHC treatment, and you should enter actual returns separately under Other Income—for example, interest or rent. Disposal proceeds move to savings and CGT is not modelled.</li>
             <li>Super access age is limited to 60 or older. The simulator treats super withdrawals as tax-free and does not model the additional tax rules that may apply before age 60.</li>
+            <li>Tax status estimate: SAPTO uses an age-and-income proxy and does not establish legal eligibility. Couple Medicare estimates assume no dependent children. Confirm current rules and personal eligibility before relying on the result.</li>
           </ul>
         </div>
       </details>
@@ -4439,6 +4440,8 @@
     const sources = [
       ['Treasury inflation forecast', core.TREASURY_INFLATION.sourceUrl],
       ['ATO resident tax rates', core.TAX_SOURCE.url],
+      ['ATO SAPTO eligibility and rates', core.SAPTO_RULES.sourceUrl],
+      ['SAPTO transfer regulations', core.SAPTO_RULES.regulationsUrl],
       ['ATO Medicare levy thresholds', core.MEDICARE_BASE.sourceUrl],
       ['Services Australia Age Pension assets test', core.SERVICES_AUSTRALIA_2026.assetsTestUrl],
       ['Services Australia Age Pension income test', core.SERVICES_AUSTRALIA_2026.incomeTestUrl],

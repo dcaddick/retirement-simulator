@@ -58,17 +58,25 @@ Guaranteed income and mandatory minimum payments are counted before discretionar
 
 ### Tax and government support
 
-The simulator contains simplified, dated estimates for Australian income tax, Medicare, selected offsets, Age Pension and the Commonwealth Seniors Health Card.
+The simulator contains simplified, dated estimates for Australian income tax, Medicare, selected offsets, Age Pension and the Commonwealth Seniors Health Card. Its household tax context treats both living partners as a couple and switches to single status immediately in the fixed first-death transition year.
 
 Income-tax brackets and LITO use the legislated fixed nominal schedule: the 2026 rate applies in 2026, the legislated 2027 rate applies from 2027, and no unlegislated later tax cuts are forecast. As nominal income rises with inflation against those fixed nominal thresholds, the model includes bracket creep. Medicare and SAPTO retain the simulator's existing indexed approximation by applying their thresholds in today's-dollar terms. This is a deterministic policy baseline, not a prediction of future government decisions.
+
+SAPTO uses an **age-and-income proxy**: a living person must be at least 67 and below the applicable income limit. This does not establish legal SAPTO eligibility; the simulator does not test residency, qualifying pension status or every statutory condition. For a couple, combined rebate income determines whether each person is eligible, while each person's own rebate income determines their preliminary taper. The prescribed spouse-transfer calculation then adjusts donor and recipient base amounts before the final offset is calculated. The individual uses the higher SAPTO Medicare thresholds only when their final SAPTO entitlement is greater than zero. Projection inputs do not separately collect adjusted rebate income, so taxable income is used as a rebate-income approximation.
+
+The calculation order is auditable per person: gross resident income tax; then non-refundable LITO and final SAPTO applied only against that income tax, floored at zero; then Medicare after the individual low-income threshold and any family reduction; then refundable franking credits last. Offsets therefore cannot reduce Medicare. Each base-income, ordinary-income and total-income tax stage receives a complete household assessment.
+
+For a **childless couple**, the Medicare calculation applies the enacted family threshold, statutory reduction, proportional spouse allocation and transfer of any excess reduction; dependent children are not modelled, so the legislated per-child threshold increment is not applied. The threshold category is selected for each person from that person's actual final SAPTO entitlement rather than age alone.
+
+SAPTO schedules and transfer rules were checked on 21 July 2026 against the ATO 2024-25 SAPTO guidance and the *Income Tax Assessment (1936 Act) Regulations 2025*. Medicare individual and family thresholds were checked on 21 July 2026 against the enacted *Treasury Laws Amendment (2025-26 Medicare Levy and Medicare Levy Surcharge Thresholds) Act 2026*: ordinary individual $28,011 lower/$35,013 upper, SAPTO individual $44,268 lower/$55,335 upper, ordinary family $47,238 and SAPTO family $61,623. Rules and thresholds change and must be reviewed against current authoritative sources before relying on them.
+
+This bounded, auditable household context is proportionate for a personal prototype and hobby use. A service intended for thousands of users would need separately versioned tax rules, richer household and dependent inputs, professional effective-date maintenance, a calculation-explanation interface, accessibility work, privacy and security controls, audit logs, monitoring and stronger release controls.
 
 The normal Age Pension estimate applies the combined homeowner-couple income and assets tests. If one partner has reached Age Pension age, the household receives half of the means-tested combined couple rate and the taxable payment is allocated to that eligible person; once both partners are 67, the household receives the full combined rate. Superannuation held by a partner under Age Pension age remains excluded while it stays in the modelled super environment. The income test uses a 50-cent combined couple reduction for each dollar above the couple free area.
 
 Taxable Other income follows its selected owner (`Person 1`, `Person 2` or `Joint 50/50`). Non-taxable Other income remains a household cash flow. Share dividends and franking credits follow the holding owner on the same basis. Franking eligibility is an explicit user assumption: the simulator does not automate holding-period, related-payment or other integrity rules. Refundable franking offsets can therefore produce an estimated tax refund in a low-tax year.
 
 Capital gains and losses are tracked per person. Current-year and carried losses are applied to non-discount gains first and discount-eligible gains second; the 50% discount is applied only to the remaining eligible gain. Opening losses begin at zero because the interface does not collect pre-existing tax losses. CGT is funded from savings first and then the configured household tiers. Share-sale proceeds and CGT-funding draws remain asset movements and never count as retirement income.
-
-Medicare low-income thresholds are the legislated 2025–26 amounts checked on 10 July 2026: ordinary individual $28,011 lower/$35,013 upper and SAPTO $44,268 lower/$55,335 upper. Rules and thresholds change and must be reviewed against current authoritative sources before relying on them.
 
 ### Assets and other income
 
