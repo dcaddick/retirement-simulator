@@ -771,6 +771,54 @@ check('age proxy is required for each person',
     rebateIncomes: [20000, 20000]
   })) === JSON.stringify([true, false]));
 
+check('unused SAPTO transfer follows the prescribed income formula',
+  core.saptoTransferAvailable({
+    baseAmount: 1602, taxableIncome: 8000, grossIncomeTax: 0
+  }) === 1302);
+check('donor at the income floor can transfer the full excess',
+  core.saptoTransferAvailable({
+    baseAmount: 1602, taxableIncome: 6000, grossIncomeTax: 0
+  }) === 1602);
+check('donor at the income floor transfers only the unused base',
+  core.saptoTransferAvailable({
+    baseAmount: 1602, taxableIncome: 6000, grossIncomeTax: 500
+  }) === 1102);
+check('donor with enough pre-rebate tax transfers nothing',
+  core.saptoTransferAvailable({
+    baseAmount: 1602, taxableIncome: 30000, grossIncomeTax: 1602
+  }) === 0);
+check('SAPTO rebate thresholds follow regulation 9',
+  core.saptoRebateThreshold(1602) === 30994 &&
+  core.saptoRebateThreshold(2230) === 34919 &&
+  core.saptoRebateThreshold(2904) === 38083);
+
+const transferredSapto = core.allocateCoupleSapto({
+  eligible: [true, true],
+  rebateIncomes: [8000, 35000],
+  taxableIncomes: [8000, 35000],
+  grossIncomeTaxes: [0, core.incomeTaxResident(35000, 2026)]
+});
+check('couple transfer records asymmetric statutory adjustments',
+  transferredSapto[0].baseReduction === 1602 &&
+  transferredSapto[0].adjustedBase === 0 &&
+  transferredSapto[1].baseIncrease === 1302 &&
+  transferredSapto[1].adjustedBase === 2904 &&
+  transferredSapto[0].final === 0 &&
+  transferredSapto[1].final === 2904);
+check('couple transfer retains original preliminary amounts for audit',
+  transferredSapto[0].preliminary === 1602 &&
+  Math.abs(transferredSapto[1].preliminary - 1101.25) < 0.001);
+check('no transfer occurs when only one partner qualifies',
+  core.allocateCoupleSapto({
+    eligible: [true, false], rebateIncomes: [8000, 35000],
+    taxableIncomes: [8000, 35000], grossIncomeTaxes: [0, 3138]
+  }).every(value => value.baseIncrease === 0 && value.baseReduction === 0));
+check('no transfer occurs when the recipient already has the full base rebate',
+  core.allocateCoupleSapto({
+    eligible: [true, true], rebateIncomes: [8000, 20000],
+    taxableIncomes: [8000, 20000], grossIncomeTaxes: [0, 288]
+  }).every(value => value.baseIncrease === 0 && value.baseReduction === 0));
+
 console.log('\nAge Pension income taper');
 const pensionRules = core.SERVICES_AUSTRALIA_2026;
 const freeArea = pensionRules.incomeFreeAreaCoupleAnnual;

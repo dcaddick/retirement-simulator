@@ -614,6 +614,93 @@
       (income - schedule.cutIn) * SAPTO_RULES.taper);
   }
 
+  function saptoRebateThreshold(baseAmount) {
+    const base = Math.max(0, Number(baseAmount) || 0);
+    const rules = SAPTO_RULES.threshold;
+    const firstBand = rules.taxFreeThreshold +
+      (rules.rebateMaximumAmount + base) / rules.lowestMarginalRate;
+    if (firstBand <= rules.rebateReductionThreshold) {
+      return Math.ceil(firstBand);
+    }
+    const reductionBand = rules.rebateReductionThreshold *
+      (rules.rebateReductionRate + rules.secondLowestMarginalRate -
+        rules.lowestMarginalRate);
+    const baseBand = rules.taxFreeThreshold * rules.lowestMarginalRate +
+      rules.rebateMaximumAmount + base;
+    return Math.ceil((reductionBand + baseBand) /
+      (rules.rebateReductionRate + rules.secondLowestMarginalRate));
+  }
+
+  function saptoTransferAvailable({ baseAmount, taxableIncome, grossIncomeTax }) {
+    const base = Math.max(0, Number(baseAmount) || 0);
+    const tax = Math.max(0, Number(grossIncomeTax) || 0);
+    const donorExcess = Math.max(0, base - tax);
+    if (donorExcess === 0) return 0;
+    const income = Math.max(0, Number(taxableIncome) || 0);
+    if (income <= SAPTO_RULES.transferIncomeFloor) return donorExcess;
+    return Math.max(0, base -
+      (income - SAPTO_RULES.transferIncomeFloor) *
+        SAPTO_RULES.transferTaxRate);
+  }
+
+  function saptoAmountForBase({ baseAmount, rebateIncome, eligible }) {
+    if (!eligible) return 0;
+    const base = Math.max(0, Number(baseAmount) || 0);
+    const income = Math.max(0, Number(rebateIncome) || 0);
+    const threshold = saptoRebateThreshold(base);
+    if (income <= threshold) return base;
+    return Math.max(0, base - (income - threshold) * SAPTO_RULES.taper);
+  }
+
+  function allocateCoupleSapto({
+    eligible, rebateIncomes, taxableIncomes, grossIncomeTaxes
+  }) {
+    const qualifies = [0, 1].map(index => Boolean(eligible?.[index]));
+    const rebateIncome = [0, 1].map(index =>
+      Math.max(0, Number(rebateIncomes?.[index]) || 0));
+    const taxableIncome = [0, 1].map(index =>
+      Math.max(0, Number(taxableIncomes?.[index]) || 0));
+    const grossIncomeTax = [0, 1].map(index =>
+      Math.max(0, Number(grossIncomeTaxes?.[index]) || 0));
+    const base = SAPTO_RULES.couple.base;
+    const preliminary = [0, 1].map(index => saptoPreliminary({
+      rebateIncome: rebateIncome[index], status: 'couple',
+      eligible: qualifies[index]
+    }));
+    const baseIncrease = [0, 0];
+    const baseReduction = [0, 0];
+
+    if (qualifies.every(Boolean)) {
+      [0, 1].forEach(donor => {
+        const recipient = donor === 0 ? 1 : 0;
+        if (base <= grossIncomeTax[donor] || preliminary[recipient] >= base) return;
+        baseReduction[donor] = Math.max(0, base - grossIncomeTax[donor]);
+        baseIncrease[recipient] = saptoTransferAvailable({
+          baseAmount: base,
+          taxableIncome: taxableIncome[donor],
+          grossIncomeTax: grossIncomeTax[donor]
+        });
+      });
+    }
+
+    return [0, 1].map(index => {
+      const adjustedBase = qualifies[index]
+        ? Math.max(0, base + baseIncrease[index] - baseReduction[index])
+        : 0;
+      return {
+        preliminary: preliminary[index],
+        adjustedBase,
+        baseIncrease: baseIncrease[index],
+        baseReduction: baseReduction[index],
+        final: saptoAmountForBase({
+          baseAmount: adjustedBase,
+          rebateIncome: rebateIncome[index],
+          eligible: qualifies[index]
+        })
+      };
+    });
+  }
+
   function saptoOffset(rebateIncome) {
     return saptoPreliminary({ rebateIncome, status: 'couple', eligible: true });
   }
@@ -2625,6 +2712,9 @@
     litoOffset,
     saptoOffset,
     saptoPreliminary,
+    saptoRebateThreshold,
+    saptoTransferAvailable,
+    allocateCoupleSapto,
     saptoProxyEligibility,
     saptoScheduleForStatus,
     netTax,
