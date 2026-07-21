@@ -578,11 +578,87 @@
     return Math.round(tax * 100) / 100;
   }
 
+  function medicareIndividualLevy({ taxableIncome, saptoEntitled }) {
+    const income = Math.max(0, Number(taxableIncome) || 0);
+    const { lower, upper } = saptoEntitled
+      ? MEDICARE_BASE.sapto
+      : MEDICARE_BASE.ordinary;
+    if (income <= lower) return 0;
+    if (income <= upper) return (income - lower) * 0.10;
+    return income * 0.02;
+  }
+
   function medicareLevy(taxableIncome, seniorEligible) {
-    const { lower, upper } = seniorEligible ? MEDICARE_BASE.sapto : MEDICARE_BASE.ordinary;
-    if (taxableIncome <= lower) return 0;
-    if (taxableIncome <= upper) return (taxableIncome - lower) * 0.10;
-    return taxableIncome * 0.02;
+    return medicareIndividualLevy({
+      taxableIncome, saptoEntitled: seniorEligible
+    });
+  }
+
+  function medicareFamilyAssessment({
+    taxableIncomes, individualLevies, saptoEntitled
+  }) {
+    const incomes = [0, 1].map(index =>
+      Math.max(0, Number(taxableIncomes?.[index]) || 0));
+    const before = [0, 1].map(index =>
+      Math.max(0, Number(individualLevies?.[index]) || 0));
+    const entitled = [0, 1].map(index =>
+      Boolean(saptoEntitled?.[index]));
+    const familyIncome = incomes[0] + incomes[1];
+
+    const records = [0, 1].map(index => {
+      const spouse = index === 0 ? 1 : 0;
+      const familyThreshold = entitled[index]
+        ? MEDICARE_BASE.family.sapto
+        : MEDICARE_BASE.family.ordinary;
+
+      if (familyIncome <= familyThreshold) {
+        return {
+          beforeFamily: before[index],
+          familyThreshold,
+          allocationMode: 'exempt',
+          allocatedReduction: before[index],
+          excessTransferred: 0,
+          familyReduction: before[index],
+          final: 0
+        };
+      }
+
+      const section8Reduction = Math.max(0,
+        familyThreshold * 0.02 -
+          (familyIncome - familyThreshold) * 0.08);
+      const spouseOtherwiseOwesLevy = before[spouse] > 0;
+      const allocationMode = spouseOtherwiseOwesLevy
+        ? 'proportional'
+        : 'full';
+      const allocatedReduction = spouseOtherwiseOwesLevy && familyIncome > 0
+        ? section8Reduction * incomes[index] / familyIncome
+        : section8Reduction;
+      const directReduction = Math.min(before[index], allocatedReduction);
+
+      return {
+        beforeFamily: before[index],
+        familyThreshold,
+        allocationMode,
+        allocatedReduction,
+        excessTransferred: 0,
+        familyReduction: directReduction,
+        final: before[index] - directReduction
+      };
+    });
+
+    records.forEach((record, index) => {
+      if (record.allocationMode !== 'proportional') return;
+      const excess = Math.max(0,
+        record.allocatedReduction - record.beforeFamily);
+      if (excess === 0) return;
+      const spouse = index === 0 ? 1 : 0;
+      const transferred = Math.min(excess, records[spouse].final);
+      record.excessTransferred = transferred;
+      records[spouse].familyReduction += transferred;
+      records[spouse].final -= transferred;
+    });
+
+    return records;
   }
 
   function litoOffset(taxableIncome) {
@@ -2708,7 +2784,9 @@
     SERVICES_AUSTRALIA_2026,
     inflationRateForYear,
     incomeTaxResident,
+    medicareIndividualLevy,
     medicareLevy,
+    medicareFamilyAssessment,
     litoOffset,
     saptoOffset,
     saptoPreliminary,

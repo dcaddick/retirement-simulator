@@ -819,6 +819,73 @@ check('no transfer occurs when the recipient already has the full base rebate',
     taxableIncomes: [8000, 20000], grossIncomeTaxes: [0, 288]
   }).every(value => value.baseIncrease === 0 && value.baseReduction === 0));
 
+check('Medicare household helpers are exported',
+  typeof core.medicareIndividualLevy === 'function' &&
+  typeof core.medicareFamilyAssessment === 'function');
+
+if (typeof core.medicareIndividualLevy === 'function' &&
+    typeof core.medicareFamilyAssessment === 'function') {
+  check('ordinary individual Medicare lower boundary is inclusive',
+    core.medicareIndividualLevy({
+      taxableIncome: 28011, saptoEntitled: false
+    }) === 0);
+  check('ordinary individual Medicare phase-in starts above the boundary',
+    core.medicareIndividualLevy({
+      taxableIncome: 28012, saptoEntitled: false
+    }) === 0.10);
+  check('SAPTO Medicare lower boundary requires actual entitlement',
+    core.medicareIndividualLevy({
+      taxableIncome: 44268, saptoEntitled: true
+    }) === 0 &&
+    core.medicareIndividualLevy({
+      taxableIncome: 44268, saptoEntitled: false
+    }) > 0);
+
+  const belowFamily = core.medicareFamilyAssessment({
+    taxableIncomes: [24000, 23238],
+    individualLevies: [0, 0],
+    saptoEntitled: [false, false]
+  });
+  check('ordinary childless family threshold is inclusive',
+    belowFamily.every(value => value.final === 0));
+
+  const familyAbove = core.medicareFamilyAssessment({
+    taxableIncomes: [30000, 20000],
+    individualLevies: [199, 0],
+    saptoEntitled: [false, false]
+  });
+  check('family reduction cannot make either levy negative',
+    familyAbove.every(value => value.final >= 0));
+  check('full reduction applies when the spouse otherwise owes no levy',
+    familyAbove[0].allocationMode === 'full' &&
+    familyAbove[0].final === 0 &&
+    familyAbove[1].final === 0);
+
+  const bothLiable = core.medicareFamilyAssessment({
+    taxableIncomes: [50000, 7000],
+    individualLevies: [1000, 10],
+    saptoEntitled: [false, false]
+  });
+  check('proportional allocation applies only when both spouses owe levy',
+    bothLiable.every(value => value.allocationMode === 'proportional') &&
+    bothLiable.every(value => value.final >= 0));
+  check('statutory excess moves only after proportional allocation',
+    Math.abs(bothLiable[1].excessTransferred - 10.11578947368421) < 0.001 &&
+    Math.abs(bothLiable.reduce((sum, value) =>
+      sum + value.familyReduction, 0) - 163.8) < 0.001 &&
+    Math.abs(bothLiable.reduce((sum, value) =>
+      sum + value.final, 0) - 846.2) < 0.001);
+
+  const mixedEntitlement = core.medicareFamilyAssessment({
+    taxableIncomes: [45000, 18000],
+    individualLevies: [900, 0],
+    saptoEntitled: [true, false]
+  });
+  check('family threshold category is selected per person',
+    mixedEntitlement[0].familyThreshold === 61623 &&
+    mixedEntitlement[1].familyThreshold === 47238);
+}
+
 console.log('\nAge Pension income taper');
 const pensionRules = core.SERVICES_AUSTRALIA_2026;
 const freeArea = pensionRules.incomeFreeAreaCoupleAnnual;
