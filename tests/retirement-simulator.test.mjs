@@ -1024,17 +1024,33 @@ const taxedAgeGapRow = core.projectScenario(taxedAgeGap).rows[0];
 const expectedPension = core.agePensionForAges({
   ages: [67, 66], assets: 0, assessableIncome: 40000, included: true
 }).household;
-const expectedEligibleTax = core.projectionNetTax({
-  taxableNominal: 40000 + expectedPension,
-  rebateNominal: 40000 + expectedPension,
-  inflationFactor: 1,
-  year: 2026,
-  seniorEligible: true
-});
+const expectedEligibleTax = core.householdTaxAssessment({
+  status: 'couple', alive: [true, true], ages: [67, 66],
+  taxableNominal: [40000 + expectedPension, 0],
+  rebateNominal: [40000 + expectedPension, 0],
+  frankingNominal: [0, 0], inflationFactor: 1, year: 2026
+}).people[0].beforeFrankingNominal;
 check('one-eligible pension is taxed only to the eligible person',
   Math.abs(taxedAgeGapRow.taxLedger[0].baseTax.beforeFrankingNominal -
     expectedEligibleTax) < 0.01 &&
   taxedAgeGapRow.taxLedger[1].baseTax.beforeFrankingNominal === 0);
+
+const unevenIncomeCouple = makeAgeGapScenario([67, 67]);
+unevenIncomeCouple.household.includeAgePension = false;
+unevenIncomeCouple.otherIncomes = [
+  {
+    id: 'uneven-high', label: 'Higher taxable income', currency: 'AUD',
+    fxToAud: 1, amount: 35000, taxable: true, owner: 'p0', survivorPct: 0
+  },
+  {
+    id: 'uneven-low', label: 'Lower taxable income', currency: 'AUD',
+    fxToAud: 1, amount: 8000, taxable: true, owner: 'p1', survivorPct: 0
+  }
+];
+const unevenRow = core.projectScenario(unevenIncomeCouple).rows[0];
+check('uneven-income couple records SAPTO transfer in the projection ledger',
+  unevenRow.taxLedger[0].totalTax.saptoBaseIncreaseNominal === 1302 &&
+  unevenRow.taxLedger[1].totalTax.saptoBaseReductionNominal === 1602);
 
 console.log('\nsingle-person Age Pension');
 check('survivor Age Pension helper is exported',
@@ -1204,6 +1220,10 @@ check('first-death event is the first event of the transition year',
   survivorFirstRow.events[0]?.type === 'first-death');
 check('survivor tax ledger leaves the deceased at zero',
   survivorFirstRow.taxByPerson[0] === 0);
+check('first-death transition immediately uses single SAPTO status',
+  survivorFirstRow.taxLedger[1].totalTax.saptoSchedule === 'single' &&
+  survivorFirstRow.taxLedger[1].totalTax.saptoBaseIncreaseNominal === 0 &&
+  survivorFirstRow.taxLedger[1].totalTax.medicareFamilyReductionNominal === 0);
 
 const reversedSurvivorScenario = structuredClone(survivorProjectionScenario);
 reversedSurvivorScenario.people = [

@@ -781,8 +781,9 @@
     return saptoPreliminary({ rebateIncome, status: 'couple', eligible: true });
   }
 
-  function zeroHouseholdTaxPerson() {
+  function zeroHouseholdTaxPerson(saptoSchedule = 'single') {
     return {
+      saptoSchedule,
       grossIncomeTaxNominal: 0,
       litoNominal: 0,
       saptoPreliminaryNominal: 0,
@@ -808,6 +809,7 @@
     frankingNominal = [0, 0], inflationFactor = 1, year
   }) {
     const factor = inflationFactor > 0 ? inflationFactor : 1;
+    const saptoSchedule = status === 'couple' ? 'couple' : 'single';
     const living = [0, 1].map(index => Boolean(alive?.[index]));
     const personAges = [0, 1].map(index =>
       Math.max(0, Number(ages?.[index]) || 0));
@@ -870,7 +872,7 @@
         }));
 
     const people = [0, 1].map(index => {
-      if (!living[index]) return zeroHouseholdTaxPerson();
+      if (!living[index]) return zeroHouseholdTaxPerson(saptoSchedule);
       const saptoPreliminaryNominal = sapto[index].preliminary * factor;
       const saptoBaseIncreaseNominal = sapto[index].baseIncrease * factor;
       const saptoBaseReductionNominal = sapto[index].baseReduction * factor;
@@ -887,6 +889,7 @@
         incomeTaxAfterOffsetsNominal + medicareFinalNominal;
       const netNominal = netBeforeFrankingNominal - franking[index];
       return {
+        saptoSchedule,
         grossIncomeTaxNominal: grossIncomeTaxNominal[index],
         litoNominal: litoNominal[index],
         saptoPreliminaryNominal,
@@ -2321,47 +2324,49 @@
       otherTaxableByPerson[index] +
       interestByPerson[index]
     );
+    const ordinaryTaxableNominal = [0, 1].map(index =>
+      baseTaxableNominal[index] + dividendFlows.cashByPerson[index] +
+        dividendFlows.frankingByPerson[index]);
+    const totalTaxableNominalByPerson = [0, 1].map(index =>
+      ordinaryTaxableNominal[index] + netCapitalGainByPerson[index]);
+    const frankingNominal = dividendFlows.frankingByPerson;
+    const householdTaxStatus = state.lifecycle.alive.every(Boolean)
+      ? 'couple'
+      : 'survivor';
+    const householdTaxInput = {
+      status: householdTaxStatus,
+      alive: state.lifecycle.alive,
+      ages,
+      inflationFactor,
+      year
+    };
+    const baseTaxAssessment = householdTaxAssessment({
+      ...householdTaxInput,
+      taxableNominal: baseTaxableNominal,
+      rebateNominal: baseTaxableNominal,
+      frankingNominal: [0, 0]
+    });
+    const ordinaryTaxAssessment = householdTaxAssessment({
+      ...householdTaxInput,
+      taxableNominal: ordinaryTaxableNominal,
+      rebateNominal: ordinaryTaxableNominal,
+      frankingNominal
+    });
+    const totalTaxAssessment = householdTaxAssessment({
+      ...householdTaxInput,
+      taxableNominal: totalTaxableNominalByPerson,
+      rebateNominal: totalTaxableNominalByPerson,
+      frankingNominal
+    });
     const taxLedger = [0, 1].map(index => {
-      if (!state.lifecycle.alive[index]) {
-        const zeroTax = {
-          grossNominal: 0, offsetNominal: 0, medicareNominal: 0,
-          creditsNominal: 0, netNominal: 0, refundNominal: 0
-        };
-        return {
-          baseTax: { ...zeroTax }, ordinaryTax: { ...zeroTax },
-          totalTax: { ...zeroTax }, frankingNominal: 0,
-          cgtTaxNominal: 0, refundNominal: 0, dividendNetNominal: 0
-        };
-      }
-      const baseTax = taxAfterFranking({
-        taxableNominal: baseTaxableNominal[index],
-        rebateNominal: baseTaxableNominal[index],
-        inflationFactor, year,
-        seniorEligible: ages[index] >= 67,
-        frankingNominal: 0
-      });
-      const taxableWithDividend = baseTaxableNominal[index] +
-        dividendFlows.cashByPerson[index] +
-        dividendFlows.frankingByPerson[index];
-      const ordinaryTax = taxAfterFranking({
-        taxableNominal: taxableWithDividend,
-        rebateNominal: taxableWithDividend,
-        inflationFactor, year,
-        seniorEligible: ages[index] >= 67,
-        frankingNominal: dividendFlows.frankingByPerson[index]
-      });
-      const totalTax = taxAfterFranking({
-        taxableNominal: taxableWithDividend + netCapitalGainByPerson[index],
-        rebateNominal: taxableWithDividend + netCapitalGainByPerson[index],
-        inflationFactor, year,
-        seniorEligible: ages[index] >= 67,
-        frankingNominal: dividendFlows.frankingByPerson[index]
-      });
+      const baseTax = baseTaxAssessment.people[index];
+      const ordinaryTax = ordinaryTaxAssessment.people[index];
+      const totalTax = totalTaxAssessment.people[index];
       return {
         baseTax,
         ordinaryTax,
         totalTax,
-        frankingNominal: dividendFlows.frankingByPerson[index],
+        frankingNominal: frankingNominal[index],
         cgtTaxNominal: Math.max(0, totalTax.netNominal - ordinaryTax.netNominal),
         refundNominal: totalTax.refundNominal,
         dividendNetNominal: dividendFlows.cashByPerson[index] -
@@ -2378,10 +2383,6 @@
       (sum, person) => sum + person.cgtTaxNominal, 0);
     const dividendNetNominal = taxLedger.reduce(
       (sum, person) => sum + person.dividendNetNominal, 0);
-    const totalTaxableNominalByPerson = [0, 1].map(index =>
-      baseTaxableNominal[index] + dividendFlows.cashByPerson[index] +
-      dividendFlows.frankingByPerson[index] + netCapitalGainByPerson[index]);
-
     const grossNonDividendTaxableSources =
       salaries.reduce((sum, value) => sum + value, 0) +
       ukState.reduce((sum, value) => sum + value, 0) +
