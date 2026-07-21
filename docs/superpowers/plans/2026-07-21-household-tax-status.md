@@ -377,10 +377,21 @@ const familyAbove = core.medicareFamilyAssessment({
 });
 check('family reduction cannot make either levy negative',
   familyAbove.every(value => value.final >= 0));
-check('family reduction and excess transfer reconcile',
-  Math.abs(familyAbove.reduce((sum, value) => sum + value.final, 0) -
-    familyAbove.reduce((sum, value) =>
-      sum + value.beforeFamily - value.familyReduction, 0)) < 0.01);
+check('full reduction applies when the spouse otherwise owes no levy',
+  familyAbove[0].allocationMode === 'full' &&
+  familyAbove[0].final === 0 &&
+  familyAbove[1].final === 0);
+
+const bothLiable = core.medicareFamilyAssessment({
+  taxableIncomes: [26000, 25000],
+  individualLevies: [100, 80],
+  saptoEntitled: [false, false]
+});
+check('proportional allocation applies only when both spouses owe levy',
+  bothLiable.every(value => value.allocationMode === 'proportional') &&
+  bothLiable.every(value => value.final >= 0));
+check('statutory excess can move only after proportional allocation',
+  bothLiable.every(value => value.excessTransferred >= 0));
 
 const mixedEntitlement = core.medicareFamilyAssessment({
   taxableIncomes: [45000, 18000],
@@ -421,7 +432,7 @@ familyReduction = max(0,
   2% × familyThreshold - 8% × (familyIncome - familyThreshold))
 ```
 
-Allocate the reduction by the statutory taxable-income proportion. Apply any amount exceeding one spouse's pre-family levy against the other spouse's levy. Return, per person, `{ beforeFamily, familyThreshold, allocatedReduction, excessTransferred, familyReduction, final }`. Enforce `final >= 0`, `familyReduction <= beforeFamily` after excess transfer, and household reconciliation to one cent. There is no dependent increment because the supported path is explicitly childless.
+For each taxpayer, calculate the section 8(2) family reduction using that taxpayer's applicable threshold. If the spouse's `beforeFamily` levy is greater than zero, set `allocationMode: 'proportional'`, allocate by taxable-income proportion under section 8(3), and apply section 8(4) excess transfer only when the spouse's allocated amount exceeds the spouse's levy. If the spouse's `beforeFamily` levy is zero, set `allocationMode: 'full'`, give the taxpayer the unproportioned section 8(2) reduction, and do not run excess transfer. Return, per person, `{ beforeFamily, familyThreshold, allocationMode, allocatedReduction, excessTransferred, familyReduction, final }`. Enforce `final >= 0` and `familyReduction <= beforeFamily` after any permitted excess transfer. There is no dependent increment because the supported path is explicitly childless.
 
 - [ ] Export the new helpers, rerun all deterministic tests, and commit.
 

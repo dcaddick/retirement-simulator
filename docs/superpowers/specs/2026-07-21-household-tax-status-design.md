@@ -121,7 +121,7 @@ For a partnered household, calculate childless family taxable income from the tw
 
 1. If family income does not exceed the applicable childless family threshold, no levy is payable by either partner.
 2. Above that threshold, calculate the statutory family reduction from the levy otherwise payable.
-3. Allocate the reduction between partners in proportion to taxable income, including the statutory excess-transfer treatment when one partner's reduction exceeds their levy.
+3. If the spouse would otherwise be liable for Medicare levy, allocate the reduction in proportion to taxable income and apply the statutory excess-transfer treatment when the spouse's allocated reduction exceeds their levy. If the spouse would not otherwise be liable, do not proportion the taxpayer's reduction: apply the full section 8 reduction to the liable taxpayer, capped at that taxpayer's levy.
 4. Cap each person's final levy at zero or above.
 
 For the statutory calculation performed for each partner, selection of the ordinary or SAPTO family threshold follows that partner's calculated SAPTO entitlement, not age alone. The household must not be assigned one global SAPTO family category when only one partner is entitled. Dependent-child increases are not approximated as zero without disclosure: the interface and methodology must expressly say the estimate supports a childless couple only.
