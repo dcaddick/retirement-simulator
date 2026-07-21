@@ -781,12 +781,150 @@
     return saptoPreliminary({ rebateIncome, status: 'couple', eligible: true });
   }
 
+  function zeroHouseholdTaxPerson() {
+    return {
+      grossIncomeTaxNominal: 0,
+      litoNominal: 0,
+      saptoPreliminaryNominal: 0,
+      saptoBaseIncreaseNominal: 0,
+      saptoBaseReductionNominal: 0,
+      saptoFinalNominal: 0,
+      incomeTaxAfterOffsetsNominal: 0,
+      medicareBeforeFamilyNominal: 0,
+      medicareFamilyReductionNominal: 0,
+      medicareFinalNominal: 0,
+      netBeforeFrankingNominal: 0,
+      beforeFrankingNominal: 0,
+      frankingNominal: 0,
+      netNominal: 0,
+      taxNominal: 0,
+      refundNominal: 0
+    };
+  }
+
+  function householdTaxAssessment({
+    status = 'couple', alive = [true, true], ages = [0, 0],
+    taxableNominal = [0, 0], rebateNominal = [0, 0],
+    frankingNominal = [0, 0], inflationFactor = 1, year
+  }) {
+    const factor = inflationFactor > 0 ? inflationFactor : 1;
+    const living = [0, 1].map(index => Boolean(alive?.[index]));
+    const personAges = [0, 1].map(index =>
+      Math.max(0, Number(ages?.[index]) || 0));
+    const taxable = [0, 1].map(index => living[index]
+      ? Math.max(0, Number(taxableNominal?.[index]) || 0)
+      : 0);
+    const rebate = [0, 1].map(index => living[index]
+      ? Math.max(0, Number(rebateNominal?.[index]) || 0)
+      : 0);
+    const franking = [0, 1].map(index => living[index]
+      ? Math.max(0, Number(frankingNominal?.[index]) || 0)
+      : 0);
+    const taxableReal = taxable.map(value => value / factor);
+    const rebateReal = rebate.map(value => value / factor);
+    const grossIncomeTaxNominal = taxable.map((value, index) =>
+      living[index] ? incomeTaxResident(value, year) : 0);
+    const grossIncomeTaxReal = grossIncomeTaxNominal.map(value => value / factor);
+    const litoNominal = taxable.map((value, index) =>
+      living[index] ? litoOffset(value) : 0);
+    const eligible = saptoProxyEligibility({
+      status, alive: living, ages: personAges, rebateIncomes: rebateReal
+    });
+    const sapto = status === 'couple'
+      ? allocateCoupleSapto({
+          eligible,
+          rebateIncomes: rebateReal,
+          taxableIncomes: taxableReal,
+          grossIncomeTaxes: grossIncomeTaxReal
+        })
+      : [0, 1].map(index => {
+          const preliminary = saptoPreliminary({
+            rebateIncome: rebateReal[index], status, eligible: eligible[index]
+          });
+          return {
+            preliminary,
+            adjustedBase: preliminary,
+            baseIncrease: 0,
+            baseReduction: 0,
+            final: preliminary
+          };
+        });
+    const saptoEntitled = sapto.map((record, index) =>
+      living[index] && record.final > 0);
+    const medicareBeforeFamilyReal = taxableReal.map((value, index) =>
+      living[index]
+        ? medicareIndividualLevy({
+            taxableIncome: value, saptoEntitled: saptoEntitled[index]
+          })
+        : 0);
+    const familyMedicare = status === 'couple' && living.every(Boolean)
+      ? medicareFamilyAssessment({
+          taxableIncomes: taxableReal,
+          individualLevies: medicareBeforeFamilyReal,
+          saptoEntitled
+        })
+      : medicareBeforeFamilyReal.map(value => ({
+          beforeFamily: value,
+          familyReduction: 0,
+          final: value
+        }));
+
+    const people = [0, 1].map(index => {
+      if (!living[index]) return zeroHouseholdTaxPerson();
+      const saptoPreliminaryNominal = sapto[index].preliminary * factor;
+      const saptoBaseIncreaseNominal = sapto[index].baseIncrease * factor;
+      const saptoBaseReductionNominal = sapto[index].baseReduction * factor;
+      const saptoFinalNominal = sapto[index].final * factor;
+      const incomeTaxAfterOffsetsNominal = Math.max(0,
+        grossIncomeTaxNominal[index] - litoNominal[index] -
+          saptoFinalNominal);
+      const medicareBeforeFamilyNominal =
+        familyMedicare[index].beforeFamily * factor;
+      const medicareFamilyReductionNominal =
+        familyMedicare[index].familyReduction * factor;
+      const medicareFinalNominal = familyMedicare[index].final * factor;
+      const netBeforeFrankingNominal =
+        incomeTaxAfterOffsetsNominal + medicareFinalNominal;
+      const netNominal = netBeforeFrankingNominal - franking[index];
+      return {
+        grossIncomeTaxNominal: grossIncomeTaxNominal[index],
+        litoNominal: litoNominal[index],
+        saptoPreliminaryNominal,
+        saptoBaseIncreaseNominal,
+        saptoBaseReductionNominal,
+        saptoFinalNominal,
+        incomeTaxAfterOffsetsNominal,
+        medicareBeforeFamilyNominal,
+        medicareFamilyReductionNominal,
+        medicareFinalNominal,
+        netBeforeFrankingNominal,
+        beforeFrankingNominal: netBeforeFrankingNominal,
+        frankingNominal: franking[index],
+        netNominal,
+        taxNominal: Math.max(0, netNominal),
+        refundNominal: Math.max(0, -netNominal)
+      };
+    });
+
+    return {
+      status,
+      combinedTaxableNominal: taxable[0] + taxable[1],
+      combinedRebateNominal: rebate[0] + rebate[1],
+      people
+    };
+  }
+
   function netTax({ taxableIncome, rebateIncome, year, seniorEligible }) {
-    const gross = incomeTaxResident(taxableIncome, year) +
-      medicareLevy(taxableIncome, seniorEligible);
-    const offsets = litoOffset(taxableIncome) +
-      (seniorEligible ? saptoOffset(rebateIncome) : 0);
-    return Math.max(0, gross - offsets);
+    return householdTaxAssessment({
+      status: 'couple',
+      alive: [true, false],
+      ages: [seniorEligible ? 67 : 0, 0],
+      taxableNominal: [taxableIncome, 0],
+      rebateNominal: [rebateIncome, 0],
+      frankingNominal: [0, 0],
+      inflationFactor: 1,
+      year
+    }).people[0].netBeforeFrankingNominal;
   }
 
   function projectionNetTax({
@@ -797,30 +935,32 @@
     seniorEligible
   }) {
     const factor = inflationFactor > 0 ? inflationFactor : 1;
-    const taxableReal = taxableNominal / factor;
-    const rebateReal = rebateNominal / factor;
-    const grossReal = incomeTaxResident(taxableNominal, year) / factor +
-      medicareLevy(taxableReal, seniorEligible);
-    const offsetsReal = litoOffset(taxableNominal) / factor +
-      (seniorEligible ? saptoOffset(rebateReal) : 0);
-    return Math.max(0, grossReal - offsetsReal);
+    return householdTaxAssessment({
+      status: 'couple',
+      alive: [true, false],
+      ages: [seniorEligible ? 67 : 0, 0],
+      taxableNominal: [taxableNominal, 0],
+      rebateNominal: [rebateNominal, 0],
+      frankingNominal: [0, 0],
+      inflationFactor: factor,
+      year
+    }).people[0].netBeforeFrankingNominal / factor;
   }
 
   function taxAfterFranking({
     taxableNominal, rebateNominal, inflationFactor, year,
     seniorEligible, frankingNominal
   }) {
-    const beforeFrankingNominal = projectionNetTax({
-      taxableNominal, rebateNominal, inflationFactor, year, seniorEligible
-    }) * inflationFactor;
-    const netNominal = beforeFrankingNominal - frankingNominal;
-    return {
-      beforeFrankingNominal,
-      frankingNominal,
-      netNominal,
-      taxNominal: Math.max(0, netNominal),
-      refundNominal: Math.max(0, -netNominal)
-    };
+    return householdTaxAssessment({
+      status: 'couple',
+      alive: [true, false],
+      ages: [seniorEligible ? 67 : 0, 0],
+      taxableNominal: [taxableNominal, 0],
+      rebateNominal: [rebateNominal, 0],
+      frankingNominal: [frankingNominal, 0],
+      inflationFactor,
+      year
+    }).people[0];
   }
 
   function pensionRuleSet(status = 'couple') {
@@ -2795,6 +2935,7 @@
     allocateCoupleSapto,
     saptoProxyEligibility,
     saptoScheduleForStatus,
+    householdTaxAssessment,
     netTax,
     projectionNetTax,
     taxAfterFranking,

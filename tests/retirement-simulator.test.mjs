@@ -1305,6 +1305,34 @@ check('projection tax matches ordinary net tax at inflation factor 1',
 check('legislated 2026 to 2027 rate transition remains active',
   core.incomeTaxResident(50000, 2026) - core.incomeTaxResident(50000, 2027) === 268);
 
+const orderingAssessment = core.householdTaxAssessment({
+  status: 'single', alive: [true, false], ages: [67, 0],
+  taxableNominal: [45000, 0], rebateNominal: [45000, 0],
+  frankingNominal: [0, 0], inflationFactor: 1, year: 2026
+});
+const orderingPerson = orderingAssessment.people[0];
+check('non-refundable offsets do not reduce Medicare levy',
+  orderingPerson.medicareFinalNominal > 0 &&
+  orderingPerson.netBeforeFrankingNominal ===
+    orderingPerson.incomeTaxAfterOffsetsNominal +
+      orderingPerson.medicareFinalNominal);
+check('household assessment exposes the complete audit contract',
+  ['grossIncomeTaxNominal', 'litoNominal', 'saptoPreliminaryNominal',
+   'saptoBaseIncreaseNominal', 'saptoBaseReductionNominal',
+   'saptoFinalNominal', 'medicareBeforeFamilyNominal',
+   'medicareFamilyReductionNominal', 'medicareFinalNominal',
+   'netBeforeFrankingNominal', 'frankingNominal', 'netNominal',
+   'taxNominal', 'refundNominal']
+    .every(key => Number.isFinite(orderingPerson[key])));
+
+const frankedAssessment = core.householdTaxAssessment({
+  status: 'single', alive: [true, false], ages: [67, 0],
+  taxableNominal: [20000, 0], rebateNominal: [20000, 0],
+  frankingNominal: [500, 0], inflationFactor: 1, year: 2026
+});
+check('refundable franking remains after tax and Medicare',
+  frankedAssessment.people[0].refundNominal === 500);
+
 console.log('\nbaseline projection');
 const base = core.projectScenario(sample);
 check('rows produced', base.rows.length > 30);
