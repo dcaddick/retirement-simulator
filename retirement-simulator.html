@@ -492,13 +492,42 @@
     checkedDate: '2026-07-06',
     url: 'https://www.ato.gov.au/tax-rates-and-codes/tax-rates-australian-residents'
   });
+  const SAPTO_RULES = Object.freeze({
+    checkedDate: '2026-07-21',
+    sourceUrl: 'https://www.ato.gov.au/myTax25OffsetsSAPTO',
+    regulationsUrl: 'https://www.legislation.gov.au/F2025L01060/latest/text',
+    taper: 0.125,
+    transferTaxRate: 0.15,
+    transferIncomeFloor: 6000,
+    coupleCombinedLimit: 87620,
+    threshold: Object.freeze({
+      taxFreeThreshold: 18200,
+      rebateMaximumAmount: 445,
+      rebateReductionThreshold: 37000,
+      rebateReductionRate: 0.015,
+      lowestMarginalRate: 0.16,
+      secondLowestMarginalRate: 0.30
+    }),
+    single: Object.freeze({ base: 2230, cutIn: 34919, cutOut: 52759 }),
+    couple: Object.freeze({ base: 1602, cutIn: 30994, cutOut: 43810 })
+  });
+
   const MEDICARE_BASE = Object.freeze({
     effectiveYear: 2025,
-    checkedDate: '2026-07-10',
-    sourceUrl: 'https://iorder.com.au/publication/Download.aspx?ProdID=71050-6.2026',
-    ordinary: { lower: 28011, upper: 35013 },
-    sapto: { lower: 44268, upper: 55335 }
+    checkedDate: '2026-07-21',
+    sourceUrl: 'https://www.legislation.gov.au/C2026A00058/asmade/2026-06-30/text/original/pdf',
+    ordinary: Object.freeze({ lower: 28011, upper: 35013 }),
+    sapto: Object.freeze({ lower: 44268, upper: 55335 }),
+    family: Object.freeze({
+      ordinary: 47238,
+      sapto: 61623,
+      dependentIncrement: 4338
+    })
   });
+
+  function saptoScheduleForStatus(status) {
+    return status === 'couple' ? SAPTO_RULES.couple : SAPTO_RULES.single;
+  }
   const SERVICES_AUSTRALIA_2026 = Object.freeze({
     effectiveDate: '2026-07-01',
     checkedDate: '2026-07-06',
@@ -2567,6 +2596,7 @@
     realReturnPct,
     TAX_SCHEDULES,
     TAX_SOURCE,
+    SAPTO_RULES,
     MEDICARE_BASE,
     SERVICES_AUSTRALIA_2026,
     inflationRateForYear,
@@ -2574,6 +2604,7 @@
     medicareLevy,
     litoOffset,
     saptoOffset,
+    saptoScheduleForStatus,
     netTax,
     projectionNetTax,
     taxAfterFranking,

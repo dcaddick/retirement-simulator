@@ -716,6 +716,25 @@ check('ordinary Medicare thresholds are current',
 check('SAPTO Medicare thresholds are current',
   core.MEDICARE_BASE.sapto.lower === 44268 && core.MEDICARE_BASE.sapto.upper === 55335);
 
+console.log('\nSAPTO and Medicare household rules');
+check('SAPTO rule source and current schedules are exported',
+  core.SAPTO_RULES.checkedDate === '2026-07-21' &&
+  core.SAPTO_RULES.single.base === 2230 &&
+  core.SAPTO_RULES.single.cutIn === 34919 &&
+  core.SAPTO_RULES.single.cutOut === 52759 &&
+  core.SAPTO_RULES.couple.base === 1602 &&
+  core.SAPTO_RULES.couple.cutIn === 30994 &&
+  core.SAPTO_RULES.couple.cutOut === 43810 &&
+  core.SAPTO_RULES.coupleCombinedLimit === 87620);
+check('Medicare family thresholds are enacted annual values',
+  core.MEDICARE_BASE.family.ordinary === 47238 &&
+  core.MEDICARE_BASE.family.sapto === 61623 &&
+  core.MEDICARE_BASE.family.dependentIncrement === 4338);
+check('single and couple schedules are selected explicitly',
+  core.saptoScheduleForStatus('single').base === 2230 &&
+  core.saptoScheduleForStatus('survivor').base === 2230 &&
+  core.saptoScheduleForStatus('couple').base === 1602);
+
 console.log('\nAge Pension income taper');
 const pensionRules = core.SERVICES_AUSTRALIA_2026;
 const freeArea = pensionRules.incomeFreeAreaCoupleAnnual;
