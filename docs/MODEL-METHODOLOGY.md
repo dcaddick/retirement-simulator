@@ -32,6 +32,12 @@ The chart ribbon uses an illustrative Gompertz curve (`A = 5.55e-6`, `G = 0.11`)
 
 The application contains a more detailed step-by-step explanation and shows the dated rates used by the active scenario.
 
+### Explicit single household
+
+The deterministic simulator stores two people so a scenario can switch between **Couple** and **Single** without deleting data. In Single mode, Person 1 is the sole active person from the first projection year. Person 2's personal inputs and Person 2-owned cash, savings, shares, Other income and Other assets are not read into the runtime calculation and contribute zero. A Joint 50/50 record contributes only Person 1's 50% share. New owned records default to Person 1, inactive drawdown sources are omitted, and switching back to Couple restores the preserved values.
+
+Single mode is a starting household state, not a survivor state. The entered Preferred Retirement Income and Essential Annual Budget remain at 100%; no first-death event, asset inheritance, continuing-income percentage or survivor spending percentage is applied. The horizon follows Person 1. Tables, CSV output, charts, tooltips, headline assets and scenario assumptions omit Person 2.
+
 ### Fixed first-death and survivor state
 
 When enabled, the selected person's death is applied at the start of the selected projection year, before that year's income, tax, returns and drawdown calculations. It is a user-selected scenario boundary, not a mortality forecast. The deceased person's employment income and super contributions stop immediately; configured UK State Pension and Other income continuation percentages are paid to the survivor. No bereavement payment or temporary concession is modelled.
@@ -58,7 +64,7 @@ Guaranteed income and mandatory minimum payments are counted before discretionar
 
 ### Tax and government support
 
-The simulator contains simplified, dated estimates for Australian income tax, Medicare, selected offsets, Age Pension and the Commonwealth Seniors Health Card. Its household tax context treats both living partners as a couple and switches to single status immediately in the fixed first-death transition year.
+The simulator contains simplified, dated estimates for Australian income tax, Medicare, selected offsets, Age Pension and the Commonwealth Seniors Health Card. Its household tax context uses single status from year zero for an explicit Single household. A Couple household treats both living partners as a couple and switches to single status immediately in the fixed first-death transition year.
 
 Income-tax brackets and LITO use the legislated fixed nominal schedule: the 2026 rate applies in 2026, the legislated 2027 rate applies from 2027, and no unlegislated later tax cuts are forecast. As nominal income rises with inflation against those fixed nominal thresholds, the model includes bracket creep. Medicare and SAPTO retain the simulator's existing indexed approximation by applying their thresholds in today's-dollar terms. This is a deterministic policy baseline, not a prediction of future government decisions.
 
@@ -72,7 +78,7 @@ SAPTO schedules and transfer rules were checked on 21 July 2026 against the ATO 
 
 This bounded, auditable household context is proportionate for a personal prototype and hobby use. A service intended for thousands of users would need separately versioned tax rules, richer household and dependent inputs, professional effective-date maintenance, a calculation-explanation interface, accessibility work, privacy and security controls, audit logs, monitoring and stronger release controls.
 
-The normal Age Pension estimate applies the combined homeowner-couple income and assets tests. If one partner has reached Age Pension age, the household receives half of the means-tested combined couple rate and the taxable payment is allocated to that eligible person; once both partners are 67, the household receives the full combined rate. Superannuation held by a partner under Age Pension age remains excluded while it stays in the modelled super environment. The income test uses a 50-cent combined couple reduction for each dollar above the couple free area.
+The normal Couple Age Pension estimate applies the combined homeowner-couple income and assets tests. If one partner has reached Age Pension age, the household receives half of the means-tested combined couple rate and the taxable payment is allocated to that eligible person; once both partners are 67, the household receives the full combined rate. Superannuation held by a partner under Age Pension age remains excluded while it stays in the modelled super environment. The income test uses a 50-cent combined couple reduction for each dollar above the couple free area. An explicit Single household applies the single-person rate, assets test, income test and deeming threshold to Person 1 from the first year.
 
 Taxable Other income follows its selected owner (`Person 1`, `Person 2` or `Joint 50/50`). Non-taxable Other income remains a household cash flow. Share dividends and franking credits follow the holding owner on the same basis. Franking eligibility is an explicit user assumption: the simulator does not automate holding-period, related-payment or other integrity rules. Refundable franking offsets can therefore produce an estimated tax refund in a low-tax year.
 
@@ -82,7 +88,7 @@ Capital gains and losses are tracked per person. Current-year and carried losses
 
 Cash, savings, shareholdings, other income and other assets are simplified. Timing is annual. Each holding's nominal share-price growth is applied at the start of the projected year, before dividends and share sales; cost base does not grow with market price. The cash dividend yield excludes price growth, so their simple derived sum is the expected total-return assumption before tax effects. Dividends use the number of months held during the year. Generic Other assets remain outside the CGT model. The optional Stooq integration is explicitly limited to US-listed symbols and always appends Stooq's `.us` market suffix; Australian and other holdings use manual prices.
 
-Every Other Asset counts in the Age Pension assets test. An asset selected as a financial investment for Age Pension deeming also contributes its remaining value to the financial-assets balance used for Age Pension deeming. Scheduled disposal moves the value to savings before assessment, while named liquidation immediately funds the nominated lump sum, so disposed value is not counted twice. The selection does not add ordinary Other Assets to CSHC deeming, which remains limited here to account-based income streams. Actual interest, rent and other returns are separate Other Income entries. The user is responsible for choosing the appropriate classification.
+Every included Other Asset counts in the Age Pension assets test. An asset selected as a financial investment for Age Pension deeming also contributes its included remaining value to the financial-assets balance used for Age Pension deeming. In Single mode a Person 2-owned asset is excluded and a Joint 50/50 asset contributes half. Scheduled disposal moves the included value to savings before assessment, while named liquidation immediately funds the nominated lump sum, so disposed value is not counted twice. The selection does not add ordinary Other Assets to CSHC deeming, which remains limited here to account-based income streams. Actual interest, rent and other returns are separate Other Income entries. The user is responsible for choosing the appropriate classification.
 
 ### Foreign pensions and currency
 
@@ -97,6 +103,8 @@ Calculations run using nominal values. Today's-dollar views divide future nomina
 ## Experimental Monte Carlo report
 
 The companion report imports a validated scenario and applies synthetic investment-return paths. Seeded runs support reproducibility, while deterministic stress cases are reported separately.
+
+The explicit Single household type described above is currently deterministic-only. The experimental Monte Carlo companion has not been changed for issue #36.
 
 Monte Carlo v0.7 accepts the standard fictional sample and scenarios using the fields its experimental engine supports. It uses the same Age Pension eligibility boundary, survivor-state transition and person-level tax allocation as the deterministic simulator. An enabled first-death event is fixed at the selected age and start-of-year boundary in every Monte Carlo path; mortality itself is not stochastic. It rejects, with a visible explanation, imports containing populated Other income/Other assets, active Defined Benefit/UK Pension income, active lump sums, or active v1.06 share growth, dividend or franking assumptions; it does not silently discard those cash flows.
 

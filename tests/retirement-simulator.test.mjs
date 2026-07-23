@@ -2326,6 +2326,17 @@ check('single assumptions omit inactive people and owned records',
   html.includes('activePeople(scenario).map') &&
   html.includes('activeOwnedEntries(scenario, scenario.otherIncomes ?? [])') &&
   html.includes('activeOwnedEntries(scenario, scenario.otherAssets ?? [])'));
+check('public docs define deterministic single household boundaries',
+  readme.includes('Person 2-owned records are hidden') &&
+  methodology.includes('### Explicit single household') &&
+  methodology.includes('Person 2-owned cash, savings, shares, Other income and Other assets') &&
+  methodology.includes('currently deterministic-only'));
+check('browser checklist covers single data restoration',
+  testingGuide.includes('switching a fictional scenario from Couple to Single') &&
+  testingGuide.includes('switching the same scenario back to Couple'));
+check('changelog records issue 36 deterministic scope',
+  changelog.includes('Couple/Single household selection') &&
+  changelog.includes('/issues/36'));
 
 console.log('\nmigration v1 -> v14 (full chain)');
 const v1 = structuredClone(v5);

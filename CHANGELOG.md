@@ -4,6 +4,7 @@ This changelog summarizes public, non-personal milestones. Early development use
 
 ## Unreleased
 
+- Added deterministic Couple/Single household selection with Person 2 data preservation, zero Person 2-owned inclusion, 50% Joint inclusion, year-zero single-person rules and Person 1-only reports; the experimental Monte Carlo companion is unchanged ([#36](https://github.com/dcaddick/retirement-simulator/issues/36)).
 - Reject experimental Monte Carlo super access ages below 60 because pre-60 withdrawal taxation is outside the simplified model ([#8](https://github.com/dcaddick/retirement-simulator/issues/8)).
 - Established Monte Carlo schema 5 and salary-growth parity as the first issue #1 import-support slice; the companion remains experimental and the other compatibility guards remain active ([#1](https://github.com/dcaddick/retirement-simulator/issues/1)).
 - Added Other-income parity as the second issue #1 Monte Carlo import-support slice, including currency conversion, CPI indexation, ownership, tax treatment and survivor continuation; four compatibility guards remain active ([#1](https://github.com/dcaddick/retirement-simulator/issues/1)).
