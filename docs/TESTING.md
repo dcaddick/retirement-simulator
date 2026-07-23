@@ -75,6 +75,18 @@ Automated tests do not replace a real-browser pass. For user-interface changes, 
 - the same fixed first-death scenario in the Monte Carlo report, confirming the assumptions disclosure and the same transition year in every Monte Carlo path;
 - Model assumptions and sources in light and dark themes at desktop and mobile widths, confirming the tax-status estimate wraps without overflow and remains readable;
 
+### GitHub Pages verification
+
+The hosted deterministic simulator is built from `retirement-simulator.html` as a two-file artifact containing only `index.html` and `.nojekyll`. Before deployment, confirm the deterministic suite passes, the copied HTML matches the canonical source and no other files enter `_site`.
+
+After deployment, verify:
+
+- `https://dcaddick.github.io/retirement-simulator/` returns 200 over HTTPS and opens the deterministic simulator directly;
+- `/retirement-monte-carlo-v0.7.html` and `/README.md` return 404;
+- the displayed version, CSP, theme, confirmation modal, chart, table, JSON import/export and local persistence work without console errors;
+- Couple/Single switching works at iPad portrait and landscape viewport sizes;
+- the README iPad link opens the Pages root.
+
 ### iPad Safari release check
 
 Before release, open the local HTML file in current iPadOS Safari (not only the Files preview) and check portrait and landscape at the common 820x1180, 1024x1366, 1180x820 and 1366x1024 CSS viewports. Confirm touch targets, independent panel scrolling, both splitters, chart inspection, form fields, safe-area banners and horizontal table scrolling. Desktop emulation is useful for regression coverage but does not replace one real-device pass.

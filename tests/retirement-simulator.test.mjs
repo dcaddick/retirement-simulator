@@ -2361,6 +2361,29 @@ check('Pages workflow is main-scoped and permission-bounded',
   pagesWorkflow.includes('pages: write') &&
   pagesWorkflow.includes('id-token: write') &&
   pagesWorkflow.includes('cancel-in-progress: false'));
+const pagesUrl = 'https://dcaddick.github.io/retirement-simulator/';
+const downloadLinkIndex = readme.indexOf(
+  'https://github.com/dcaddick/retirement-simulator/releases/latest/download/retirement-simulator.html'
+);
+const hostedLinkIndex = readme.indexOf(pagesUrl);
+check('README offers the hosted simulator beneath the download',
+  downloadLinkIndex >= 0 &&
+  hostedLinkIndex > downloadLinkIndex &&
+  readme.includes('Using an iPad? Try the simulator in your browser'));
+check('README explains hosted storage and transfer boundaries',
+  readme.includes("that browser's local storage") &&
+  readme.includes('do not automatically appear') &&
+  readme.includes('JSON export/import'));
+check('README discloses GitHub Pages request metadata',
+  readme.includes('GitHub Pages') &&
+  readme.includes('visitor IP address'));
+check('testing guide covers controlled Pages publishing',
+  testingGuide.includes('### GitHub Pages verification') &&
+  testingGuide.includes('retirement-monte-carlo-v0.7.html') &&
+  testingGuide.includes('return 404'));
+check('changelog records deterministic Pages hosting',
+  changelog.includes('GitHub Pages') &&
+  changelog.includes('iPad'));
 
 console.log('\nmigration v1 -> v14 (full chain)');
 const v1 = structuredClone(v5);

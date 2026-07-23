@@ -225,9 +225,9 @@ check('README discloses GitHub Pages request metadata',
   readme.includes('GitHub Pages') &&
   readme.includes('visitor IP address'));
 check('testing guide covers controlled Pages publishing',
-  testingGuide.includes('## GitHub Pages verification') &&
+  testingGuide.includes('### GitHub Pages verification') &&
   testingGuide.includes('retirement-monte-carlo-v0.7.html') &&
-  testingGuide.includes('returns 404'));
+  testingGuide.includes('return 404'));
 check('changelog records deterministic Pages hosting',
   changelog.includes('GitHub Pages') &&
   changelog.includes('iPad'));

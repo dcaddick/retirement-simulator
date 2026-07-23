@@ -4,6 +4,7 @@ This changelog summarizes public, non-personal milestones. Early development use
 
 ## Unreleased
 
+- Added an optional GitHub Pages entry point for iPad and browser users, publishing only the deterministic simulator while retaining the downloadable HTML as the primary distribution.
 - Replaced the native `window.confirm()` prompts on the deterministic simulator's destructive actions (Reset sample, New, Remove income/asset, Remove shareholding) with a self-contained in-app confirmation modal, because iOS/iPadOS Safari can silently suppress the native dialog and leave those buttons dead ([#34](https://github.com/dcaddick/retirement-simulator/issues/34)).
 - Added deterministic Couple/Single household selection with Person 2 data preservation, zero Person 2-owned inclusion, 50% Joint inclusion, year-zero single-person rules and Person 1-only reports; the experimental Monte Carlo companion is unchanged ([#36](https://github.com/dcaddick/retirement-simulator/issues/36)).
 - Reject experimental Monte Carlo super access ages below 60 because pre-60 withdrawal taxation is outside the simplified model ([#8](https://github.com/dcaddick/retirement-simulator/issues/8)).
