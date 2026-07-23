@@ -1707,6 +1707,10 @@
     return scenario.household?.type === 'single';
   }
 
+  function outputPersonIndexes(scenario) {
+    return isSingleHousehold(scenario) ? [0] : [0, 1];
+  }
+
   function householdRuleStatus(scenario, lifecycle) {
     return isSingleHousehold(scenario) ||
       lifecycle.householdStatus === 'survivor'
@@ -3010,9 +3014,14 @@
     }));
   }
 
+  function outputAgeContext(row, scenario) {
+    const ages = outputPersonIndexes(scenario)
+      .map(index => row.ages[index] ?? '—');
+    return `${row.year} · ${ages.length === 1 ? 'age' : 'ages'} ${ages.join(' and ')}`;
+  }
+
   function chartTooltipLines(segment, row, scenario) {
-    const ages = row.ages.map(age => age ?? '—');
-    const context = `${row.year} · ages ${ages[0]} and ${ages[1]}`;
+    const context = outputAgeContext(row, scenario);
     if (segment.key === 'lumpSum') {
       const detail = row.events.filter(event => event.type === 'lump-sum')
         .map(event => lumpSumEventLabel(event, scenario.people))
@@ -3042,6 +3051,7 @@
     sourceSummary,
     lumpSumEventLabel,
     chartTooltipLines,
+    outputAgeContext,
     validateScenario,
     parseMoney,
     formatMoney,
@@ -3104,6 +3114,7 @@
     cshcEstimate,
     assessableFinancialAssets,
     isSingleHousehold,
+    outputPersonIndexes,
     householdRuleStatus,
     solePersonIndex,
     makeProjectionState,
@@ -3205,10 +3216,11 @@
       base.push(['ukStateNet', '#C99A45', statePensionLabel(scenario)]);
     }
     base.push(['agePensionNet', colour('--chart-pension'), 'Aust. Aged Pension']);
-    if ((scenario.otherIncomes ?? []).length) {
+    if (activeOwnedEntries(scenario, scenario.otherIncomes ?? []).length) {
       base.push(['otherIncomeNet', '#E38A56', 'Other income']);
     }
-    if ((scenario.shareholdings ?? []).some(holding => holding.dividendYieldPct > 0)) {
+    if (activeOwnedEntries(scenario, scenario.shareholdings ?? [])
+      .some(({ item }) => item.dividendYieldPct > 0)) {
       base.push(['shareDividendNet', '#E7B85C', 'Share dividends']);
     }
     const sourceMeta = {
@@ -3218,8 +3230,8 @@
       cash: ['cashDraw', colour('--chart-label'), 'Cash drawdown']
     };
     const discretionary = [];
-    scenario.household.drawdownPriority.forEach(tier => {
-      tier.forEach(entry => {
+    activeDrawdownTiers(scenario).forEach(({ entries }) => {
+      entries.forEach(({ entry }) => {
         if (sourceMeta[entry.source]) discretionary.push(sourceMeta[entry.source]);
       });
     });
@@ -4263,16 +4275,18 @@
     hideChartTooltip();
     drawAxes(ctx, width, height, maximum, pads);
 
+    const superColours = ['#0B81A2', '#59A89C'];
     const series = [
-      ['superBalances', 0, '#0B81A2', `${scenario.people[0].name} super`],
-      ['superBalances', 1, '#59A89C', `${scenario.people[1].name} super`],
+      ...core.outputPersonIndexes(scenario).map(personIndex =>
+        ['superBalances', personIndex, superColours[personIndex],
+          `${scenario.people[personIndex].name} super`]),
       ...((rows.some(row => row.inheritedSuper.total > 0))
         ? [['inheritedSuper', 'total', '#E38A56', 'Inherited super']]
         : []),
       ['savings', null, '#7F8F98', 'Savings'],
       ['cash', null, '#9FB0C0', 'Cash'],
       ['shares', null, '#F0C571', 'Unsold shares'],
-      ...((scenario.otherAssets ?? []).length
+      ...(activeOwnedEntries(scenario, scenario.otherAssets ?? []).length
         ? [['otherAssets', null, '#C77DFF', 'Other assets']]
         : []),
       ['totalAssets', null, '#C8C8C8', 'Total assets']
@@ -4329,15 +4343,16 @@
     const factor = displayFactor(row);
     const money = value => core.formatMoney(value * factor, 'AUD');
     tooltip.innerHTML = `
-      <strong>${row.year} · ages ${row.ages.map(age => age ?? '—').join(' and ')}</strong>
-      <span>${escapeHtml(people[0].name)} super: ${money(row.superBalances[0])}</span>
-      <span>${escapeHtml(people[1].name)} super: ${money(row.superBalances[1])}</span>
+      <strong>${escapeHtml(core.outputAgeContext(row, currentScenario))}</strong>
+      ${core.outputPersonIndexes(currentScenario).map(personIndex =>
+        `<span>${escapeHtml(people[personIndex].name)} super: ${money(row.superBalances[personIndex])}</span>`
+      ).join('')}
       ${row.inheritedSuper.total > 0
         ? `<span>Inherited super: ${money(row.inheritedSuper.total)}</span>` : ''}
       <span>Savings: ${money(row.savings)}</span>
       <span>Cash: ${money(row.cash)}</span>
       <span>Unsold shares: ${money(row.shares)}</span>
-      ${(currentScenario.otherAssets ?? []).length
+      ${activeOwnedEntries(currentScenario, currentScenario.otherAssets ?? []).length
         ? `<span>Other assets: ${money(row.otherAssets)}</span>`
         : ''}
       <span><strong>Total: ${money(row.totalAssets)}</strong></span>`;
@@ -4362,6 +4377,21 @@
     showChartTooltip(segment, currentProjection.rows[segment.rowIndex], { x, y });
   }
 
+  function enteredAssetsNow(scenario) {
+    const included = (owner, readValue) => {
+      const fraction = core.householdInclusion(scenario, owner);
+      return fraction === 0 ? 0 : (readValue() || 0) * fraction;
+    };
+    return scenario.people.reduce((sum, person, index) =>
+      sum + included(`p${index}`, () => person.super), 0) +
+      included(scenario.cash.owner, () => scenario.cash.amount) +
+      included(scenario.savings.owner, () => scenario.savings.amount) +
+      (scenario.shareholdings ?? []).reduce((sum, holding) =>
+        sum + included(holding.owner, () => core.shareValueAud(holding)), 0) +
+      (scenario.otherAssets ?? []).reduce((sum, asset) =>
+        sum + included(asset.owner, () => asset.amount * core.otherItemFx(asset)), 0);
+  }
+
   function renderKpis(result, scenario) {
     const end = result.rows.at(-1);
     // Each row is stored in today's dollars; in nominal mode reinflate by that
@@ -4380,26 +4410,14 @@
       ...result.rows.map(row => row.cshc?.assessedIncome ?? 0)
     );
     const endAssets = end.totalAssets * displayFactor(end);
-    const assetsNow =
-      scenario.people.reduce((sum, person) => sum + (person.super || 0), 0) +
-      (scenario.cash?.amount || 0) +
-      (scenario.savings?.amount || 0) +
-      (scenario.shareholdings || []).reduce(
-        (sum, holding) =>
-          sum + (holding.quantity || 0) * (holding.price || 0) * (holding.fxToAud || 1),
-        0
-      ) +
-      (scenario.otherAssets || []).reduce(
-        (sum, asset) => sum + (asset.amount || 0) * core.otherItemFx(asset),
-        0
-      );
+    const assetsNow = enteredAssetsNow(scenario);
     const basis = displayMode === 'nominal' ? ' (nominal)' : '';
     const kpis = [
       { label: 'Assets now', value: core.formatMoney(assetsNow) },
       {
         label: 'First projected shortfall',
         value: result.firstShortfall
-          ? `${result.firstShortfall.year} · age ${result.firstShortfall.ages.find(age => age !== null) ?? '—'}`
+          ? core.outputAgeContext(result.firstShortfall, scenario)
           : 'None in model period'
       },
       { label: `Assets at age ${scenario.household.modelEndAge}${basis}`, value: core.formatMoney(endAssets) },
@@ -4416,19 +4434,18 @@
 
   function renderProjectionTable(rows, people, scenario) {
     const nominal = displayMode === 'nominal';
-    const hasOtherIncome = (scenario.otherIncomes ?? []).length > 0;
-    const hasOtherAssets = (scenario.otherAssets ?? []).length > 0;
+    const personIndexes = core.outputPersonIndexes(scenario);
+    const hasOtherIncome = activeOwnedEntries(scenario, scenario.otherIncomes ?? []).length > 0;
+    const hasOtherAssets = activeOwnedEntries(scenario, scenario.otherAssets ?? []).length > 0;
     const hasFranking = rows.some(row => Math.abs(row.frankingCredits) > 0.005);
     const hasCgt = rows.some(row => Math.abs(row.cgtTax) > 0.005);
     const hasInheritedSuper = rows.some(row => row.inheritedSuper.total > 0.005);
     const ageText = age => age ?? '—';
     const headings = [
       'Year',
-      people[0].name,
-      people[1].name,
+      ...personIndexes.map(index => people[index].name),
       'Total Assets',
-      `${people[0].name} super`,
-      `${people[1].name} super`,
+      ...personIndexes.map(index => `${people[index].name} super`),
       ...(hasInheritedSuper ? ['Inherited super'] : []),
       'Cash',
       'Savings',
@@ -4456,9 +4473,9 @@
         ? `Estimated tax refund ${money(-row.tax)}`
         : money(row.tax);
       const eventText = row.events.map(event => event.label).join('; ');
-      const minDraw = row.minDraws[0] + row.minDraws[1];
-      const topUpDraw = row.topUpDraws[0] + row.topUpDraws[1];
-      const rateLabels = row.minRates
+      const minDraw = personIndexes.reduce((sum, index) => sum + row.minDraws[index], 0);
+      const topUpDraw = personIndexes.reduce((sum, index) => sum + row.topUpDraws[index], 0);
+      const rateLabels = personIndexes.map(index => row.minRates[index])
         .filter(rate => rate > 0)
         .map(rate => `${(rate * 100).toFixed(0)}%`);
       const minDrawCell = minDraw > 0.5
@@ -4466,11 +4483,9 @@
         : '-';
       return `<tr class="${row.shortfall > 1 ? 'short' : ''}${row.events.length ? ' event' : ''}">
         <td>${row.year}</td>
-        <td>${ageText(row.ages[0])}</td>
-        <td>${ageText(row.ages[1])}</td>
+        ${personIndexes.map(index => `<td>${ageText(row.ages[index])}</td>`).join('')}
         <td>${money(row.totalAssets)}</td>
-        <td>${money(row.superBalances[0])}</td>
-        <td>${money(row.superBalances[1])}</td>
+        ${personIndexes.map(index => `<td>${money(row.superBalances[index])}</td>`).join('')}
         ${hasInheritedSuper ? `<td>${money(row.inheritedSuper.total)}</td>` : ''}
         <td>${money(row.cash)}</td>
         <td>${money(row.savings)}</td>
@@ -4638,9 +4653,17 @@
     const inflationText = assumptions.inflationMode === 'manual'
       ? `Manual ${assumptions.manualInflationPct}% every year`
       : 'Treasury forecast: 5% for calendar 2026, 2.5% from 2027 onward (Budget 2026-27, published 12 May 2026)';
+    const activeIncomes = activeOwnedEntries(scenario, scenario.otherIncomes ?? []);
+    const activeAssets = activeOwnedEntries(scenario, scenario.otherAssets ?? []);
+    const cashRates = [
+      ...(!isSingleScenario(scenario) || scenario.cash.owner !== 'p1'
+        ? [`Cash interest ${scenario.cash.interestPct}%/yr`] : []),
+      ...(!isSingleScenario(scenario) || scenario.savings.owner !== 'p1'
+        ? [`savings interest ${scenario.savings.interestPct}%/yr`] : [])
+    ];
     const items = [
       `Inflation: ${inflationText}. Returns below are estimated net nominal returns after fees and tax; today's-dollars figures are deflated by this path.`,
-      ...scenario.people.map(person =>
+      ...activePeople(scenario).map(({ person }) =>
         `${escapeHtml(person.name)}: accumulation return ${person.accumulationReturnPct}%/yr, ` +
         `ABP (drawdown) return ${person.retirementReturnPct}%/yr, ` +
         `retires at ${person.retireAge}, super access at ${person.superAccessAge} (${person.superAccessPct}% to ABP)`),
@@ -4654,19 +4677,25 @@
         ? `GBP to AUD ${assumptions.gbpAud} fixed for all years; UK State Pension indexation per person ` +
           `(frozen = fixed nominal GBP, so real value falls with inflation); UPP deduction ${assumptions.uppPct}% for tax`
         : 'UK/DB pensions excluded from the projection',
-      'Cash interest ' + scenario.cash.interestPct + '%/yr, savings interest ' +
-        scenario.savings.interestPct + '%/yr (taxable)',
+      ...(cashRates.length ? [`${cashRates.join(', ')} (taxable)`] : []),
       'Income-tax brackets and LITO stay fixed in nominal dollars after the legislated 2027 rate change, so inflation creates bracket creep; Medicare and SAPTO thresholds use an indexed approximation',
-      scenario.household.firstDeath.enabled
+      isSingleScenario(scenario)
+        ? 'Single household from the start: Person 2 data is preserved but excluded; no first-death, inheritance or survivor-income transition is applied'
+        : scenario.household.firstDeath.enabled
         ? `First death: ${scenario.people[scenario.household.firstDeath.deceasedPerson === 'p1' ? 1 : 0].name} at age ${scenario.household.firstDeath.deathAge}; ` +
           `survivor Preferred Income ${scenario.household.firstDeath.survivorPreferredPct}% and Essential Budget ${scenario.household.firstDeath.survivorEssentialPct}% from the transition year`
         : 'First-death scenario off',
-      'Age Pension uses combined couple tests before first death and single-person tests for the configured survivor; one eligible partner in a couple receives half of the means-tested combined rate'
+      isSingleScenario(scenario)
+        ? 'Age Pension, deeming, SAPTO, Medicare and CSHC use single-person rules from the first year'
+        : 'Age Pension uses combined couple tests before first death and single-person tests for the configured survivor; one eligible partner in a couple receives half of the means-tested combined rate',
+      ...(isSingleScenario(scenario)
+        ? ['Person 2-owned entries contribute zero; Joint 50/50 entries contribute only Person 1’s 50% share']
+        : [])
     ];
-    const otherIncomeCount = (scenario.otherIncomes ?? []).length;
-    const otherAssetCount = (scenario.otherAssets ?? []).length;
-    const deemedOtherAssetCount = (scenario.otherAssets ?? [])
-      .filter(asset => asset.agePensionDeemed === true).length;
+    const otherIncomeCount = activeIncomes.length;
+    const otherAssetCount = activeAssets.length;
+    const deemedOtherAssetCount = activeAssets
+      .filter(({ item }) => item.agePensionDeemed === true).length;
     if (otherIncomeCount || otherAssetCount) {
       items.push(
         `Other items: ${otherIncomeCount} income (CPI-indexed; taxable items follow their selected owner) ` +

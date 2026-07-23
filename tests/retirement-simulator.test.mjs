@@ -1378,8 +1378,16 @@ if (typeof core.applyFirstDeathTransition === 'function') {
 }
 
 console.log('\ndeterministic single household');
+check('output person indexes are exported',
+  typeof core.outputPersonIndexes === 'function');
 const singleLifecycleScenario = structuredClone(sample);
 singleLifecycleScenario.household.type = 'single';
+check('single outputs only Person 1 while couple outputs both people',
+  JSON.stringify(core.outputPersonIndexes(singleLifecycleScenario)) === '[0]' &&
+  JSON.stringify(core.outputPersonIndexes(sample)) === '[0,1]');
+check('single tooltip context omits Person 2 age',
+  core.outputAgeContext({ year: 2030, ages: [64, 61] }, singleLifecycleScenario) ===
+    '2030 · age 64');
 singleLifecycleScenario.household.targetAfterTax = 80000;
 singleLifecycleScenario.household.annualBudget = 70000;
 singleLifecycleScenario.household.modelEndAge =
@@ -2310,6 +2318,14 @@ check('single item creation defaults ownership to Person 1',
 check('household type change immediately rerenders',
   html.includes("if (path === 'household.type')") &&
   html.includes('renderScenario(currentScenario);'));
+check('single reports use the output-person boundary',
+  html.includes('core.outputPersonIndexes(scenario)') &&
+  html.includes('function enteredAssetsNow(scenario)') &&
+  html.includes('function outputAgeContext(row, scenario)'));
+check('single assumptions omit inactive people and owned records',
+  html.includes('activePeople(scenario).map') &&
+  html.includes('activeOwnedEntries(scenario, scenario.otherIncomes ?? [])') &&
+  html.includes('activeOwnedEntries(scenario, scenario.otherAssets ?? [])'));
 
 console.log('\nmigration v1 -> v14 (full chain)');
 const v1 = structuredClone(v5);
