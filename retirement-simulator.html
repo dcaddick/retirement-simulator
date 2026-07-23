@@ -1675,8 +1675,30 @@
     };
   }
 
+  function isSingleHousehold(scenario) {
+    return scenario.household?.type === 'single';
+  }
+
+  function householdRuleStatus(scenario, lifecycle) {
+    return isSingleHousehold(scenario) ||
+      lifecycle.householdStatus === 'survivor'
+      ? 'single'
+      : 'couple';
+  }
+
+  function solePersonIndex(scenario, lifecycle) {
+    if (isSingleHousehold(scenario)) return 0;
+    return lifecycle.householdStatus === 'survivor'
+      ? lifecycle.survivorIndex
+      : null;
+  }
+
   function makeProjectionState(scenario) {
-    const splits = scenario.people.map(superAccessSplit);
+    const single = isSingleHousehold(scenario);
+    const splits = scenario.people.map((person, index) =>
+      single && index === 1
+        ? { accum: 0, retire: 0, transitioned: true }
+        : superAccessSplit(person));
     return {
       superAccum: splits.map(split => split.accum),
       superRetire: splits.map(split => split.retire),
@@ -1684,13 +1706,21 @@
       cash: scenario.cash.amount,
       savings: scenario.savings.amount,
       capitalLossCarryForward: [0, 0],
-      lifecycle: {
-        householdStatus: 'couple',
-        alive: [true, true],
-        survivorIndex: null,
-        deceasedIndex: null,
-        transitionYear: null
-      },
+      lifecycle: single
+        ? {
+            householdStatus: 'single',
+            alive: [true, false],
+            survivorIndex: null,
+            deceasedIndex: null,
+            transitionYear: null
+          }
+        : {
+            householdStatus: 'couple',
+            alive: [true, true],
+            survivorIndex: null,
+            deceasedIndex: null,
+            transitionYear: null
+          },
       ownership: {
         cash: scenario.cash.owner,
         savings: scenario.savings.owner
@@ -1725,7 +1755,9 @@
 
   function applyFirstDeathTransition({ scenario, state, year, ages }) {
     const firstDeath = scenario.household.firstDeath;
-    if (!firstDeath.enabled || state.lifecycle.householdStatus === 'survivor') {
+    if (isSingleHousehold(scenario) ||
+        !firstDeath.enabled ||
+        state.lifecycle.householdStatus === 'survivor') {
       return lifecycleContext(scenario, state, false);
     }
     const deceasedIndex = firstDeath.deceasedPerson === 'p1' ? 1 : 0;
@@ -2002,10 +2034,11 @@
     const errors = validateScenario(scenario);
     if (errors.length) throw new Error(`${errors[0].path}: ${errors[0].message}`);
 
-    const configuredDeceasedIndex =
-      scenario.household.firstDeath.deceasedPerson === 'p1' ? 1 : 0;
-    const horizonIndex = scenario.household.firstDeath.enabled
-      ? 1 - configuredDeceasedIndex : 0;
+    const horizonIndex = isSingleHousehold(scenario)
+      ? 0
+      : scenario.household.firstDeath.enabled
+        ? 1 - (scenario.household.firstDeath.deceasedPerson === 'p1' ? 1 : 0)
+        : 0;
     const rowCount = scenario.household.modelEndAge -
       scenario.people[horizonIndex].age + 1;
     const factors = inflationFactors(scenario, rowCount);
@@ -2774,41 +2807,47 @@
       add('household.annualBudget', 'Essential Annual Budget must be zero or greater.');
     }
     const firstDeath = scenario.household?.firstDeath;
-    const horizonIndex = firstDeath?.enabled
-      ? 1 - (firstDeath.deceasedPerson === 'p1' ? 1 : 0) : 0;
+    const horizonIndex = isSingleHousehold(scenario)
+      ? 0
+      : firstDeath?.enabled
+        ? 1 - (firstDeath.deceasedPerson === 'p1' ? 1 : 0)
+        : 0;
     if (!(scenario.household?.modelEndAge >= scenario.people?.[horizonIndex]?.age)) {
-      add('household.modelEndAge', firstDeath?.enabled
+      add('household.modelEndAge',
+        !isSingleHousehold(scenario) && firstDeath?.enabled
         ? 'Model end age cannot be below the survivor current age.'
         : 'Model end age cannot be below Person 1 current age.');
     }
-    if (!firstDeath || typeof firstDeath.enabled !== 'boolean') {
-      add('household.firstDeath.enabled',
-        'First-death inclusion must be true or false.');
-    } else if (firstDeath.enabled) {
-      const validDeceased = ['p0', 'p1'].includes(firstDeath.deceasedPerson);
-      if (!validDeceased) {
-        add('household.firstDeath.deceasedPerson',
-          'Select the person who dies first.');
-      }
-      const deceasedIndex = firstDeath.deceasedPerson === 'p1' ? 1 : 0;
-      const survivorIndex = 1 - deceasedIndex;
-      const deceased = scenario.people?.[deceasedIndex];
-      const survivor = scenario.people?.[survivorIndex];
-      if (!deceased || !Number.isInteger(firstDeath.deathAge) ||
-          firstDeath.deathAge <= deceased.age) {
-        add('household.firstDeath.deathAge',
-          'Death age must be above the current age.');
-      } else if (survivor &&
-          survivor.age + firstDeath.deathAge - deceased.age >=
-            scenario.household.modelEndAge) {
-        add('household.firstDeath.deathAge',
-          'Death must occur before the survivor reaches Model End Age.');
-      }
-      for (const field of ['survivorPreferredPct', 'survivorEssentialPct']) {
-        if (!Number.isFinite(firstDeath[field]) ||
-            firstDeath[field] < 0 || firstDeath[field] > 100) {
-          add(`household.firstDeath.${field}`,
-            'Survivor percentage must be from 0% to 100%.');
+    if (!isSingleHousehold(scenario)) {
+      if (!firstDeath || typeof firstDeath.enabled !== 'boolean') {
+        add('household.firstDeath.enabled',
+          'First-death inclusion must be true or false.');
+      } else if (firstDeath.enabled) {
+        const validDeceased = ['p0', 'p1'].includes(firstDeath.deceasedPerson);
+        if (!validDeceased) {
+          add('household.firstDeath.deceasedPerson',
+            'Select the person who dies first.');
+        }
+        const deceasedIndex = firstDeath.deceasedPerson === 'p1' ? 1 : 0;
+        const survivorIndex = 1 - deceasedIndex;
+        const deceased = scenario.people?.[deceasedIndex];
+        const survivor = scenario.people?.[survivorIndex];
+        if (!deceased || !Number.isInteger(firstDeath.deathAge) ||
+            firstDeath.deathAge <= deceased.age) {
+          add('household.firstDeath.deathAge',
+            'Death age must be above the current age.');
+        } else if (survivor &&
+            survivor.age + firstDeath.deathAge - deceased.age >=
+              scenario.household.modelEndAge) {
+          add('household.firstDeath.deathAge',
+            'Death must occur before the survivor reaches Model End Age.');
+        }
+        for (const field of ['survivorPreferredPct', 'survivorEssentialPct']) {
+          if (!Number.isFinite(firstDeath[field]) ||
+              firstDeath[field] < 0 || firstDeath[field] > 100) {
+            add(`household.firstDeath.${field}`,
+              'Survivor percentage must be from 0% to 100%.');
+          }
         }
       }
     }
@@ -2973,6 +3012,9 @@
     agePensionForHousehold,
     cshcEstimate,
     assessableFinancialAssets,
+    isSingleHousehold,
+    householdRuleStatus,
+    solePersonIndex,
     makeProjectionState,
     applyFirstDeathTransition,
     superAccessSplit,

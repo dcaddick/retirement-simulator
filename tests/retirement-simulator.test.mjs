@@ -1218,6 +1218,74 @@ if (typeof core.applyFirstDeathTransition === 'function') {
       openingDeceasedSuper);
 }
 
+console.log('\ndeterministic single household');
+const singleLifecycleScenario = structuredClone(sample);
+singleLifecycleScenario.household.type = 'single';
+singleLifecycleScenario.household.targetAfterTax = 80000;
+singleLifecycleScenario.household.annualBudget = 70000;
+singleLifecycleScenario.household.modelEndAge =
+  singleLifecycleScenario.people[0].age + 1;
+singleLifecycleScenario.household.firstDeath = {
+  enabled: true,
+  deceasedPerson: 'p0',
+  deathAge: singleLifecycleScenario.people[0].age + 1,
+  survivorPreferredPct: 70,
+  survivorEssentialPct: 70
+};
+singleLifecycleScenario.people[1].salary = 999999;
+singleLifecycleScenario.people[1].super = 999999;
+singleLifecycleScenario.lumpSumWithdrawals = [];
+
+const singleInitialState = core.makeProjectionState(singleLifecycleScenario);
+check('single state starts with only Person 1 alive',
+  singleInitialState.lifecycle.householdStatus === 'single' &&
+  JSON.stringify(singleInitialState.lifecycle.alive) ===
+    JSON.stringify([true, false]) &&
+  singleInitialState.lifecycle.survivorIndex === null);
+check('single lifecycle helpers identify the active rule status and person',
+  core.isSingleHousehold(singleLifecycleScenario) &&
+  core.householdRuleStatus(
+    singleLifecycleScenario, singleInitialState.lifecycle) === 'single' &&
+  core.solePersonIndex(
+    singleLifecycleScenario, singleInitialState.lifecycle) === 0);
+
+const inertSingleFirstDeath = structuredClone(singleLifecycleScenario);
+inertSingleFirstDeath.household.modelEndAge =
+  inertSingleFirstDeath.people[0].age;
+inertSingleFirstDeath.people[1].age =
+  inertSingleFirstDeath.people[0].age + 10;
+inertSingleFirstDeath.household.firstDeath = {
+  enabled: 'invalid',
+  deceasedPerson: 'invalid',
+  deathAge: NaN,
+  survivorPreferredPct: NaN,
+  survivorEssentialPct: NaN
+};
+check('single validation ignores saved first-death settings and Person 2 horizon',
+  !core.validateScenario(inertSingleFirstDeath).some(error =>
+    error.path === 'household.modelEndAge' ||
+    error.path.startsWith('household.firstDeath.')));
+inertSingleFirstDeath.household.type = 'couple';
+check('couple validation restores saved first-death settings and horizon',
+  core.validateScenario(inertSingleFirstDeath).some(error =>
+    error.path === 'household.modelEndAge') &&
+  core.validateScenario(inertSingleFirstDeath).some(error =>
+    error.path.startsWith('household.firstDeath.')));
+
+const singleLifecycleRows =
+  core.projectScenario(singleLifecycleScenario).rows;
+check('single household keeps entered targets at 100 percent',
+  singleLifecycleRows.every(row =>
+    row.target === 80000 && row.budget === 70000));
+check('single household never emits a first-death event',
+  singleLifecycleRows.every(row =>
+    !row.events.some(event => event.type === 'first-death')));
+check('Person 2 personal flows remain inactive',
+  singleLifecycleRows.every(row =>
+    row.salaryByPerson[1] === 0 &&
+    row.superBalances[1] === 0 &&
+    row.taxByPerson[1] === 0));
+
 console.log('\ndeterministic survivor projection');
 const survivorProjectionScenario = structuredClone(sample);
 survivorProjectionScenario.assumptions.inflationMode = 'manual';
