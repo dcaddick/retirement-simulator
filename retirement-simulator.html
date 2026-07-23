@@ -2365,17 +2365,18 @@
     });
     const otherAssetsReal = otherAssetsNominal / inflationFactor;
     const deemableOtherAssetsReal = deemableOtherAssetsNominal / inflationFactor;
+    const ruleStatus = householdRuleStatus(scenario, state.lifecycle);
+    const singleIndex = solePersonIndex(scenario, state.lifecycle);
     const agePensionIncomeReal =
       salaries.reduce((sum, value) => sum + value, 0) / inflationFactor +
       ukState.reduce((sum, value) => sum + value, 0) / inflationFactor +
       (otherTaxableNominal + otherNonTaxableNominal) / inflationFactor +
       deemedIncome(assessableAssetsReal + deemableOtherAssetsReal,
-        state.lifecycle.householdStatus === 'survivor'
-        ? 'single' : 'couple');
+        ruleStatus);
     const agePension = agePensionForHousehold({
       ages,
       alive: state.lifecycle.alive,
-      survivorIndex: state.lifecycle.survivorIndex,
+      survivorIndex: singleIndex,
       assets: assessableAssetsReal + otherAssetsReal,
       assessableIncome: agePensionIncomeReal,
       included: scenario.household.includeAgePension
@@ -2421,11 +2422,8 @@
     const totalTaxableNominalByPerson = [0, 1].map(index =>
       ordinaryTaxableNominal[index] + netCapitalGainByPerson[index]);
     const frankingNominal = dividendFlows.frankingByPerson;
-    const householdTaxStatus = state.lifecycle.alive.every(Boolean)
-      ? 'couple'
-      : 'survivor';
     const householdTaxInput = {
-      status: householdTaxStatus,
+      status: ruleStatus,
       alive: state.lifecycle.alive,
       ages,
       inflationFactor,
@@ -2557,7 +2555,7 @@
     const cshc = cshcEstimate({
       adjustedTaxableIncome: adjustedTaxableIncomeReal,
       accountBasedPensionBalance: abpBalanceReal,
-      status: state.lifecycle.householdStatus === 'survivor' ? 'single' : 'couple'
+      status: ruleStatus
     });
 
     return {
@@ -2606,6 +2604,7 @@
       taxRefund: taxLedger.reduce(
         (sum, person) => sum + person.refundNominal, 0) / inflationFactor,
       taxLedger: taxLedger.map(person => ({ ...person })),
+      agePensionByPerson: [...agePension.byPerson],
       cshc,
       agePensionStatus: agePension.status,
       totalIncome: totalIncomeNominal / inflationFactor,

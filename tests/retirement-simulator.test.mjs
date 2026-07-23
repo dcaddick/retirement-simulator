@@ -1445,6 +1445,56 @@ check('Person 2 personal flows remain inactive',
     row.superBalances[1] === 0 &&
     row.taxByPerson[1] === 0));
 
+const singleRules = structuredClone(sample);
+singleRules.household.type = 'single';
+singleRules.people[0].age = 67;
+singleRules.people[0].retireAge = 67;
+singleRules.people[0].salary = 0;
+singleRules.people[0].super = 0;
+singleRules.people[1].age = 67;
+singleRules.people[1].salary = 999999;
+singleRules.people[1].super = 999999;
+singleRules.cash = { amount: 0, interestPct: 0, owner: 'p0' };
+singleRules.savings = { amount: 0, interestPct: 0, owner: 'p0' };
+singleRules.shareholdings = [];
+singleRules.otherIncomes = [];
+singleRules.otherAssets = [];
+singleRules.lumpSumWithdrawals = [];
+singleRules.household.modelEndAge = 67;
+singleRules.household.targetAfterTax = 0;
+singleRules.household.annualBudget = 0;
+singleRules.household.applyMinimumDrawdown = false;
+singleRules.household.includeAgePension = true;
+singleRules.assumptions.ukPensionsEnabled = false;
+
+const singleRulesRow = core.projectScenario(singleRules).rows[0];
+check('single rules apply from year zero',
+  singleRulesRow.agePensionStatus === 'single' &&
+  singleRulesRow.components.agePensionNet ===
+    core.SERVICES_AUSTRALIA_2026.agePensionMaxSingleAnnual &&
+  singleRulesRow.cshc.threshold ===
+    core.SERVICES_AUSTRALIA_2026.cshcSingleThreshold &&
+  singleRulesRow.taxLedger[0].totalTax.saptoSchedule === 'single' &&
+  singleRulesRow.taxLedger[0].totalTax
+    .medicareFamilyReductionNominal === 0);
+check('single pension and tax allocate only to Person 1',
+  singleRulesRow.agePensionByPerson[1] === 0 &&
+  singleRulesRow.taxByPerson[1] === 0);
+
+const equivalentSingleRate = core.agePensionForHousehold({
+  ages: [67, 0],
+  alive: [true, false],
+  survivorIndex: 0,
+  assets: 0,
+  assessableIncome: 0,
+  included: true
+});
+check('year-zero single uses the established survivor rule result',
+  singleRulesRow.components.agePensionNet ===
+    equivalentSingleRate.household &&
+  singleRulesRow.target === singleRules.household.targetAfterTax &&
+  singleRulesRow.budget === singleRules.household.annualBudget);
+
 console.log('\ndeterministic survivor projection');
 const survivorProjectionScenario = structuredClone(sample);
 survivorProjectionScenario.assumptions.inflationMode = 'manual';
