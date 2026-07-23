@@ -469,7 +469,7 @@
 <script id="simulator-core">
 (function () {
   'use strict';
-  const SCHEMA_VERSION = 13;
+  const SCHEMA_VERSION = 14;
   const VALID_OWNERS = new Set(['p0', 'p1', 'joint']);
   const DRAWDOWN_SOURCES = new Set(['p0Super', 'p1Super', 'cash', 'savings']);
   const OTHER_CURRENCIES = new Set(['AUD', 'GBP', 'USD']);
@@ -1172,6 +1172,7 @@
       otherIncomes: [],
       otherAssets: [],
       household: {
+        type: 'couple',
         targetAfterTax: 80000,
         annualBudget: 70000,
         modelEndAge: 95,
@@ -1417,6 +1418,19 @@
       }));
       current = migrated;
     }
+    if (current.schemaVersion === 13) {
+      const migrated = structuredClone(current);
+      migrated.schemaVersion = 14;
+      migrated.household = {
+        ...migrated.household,
+        type: 'couple'
+      };
+      migrated.otherAssets = (migrated.otherAssets ?? []).map(asset => ({
+        ...asset,
+        owner: asset.owner ?? 'joint'
+      }));
+      current = migrated;
+    }
     if (current.schemaVersion !== SCHEMA_VERSION) {
       throw new Error(`Unsupported schema version: ${raw.schemaVersion}.`);
     }
@@ -1620,6 +1634,7 @@
       currency: 'AUD',
       fxToAud: 1,
       amount: 0,
+      owner: 'joint',
       agePensionDeemed: false,
       growthPct: 0,
       disposalYear: new Date().getFullYear() + 5
@@ -2566,6 +2581,9 @@
     if (scenario.schemaVersion !== SCHEMA_VERSION) {
       add('schemaVersion', `Expected schema version ${SCHEMA_VERSION}.`);
     }
+    if (!['couple', 'single'].includes(scenario.household?.type)) {
+      add('household.type', 'Household type must be Couple or Single.');
+    }
     if (!Array.isArray(scenario.people) || scenario.people.length !== 2) {
       add('people', 'Exactly two people are required.');
     } else {
@@ -2730,6 +2748,10 @@
         }
         if (!finiteNonNegative(item.amount)) {
           add(`${path}.amount`, 'Value must be zero or greater.');
+        }
+        if (!VALID_OWNERS.has(item.owner)) {
+          add(`${path}.owner`,
+            'Owner must be Person 1, Person 2, or Joint 50/50.');
         }
         if (typeof item.agePensionDeemed !== 'boolean') {
           add(`${path}.agePensionDeemed`,
