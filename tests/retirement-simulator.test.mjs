@@ -37,6 +37,9 @@ const SCREENSHOT_110 = fileURLToPath(
   new URL('../docs/assets/retirement-simulator-v1.10.png', import.meta.url)
 );
 const README = fileURLToPath(new URL('../README.md', import.meta.url));
+const PAGES_WORKFLOW = fileURLToPath(
+  new URL('../.github/workflows/deploy-pages.yml', import.meta.url)
+);
 const html = readFileSync(FILE, 'utf8');
 const deferredReview = existsSync(DEFERRED_REVIEW)
   ? readFileSync(DEFERRED_REVIEW, 'utf8')
@@ -45,6 +48,9 @@ const methodology = readFileSync(METHODOLOGY, 'utf8');
 const testingGuide = readFileSync(TESTING, 'utf8');
 const changelog = readFileSync(CHANGELOG, 'utf8');
 const readme = readFileSync(README, 'utf8');
+const pagesWorkflow = existsSync(PAGES_WORKFLOW)
+  ? readFileSync(PAGES_WORKFLOW, 'utf8')
+  : '';
 
 function extract(id) {
   const match = html.match(new RegExp(`<script id="${id}">([\\s\\S]*?)<\\/script>`));
@@ -2337,6 +2343,24 @@ check('browser checklist covers single data restoration',
 check('changelog records issue 36 deterministic scope',
   changelog.includes('Couple/Single household selection') &&
   changelog.includes('/issues/36'));
+
+console.log('\ngithub pages deployment');
+check('Pages workflow exists', pagesWorkflow.length > 0);
+check('Pages workflow validates only the deterministic simulator',
+  pagesWorkflow.includes('node tests/retirement-simulator.test.mjs') &&
+  !pagesWorkflow.includes('retirement-monte-carlo.test.mjs') &&
+  pagesWorkflow.includes('needs: validate'));
+check('Pages workflow publishes only the canonical simulator artifact',
+  pagesWorkflow.includes('cp retirement-simulator.html _site/index.html') &&
+  pagesWorkflow.includes('touch _site/.nojekyll') &&
+  pagesWorkflow.includes('cmp retirement-simulator.html _site/index.html') &&
+  pagesWorkflow.includes("path: '_site'"));
+check('Pages workflow is main-scoped and permission-bounded',
+  pagesWorkflow.includes('branches: [main]') &&
+  pagesWorkflow.includes('workflow_dispatch:') &&
+  pagesWorkflow.includes('pages: write') &&
+  pagesWorkflow.includes('id-token: write') &&
+  pagesWorkflow.includes('cancel-in-progress: false'));
 
 console.log('\nmigration v1 -> v14 (full chain)');
 const v1 = structuredClone(v5);
