@@ -592,6 +592,165 @@ check('dividend and franking credit follow share ownership',
   dividendFlows.cashByPerson[1] === 0 &&
   dividendFlows.frankingByPerson[0] > 25);
 
+console.log('\nsingle household ownership');
+check('single ownership fractions are explicit',
+  core.singleHouseholdInclusion('p0') === 1 &&
+  core.singleHouseholdInclusion('p1') === 0 &&
+  core.singleHouseholdInclusion('joint') === 0.5);
+
+const ownershipSingle = structuredClone(sample);
+ownershipSingle.household.type = 'single';
+ownershipSingle.household.modelEndAge = ownershipSingle.people[0].age;
+ownershipSingle.people[0].super = 0;
+ownershipSingle.people[0].salary = 0;
+ownershipSingle.cash = { amount: 10000, interestPct: 0, owner: 'p0' };
+ownershipSingle.savings = { amount: 20000, interestPct: 0, owner: 'p1' };
+ownershipSingle.shareholdings = [{
+  ...core.makeShareholding(0),
+  id: 'joint-share',
+  symbol: 'JOINT',
+  owner: 'joint',
+  quantity: 10,
+  price: 1000,
+  costBaseAud: 8000,
+  saleYear: ownershipSingle.startYear + 20
+}];
+ownershipSingle.otherIncomes = [{
+  ...core.makeOtherIncome(0),
+  id: 'joint-income',
+  label: 'Joint income',
+  owner: 'joint',
+  amount: 12000,
+  taxable: false
+}];
+ownershipSingle.otherAssets = [{
+  ...core.makeOtherAsset(0),
+  id: 'p1-asset',
+  label: 'Person 2 asset',
+  owner: 'p1',
+  amount: 500000,
+  disposalYear: ownershipSingle.startYear + 20
+}];
+ownershipSingle.lumpSumWithdrawals = [];
+ownershipSingle.household.includeAgePension = false;
+ownershipSingle.household.targetAfterTax = 6000;
+ownershipSingle.household.annualBudget = 6000;
+
+const ownershipSingleRow = core.projectScenario(ownershipSingle).rows[0];
+check('single projection applies p0, p1 and joint inclusion',
+  ownershipSingleRow.cash === 10000 &&
+  ownershipSingleRow.savings === 0 &&
+  ownershipSingleRow.shares === 5000 &&
+  ownershipSingleRow.otherAssets === 0 &&
+  ownershipSingleRow.otherIncomeByPerson[0] === 6000 &&
+  ownershipSingleRow.otherIncomeByPerson[1] === 0,
+  JSON.stringify({
+    cash: ownershipSingleRow.cash,
+    savings: ownershipSingleRow.savings,
+    shares: ownershipSingleRow.shares,
+    otherAssets: ownershipSingleRow.otherAssets,
+    otherIncomeByPerson: ownershipSingleRow.otherIncomeByPerson
+  }));
+
+const jointRuntimeSingle = structuredClone(ownershipSingle);
+jointRuntimeSingle.cash = { amount: 10000, interestPct: 0, owner: 'joint' };
+jointRuntimeSingle.savings = { amount: 20000, interestPct: 0, owner: 'joint' };
+jointRuntimeSingle.shareholdings[0].dividendYieldPct = 12;
+jointRuntimeSingle.otherAssets[0].owner = 'joint';
+const jointRuntimeState = core.makeProjectionState(jointRuntimeSingle);
+check('included single runtime ownership allocates only to Person 1',
+  jointRuntimeState.cash === 5000 &&
+  jointRuntimeState.savings === 10000 &&
+  jointRuntimeState.ownership.cash === 'p0' &&
+  jointRuntimeState.ownership.savings === 'p0' &&
+  jointRuntimeState.holdings[0].owner === 'p0' &&
+  jointRuntimeState.holdings[0].quantity === 5 &&
+  jointRuntimeState.holdings[0].costBaseAud === 4000 &&
+  jointRuntimeState.otherAssets[0].owner === 'p0' &&
+  jointRuntimeState.otherAssets[0].value === 250000);
+core.beginShareYear(jointRuntimeState);
+const jointRuntimeDividends = core.shareDividendFlows(jointRuntimeState);
+check('single joint share dividends include half only for Person 1',
+  jointRuntimeDividends.cashByPerson[0] === 600 &&
+  jointRuntimeDividends.cashByPerson[1] === 0);
+
+const jointCgtSingle = structuredClone(ownershipSingle);
+jointCgtSingle.cash = { amount: 0, interestPct: 0, owner: 'p0' };
+jointCgtSingle.shareholdings[0].saleYear = jointCgtSingle.startYear;
+jointCgtSingle.shareholdings[0].cgtDiscountEligible = false;
+const jointCgtSingleRow = core.projectScenario(jointCgtSingle).rows[0];
+check('single joint share CGT includes half and belongs only to Person 1',
+  jointCgtSingleRow.capitalLedger[0].nonDiscountGain === 1000 &&
+  jointCgtSingleRow.capitalLedger[1].nonDiscountGain === 0);
+
+const inactiveInvalid = structuredClone(sample);
+inactiveInvalid.household.type = 'single';
+inactiveInvalid.people[1].name = '';
+inactiveInvalid.people[1].age = NaN;
+inactiveInvalid.people[1].superAccessAge = NaN;
+inactiveInvalid.cash = { amount: NaN, interestPct: NaN, owner: 'p1' };
+inactiveInvalid.savings = { amount: NaN, interestPct: NaN, owner: 'p1' };
+inactiveInvalid.shareholdings = [{
+  ...core.makeShareholding(0),
+  id: 'hidden-invalid-share',
+  symbol: '',
+  owner: 'p1',
+  quantity: NaN,
+  costBaseAud: NaN
+}];
+inactiveInvalid.otherIncomes = [{
+  ...core.makeOtherIncome(0),
+  id: 'hidden-invalid-income',
+  label: '',
+  owner: 'p1',
+  amount: NaN
+}];
+inactiveInvalid.otherAssets = [{
+  ...core.makeOtherAsset(0),
+  id: 'hidden-invalid-asset',
+  label: '',
+  owner: 'p1',
+  amount: NaN
+}];
+check('inactive Person 2 values do not block single projection',
+  core.validateScenario(inactiveInvalid).length === 0);
+const inactiveBadOwner = structuredClone(inactiveInvalid);
+inactiveBadOwner.otherIncomes[0].owner = 'nobody';
+check('inactive record owner discriminators still validate',
+  core.validateScenario(inactiveBadOwner).some(error =>
+    error.path === 'otherIncomes.0.owner'));
+const inactiveState = core.makeProjectionState(inactiveInvalid);
+check('inactive malformed Person 2 owned values are never read into runtime state',
+  inactiveState.cash === 0 &&
+  inactiveState.savings === 0 &&
+  inactiveState.holdings.length === 0 &&
+  inactiveState.otherAssets.length === 0);
+const inactiveRows = core.projectScenario(inactiveInvalid).rows;
+check('single projection never reads inactive Person 2 numeric fields',
+  inactiveRows.every(row =>
+    row.ages[1] === null &&
+    row.rawAges[1] === null &&
+    Number.isFinite(row.totalAssets)));
+inactiveInvalid.household.type = 'couple';
+check('restored Person 2 values validate in couple mode',
+  core.validateScenario(inactiveInvalid).some(error =>
+    error.path.startsWith('people.1.') ||
+    error.path.startsWith('cash.') ||
+    error.path.startsWith('savings.') ||
+    error.path.startsWith('shareholdings.0.') ||
+    error.path.startsWith('otherIncomes.0.') ||
+    error.path.startsWith('otherAssets.0.')));
+
+const retainedSingle = structuredClone(ownershipSingle);
+retainedSingle.savings.amount = 23456;
+retainedSingle.otherAssets[0].amount = 654321;
+const retainedRoundTrip = core.importScenario(core.exportScenario(retainedSingle));
+check('single export roundtrip preserves excluded Person 2 owned data',
+  retainedRoundTrip.savings.owner === 'p1' &&
+  retainedRoundTrip.savings.amount === 23456 &&
+  retainedRoundTrip.otherAssets[0].owner === 'p1' &&
+  retainedRoundTrip.otherAssets[0].amount === 654321);
+
 const taxState = {
   superRetire: [1000, 1000], cash: 300, savings: 400
 };

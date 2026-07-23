@@ -1234,6 +1234,18 @@
     throw new Error(`Invalid owner: ${owner}`);
   }
 
+  function singleHouseholdInclusion(owner) {
+    if (owner === 'p0') return 1;
+    if (owner === 'joint') return 0.5;
+    return 0;
+  }
+
+  function householdInclusion(scenario, owner) {
+    return isSingleHousehold(scenario)
+      ? singleHouseholdInclusion(owner)
+      : 1;
+  }
+
   function hitTestSegments(segments, x, y) {
     return segments.find(segment =>
       x >= segment.x &&
@@ -1699,12 +1711,36 @@
       single && index === 1
         ? { accum: 0, retire: 0, transitioned: true }
         : superAccessSplit(person));
+    const cashFraction = householdInclusion(scenario, scenario.cash.owner);
+    const savingsFraction =
+      householdInclusion(scenario, scenario.savings.owner);
+    const activeHoldings = scenario.shareholdings.flatMap(holding => {
+      const fraction = householdInclusion(scenario, holding.owner);
+      return fraction === 0 ? [] : [{
+        ...holding,
+        owner: single ? 'p0' : holding.owner,
+        quantity: holding.quantity * fraction,
+        costBaseAud: holding.costBaseAud * fraction,
+        sold: false
+      }];
+    });
+    const activeOtherAssets = (scenario.otherAssets ?? []).flatMap(asset => {
+      const fraction = householdInclusion(scenario, asset.owner);
+      return fraction === 0 ? [] : [{
+        ...asset,
+        owner: single ? 'p0' : asset.owner,
+        value: asset.amount * otherItemFx(asset) * fraction,
+        sold: false
+      }];
+    });
     return {
       superAccum: splits.map(split => split.accum),
       superRetire: splits.map(split => split.retire),
       superTransitioned: splits.map(split => split.transitioned),
-      cash: scenario.cash.amount,
-      savings: scenario.savings.amount,
+      cash: cashFraction === 0 ? 0 : scenario.cash.amount * cashFraction,
+      savings: savingsFraction === 0
+        ? 0
+        : scenario.savings.amount * savingsFraction,
       capitalLossCarryForward: [0, 0],
       lifecycle: single
         ? {
@@ -1722,16 +1758,16 @@
             transitionYear: null
           },
       ownership: {
-        cash: scenario.cash.owner,
-        savings: scenario.savings.owner
+        cash: single ? 'p0' : scenario.cash.owner,
+        savings: single ? 'p0' : scenario.savings.owner
+      },
+      interestPct: {
+        cash: cashFraction === 0 ? 0 : scenario.cash.interestPct,
+        savings: savingsFraction === 0 ? 0 : scenario.savings.interestPct
       },
       inheritedSuper: { accum: 0, retire: 0, ownerIndex: null },
-      holdings: scenario.shareholdings.map(holding => ({ ...holding, sold: false })),
-      otherAssets: (scenario.otherAssets ?? []).map(asset => ({
-        ...asset,
-        value: asset.amount * otherItemFx(asset),
-        sold: false
-      }))
+      holdings: activeHoldings,
+      otherAssets: activeOtherAssets
     };
   }
 
@@ -2034,7 +2070,8 @@
     const errors = validateScenario(scenario);
     if (errors.length) throw new Error(`${errors[0].path}: ${errors[0].message}`);
 
-    const horizonIndex = isSingleHousehold(scenario)
+    const single = isSingleHousehold(scenario);
+    const horizonIndex = single
       ? 0
       : scenario.household.firstDeath.enabled
         ? 1 - (scenario.household.firstDeath.deceasedPerson === 'p1' ? 1 : 0)
@@ -2048,7 +2085,8 @@
     for (let index = 0; index < rowCount; index += 1) {
       const year = scenario.startYear + index;
       const inflationFactor = factors[index];
-      const ages = scenario.people.map(person => person.age + index);
+      const ages = scenario.people.map((person, personIndex) =>
+        single && personIndex === 1 ? null : person.age + index);
       const events = [];
 
       const lifecycle = applyFirstDeathTransition({
@@ -2271,7 +2309,10 @@
     const otherTaxableByPerson = [0, 0];
     const otherNonTaxableByPerson = [0, 0];
     (scenario.otherIncomes ?? []).forEach(item => {
-      let nominal = item.amount * otherItemFx(item) * inflationFactor;
+      const inclusion = householdInclusion(scenario, item.owner);
+      if (inclusion === 0) return;
+      let nominal =
+        item.amount * otherItemFx(item) * inflationFactor * inclusion;
       let owner = item.owner;
       if (state.lifecycle.householdStatus === 'survivor') {
         const deceasedOwner = `p${state.lifecycle.deceasedIndex}`;
@@ -2281,6 +2322,7 @@
         }
         owner = survivorOwner;
       }
+      if (isSingleHousehold(scenario)) owner = 'p0';
       const target = item.taxable
         ? otherTaxableByPerson : otherNonTaxableByPerson;
       allocateOwnedAmount(nominal, owner).forEach((amount, index) => {
@@ -2292,9 +2334,9 @@
     const otherNonTaxableNominal = otherNonTaxableByPerson.reduce(
       (sum, amount) => sum + amount, 0);
 
-    const cashInterest = state.cash * scenario.cash.interestPct / 100;
+    const cashInterest = state.cash * state.interestPct.cash / 100;
     const savingsInterest =
-      openingSavings * scenario.savings.interestPct / 100 +
+      openingSavings * state.interestPct.savings / 100 +
       saleYearInterest;
     state.cash += cashInterest;
     state.savings += savingsInterest;
@@ -2603,6 +2645,56 @@
     };
   }
 
+  function validatePerson(person, index, add) {
+    const finiteNonNegative = value => Number.isFinite(value) && value >= 0;
+    if (!person.name || typeof person.name !== 'string') {
+      add(`people.${index}.name`, 'Name is required.');
+    }
+    if (!finiteNonNegative(person.age) || person.age > 120) {
+      add(`people.${index}.age`, 'Age must be between 0 and 120.');
+    }
+    if (!finiteNonNegative(person.super)) {
+      add(`people.${index}.super`, 'Super must be zero or greater.');
+    }
+    if (!finiteNonNegative(person.salary)) {
+      add(`people.${index}.salary`, 'Salary must be zero or greater.');
+    }
+    if (!Number.isFinite(person.sgPct) || person.sgPct < 0 || person.sgPct > 30) {
+      add(`people.${index}.sgPct`, 'SG % must be between 0 and 30.');
+    }
+    if (!Number.isFinite(person.accumulationReturnPct) ||
+        person.accumulationReturnPct < -20 || person.accumulationReturnPct > 30) {
+      add(`people.${index}.accumulationReturnPct`,
+        'Accumulation return % must be between -20 and 30.');
+    }
+    if (!Number.isFinite(person.retirementReturnPct) ||
+        person.retirementReturnPct < -20 || person.retirementReturnPct > 30) {
+      add(`people.${index}.retirementReturnPct`,
+        'Retirement return % must be between -20 and 30.');
+    }
+    if (!finiteNonNegative(person.salaryGrowthPct)) {
+      add(`people.${index}.salaryGrowthPct`,
+        'Salary growth above inflation must be zero or greater.');
+    }
+    if (!finiteNonNegative(person.retireAge) || person.retireAge < person.age) {
+      add(`people.${index}.retireAge`, 'Retirement age cannot be below current age.');
+    }
+    if (!Number.isFinite(person.superAccessAge) ||
+        person.superAccessAge < 60 || person.superAccessAge > 120) {
+      add(`people.${index}.superAccessAge`,
+        'Super access age must be 60 or older because this simulator does not model taxation of withdrawals before age 60.');
+    }
+    if (!Number.isFinite(person.superAccessPct) ||
+        person.superAccessPct < 0 || person.superAccessPct > 100) {
+      add(`people.${index}.superAccessPct`, 'Super access % must be between 0 and 100.');
+    }
+    if (!Number.isFinite(person.ukStateSurvivorPct) ||
+        person.ukStateSurvivorPct < 0 || person.ukStateSurvivorPct > 100) {
+      add(`people.${index}.ukStateSurvivorPct`,
+        'UK State Pension survivor % must be between 0 and 100.');
+    }
+  }
+
   function validateScenario(scenario) {
     const errors = [];
     const add = (path, message) => errors.push({ path, message });
@@ -2621,60 +2713,23 @@
       add('people', 'Exactly two people are required.');
     } else {
       scenario.people.forEach((person, index) => {
-        if (!person.name || typeof person.name !== 'string') {
-          add(`people.${index}.name`, 'Name is required.');
-        }
-        if (!finiteNonNegative(person.age) || person.age > 120) {
-          add(`people.${index}.age`, 'Age must be between 0 and 120.');
-        }
-        if (!finiteNonNegative(person.super)) {
-          add(`people.${index}.super`, 'Super must be zero or greater.');
-        }
-        if (!finiteNonNegative(person.salary)) {
-          add(`people.${index}.salary`, 'Salary must be zero or greater.');
-        }
-        if (!Number.isFinite(person.sgPct) || person.sgPct < 0 || person.sgPct > 30) {
-          add(`people.${index}.sgPct`, 'SG % must be between 0 and 30.');
-        }
-        if (!Number.isFinite(person.accumulationReturnPct) ||
-            person.accumulationReturnPct < -20 || person.accumulationReturnPct > 30) {
-          add(`people.${index}.accumulationReturnPct`,
-            'Accumulation return % must be between -20 and 30.');
-        }
-        if (!Number.isFinite(person.retirementReturnPct) ||
-            person.retirementReturnPct < -20 || person.retirementReturnPct > 30) {
-          add(`people.${index}.retirementReturnPct`,
-            'Retirement return % must be between -20 and 30.');
-        }
-        if (!finiteNonNegative(person.salaryGrowthPct)) {
-          add(`people.${index}.salaryGrowthPct`,
-            'Salary growth above inflation must be zero or greater.');
-        }
-        if (!finiteNonNegative(person.retireAge) || person.retireAge < person.age) {
-          add(`people.${index}.retireAge`, 'Retirement age cannot be below current age.');
-        }
-        if (!Number.isFinite(person.superAccessAge) ||
-            person.superAccessAge < 60 || person.superAccessAge > 120) {
-          add(`people.${index}.superAccessAge`,
-            'Super access age must be 60 or older because this simulator does not model taxation of withdrawals before age 60.');
-        }
-        if (!Number.isFinite(person.superAccessPct) ||
-            person.superAccessPct < 0 || person.superAccessPct > 100) {
-          add(`people.${index}.superAccessPct`, 'Super access % must be between 0 and 100.');
-        }
-        if (!Number.isFinite(person.ukStateSurvivorPct) ||
-            person.ukStateSurvivorPct < 0 || person.ukStateSurvivorPct > 100) {
-          add(`people.${index}.ukStateSurvivorPct`,
-            'UK State Pension survivor % must be between 0 and 100.');
-        }
+        if (isSingleHousehold(scenario) && index === 1) return;
+        validatePerson(person, index, add);
       });
     }
     ['cash', 'savings'].forEach(key => {
-      if (!scenario[key] || !finiteNonNegative(scenario[key].amount)) {
+      const item = scenario[key];
+      if (!item || !VALID_OWNERS.has(item.owner)) {
+        add(`${key}.owner`, 'Owner must be Person 1, Person 2, or Joint 50/50.');
+        return;
+      }
+      if (isSingleHousehold(scenario) && item.owner === 'p1') return;
+      if (!finiteNonNegative(item.amount)) {
         add(`${key}.amount`, 'Amount must be zero or greater.');
       }
-      if (!scenario[key] || !VALID_OWNERS.has(scenario[key].owner)) {
-        add(`${key}.owner`, 'Owner must be Person 1, Person 2, or Joint 50/50.');
+      if (!Number.isFinite(item.interestPct) ||
+          item.interestPct < 0 || item.interestPct > 30) {
+        add(`${key}.interestPct`, 'Interest rate must be between 0 and 30%.');
       }
     });
     if (!Array.isArray(scenario.shareholdings)) {
@@ -2682,6 +2737,12 @@
     } else {
       scenario.shareholdings.forEach((holding, index) => {
         const path = `shareholdings.${index}`;
+        if (!VALID_OWNERS.has(holding.owner)) {
+          add(`${path}.owner`,
+            'Owner must be Person 1, Person 2, or Joint 50/50.');
+          return;
+        }
+        if (isSingleHousehold(scenario) && holding.owner === 'p1') return;
         if (!holding.symbol || typeof holding.symbol !== 'string') {
           add(`${path}.symbol`, 'Symbol is required.');
         }
@@ -2696,9 +2757,6 @@
         }
         if (!(Number.isFinite(holding.fxToAud) && holding.fxToAud > 0)) {
           add(`${path}.fxToAud`, 'FX rate must be greater than zero.');
-        }
-        if (!VALID_OWNERS.has(holding.owner)) {
-          add(`${path}.owner`, 'Owner must be Person 1, Person 2, or Joint 50/50.');
         }
         if (!finiteNonNegative(holding.costBaseAud)) {
           add(`${path}.costBaseAud`, 'Cost base must be zero or greater.');
@@ -2739,6 +2797,12 @@
     } else {
       scenario.otherIncomes.forEach((item, index) => {
         const path = `otherIncomes.${index}`;
+        if (!VALID_OWNERS.has(item.owner)) {
+          add(`${path}.owner`,
+            'Tax owner must be Person 1, Person 2, or Joint 50/50.');
+          return;
+        }
+        if (isSingleHousehold(scenario) && item.owner === 'p1') return;
         if (!item.label || typeof item.label !== 'string') {
           add(`${path}.label`, 'Label is required.');
         }
@@ -2755,9 +2819,6 @@
         if (typeof item.taxable !== 'boolean') {
           add(`${path}.taxable`, 'Taxable must be true or false.');
         }
-        if (!['p0', 'p1', 'joint'].includes(item.owner)) {
-          add(`${path}.owner`, 'Tax owner must be Person 1, Person 2, or Joint 50/50.');
-        }
         if (!Number.isFinite(item.survivorPct) ||
             item.survivorPct < 0 || item.survivorPct > 100) {
           add(`${path}.survivorPct`, 'Survivor % must be between 0 and 100.');
@@ -2769,6 +2830,12 @@
     } else {
       scenario.otherAssets.forEach((item, index) => {
         const path = `otherAssets.${index}`;
+        if (!VALID_OWNERS.has(item.owner)) {
+          add(`${path}.owner`,
+            'Owner must be Person 1, Person 2, or Joint 50/50.');
+          return;
+        }
+        if (isSingleHousehold(scenario) && item.owner === 'p1') return;
         if (!item.label || typeof item.label !== 'string') {
           add(`${path}.label`, 'Label is required.');
         }
@@ -2781,10 +2848,6 @@
         }
         if (!finiteNonNegative(item.amount)) {
           add(`${path}.amount`, 'Value must be zero or greater.');
-        }
-        if (!VALID_OWNERS.has(item.owner)) {
-          add(`${path}.owner`,
-            'Owner must be Person 1, Person 2, or Joint 50/50.');
         }
         if (typeof item.agePensionDeemed !== 'boolean') {
           add(`${path}.agePensionDeemed`,
@@ -2958,6 +3021,8 @@
     formatMoney,
     csvFromMatrix,
     ownerWeights,
+    singleHouseholdInclusion,
+    householdInclusion,
     hitTestSegments,
     exportScenario,
     importScenario,
