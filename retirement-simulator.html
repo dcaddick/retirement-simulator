@@ -200,7 +200,7 @@
     <input type="file" id="scenarioFile" accept=".json,application/json" hidden>
   </nav>
   </div>
-  <div class="sub">A transparent two-person household projection. Working estimate, not financial advice.</div>
+  <div class="sub">A transparent single- or two-person household projection. Working estimate, not financial advice.</div>
   <div class="header-meta">
     <p id="scenarioMessage" class="scenario-message" aria-live="polite"></p>
     <p class="privacy-note">Scenario data is saved locally and not uploaded. Optional US quote/FX fetches contact Stooq and Frankfurter.</p>
@@ -1611,7 +1611,7 @@
     return allocateOwnedAmount(taxableGain, holding.owner);
   }
 
-  function makeShareholding(index) {
+  function makeShareholding(index, owner = 'joint') {
     return {
       id: `share-${Date.now()}-${index}`,
       symbol: '',
@@ -1620,7 +1620,7 @@
       quoteMarket: 'manual',
       price: 0,
       fxToAud: 1,
-      owner: 'joint',
+      owner,
       costBaseAud: 0,
       cgtDiscountEligible: true,
       saleYear: new Date().getFullYear() + 1,
@@ -1642,7 +1642,7 @@
     return `https://stooq.com/q/l/?s=${symbol}.us&f=sd2t2ohlcv&h&e=csv`;
   }
 
-  function makeOtherIncome(index) {
+  function makeOtherIncome(index, owner = 'joint') {
     return {
       id: `income-${Date.now()}-${index}`,
       label: '',
@@ -1650,19 +1650,19 @@
       fxToAud: 1,
       amount: 0,
       taxable: true,
-      owner: 'joint',
+      owner,
       survivorPct: 0
     };
   }
 
-  function makeOtherAsset(index) {
+  function makeOtherAsset(index, owner = 'joint') {
     return {
       id: `asset-${Date.now()}-${index}`,
       label: '',
       currency: 'AUD',
       fxToAud: 1,
       amount: 0,
-      owner: 'joint',
+      owner,
       agePensionDeemed: false,
       growthPct: 0,
       disposalYear: new Date().getFullYear() + 5
@@ -3247,12 +3247,48 @@
       .replace(/^-|-$/g, '') || 'retirement-scenario';
   }
 
-  function ownerOptions(selected, people) {
+  function isSingleScenario(scenario) {
+    return scenario.household.type === 'single';
+  }
+
+  function activePeople(scenario) {
+    return scenario.people
+      .map((person, index) => ({ person, index }))
+      .filter(({ index }) => !isSingleScenario(scenario) || index === 0);
+  }
+
+  function activeOwnedEntries(scenario, items) {
+    return items
+      .map((item, index) => ({ item, index }))
+      .filter(({ item }) => !isSingleScenario(scenario) || item.owner !== 'p1');
+  }
+
+  function hiddenPerson2Count(scenario) {
+    if (!isSingleScenario(scenario)) return 0;
     return [
-      ['p0', people[0].name],
-      ['p1', people[1].name],
+      scenario.cash,
+      scenario.savings,
+      ...(scenario.shareholdings ?? []),
+      ...(scenario.otherIncomes ?? []),
+      ...(scenario.otherAssets ?? [])
+    ].filter(item => item?.owner === 'p1').length;
+  }
+
+  function sourceIsActiveForScenario(scenario, source) {
+    if (!isSingleScenario(scenario)) return true;
+    if (source === 'p1Super') return false;
+    if (source === 'cash') return scenario.cash.owner !== 'p1';
+    if (source === 'savings') return scenario.savings.owner !== 'p1';
+    return true;
+  }
+
+  function ownerOptions(selected, scenario) {
+    const options = [
+      ['p0', scenario.people[0].name],
+      ['p1', scenario.people[1].name],
       ['joint', 'Joint 50/50']
-    ].map(([value, label]) =>
+    ].filter(([value]) => !isSingleScenario(scenario) || value !== 'p1');
+    return options.map(([value, label]) =>
       `<option value="${value}"${value === selected ? ' selected' : ''}>${escapeHtml(label)}</option>`
     ).join('');
   }
@@ -3297,9 +3333,11 @@
     </label>`;
   }
 
-  function ownerField(label, path, selected, people) {
+  function ownerField(label, path, selected, scenario) {
     return `<label><span class="k">${escapeHtml(label)}</span>
-      <select data-path="${path}">${ownerOptions(selected, people)}</select>
+      <select data-path="${path}">${ownerOptions(selected, scenario)}</select>
+      ${isSingleScenario(scenario) && selected === 'joint'
+        ? '<span class="sub">50% included for Person 1.</span>' : ''}
     </label>`;
   }
 
@@ -3323,8 +3361,9 @@
     </fieldset>`;
   }
 
-  function renderPeople(people) {
-    $('#peopleFields').innerHTML = people.map(personFields).join('');
+  function renderPeople(scenario) {
+    $('#peopleFields').innerHTML = activePeople(scenario)
+      .map(({ person, index }) => personFields(person, index)).join('');
   }
 
   function signedPct(value) {
@@ -3362,7 +3401,7 @@
   }
 
   function renderReturnAssumptions(scenario) {
-    $('#returnFields').innerHTML = scenario.people.map((person, index) =>
+    $('#returnFields').innerHTML = activePeople(scenario).map(({ person, index }) =>
       returnFields(person, index, scenario.assumptions)).join('');
     $('#inflationMode').value = scenario.assumptions.inflationMode;
     $('#manualInflationPct').value = scenario.assumptions.manualInflationPct;
@@ -3385,30 +3424,39 @@
   }
 
   function renderCashAndSavings(scenario) {
-    $('#cashSavingsFields').innerHTML = `
+    const cash = isSingleScenario(scenario) && scenario.cash.owner === 'p1' ? '' : `
       <fieldset>
         <legend>Cash on hand</legend>
         ${moneyField('Amount', 'cash.amount', scenario.cash.amount)}
         ${numberField('Interest rate %', 'cash.interestPct', scenario.cash.interestPct, 'min="0" max="30" step="0.1"')}
-        ${ownerField('Owner', 'cash.owner', scenario.cash.owner, scenario.people)}
-      </fieldset>
+        ${ownerField('Owner', 'cash.owner', scenario.cash.owner, scenario)}
+      </fieldset>`;
+    const savings = isSingleScenario(scenario) && scenario.savings.owner === 'p1' ? '' : `
       <fieldset>
         <legend>Savings Pot (Term Deposits, etc..)</legend>
         ${moneyField('Amount', 'savings.amount', scenario.savings.amount)}
         ${numberField('Interest rate %', 'savings.interestPct', scenario.savings.interestPct, 'min="0" max="30" step="0.1"')}
-        ${ownerField('Owner', 'savings.owner', scenario.savings.owner, scenario.people)}
+        ${ownerField('Owner', 'savings.owner', scenario.savings.owner, scenario)}
       </fieldset>`;
+    $('#cashSavingsFields').innerHTML = cash || savings
+      ? `${cash}${savings}`
+      : '<p class="sub">Person 2-owned cash and savings are hidden and excluded.</p>';
   }
 
   function lumpSourceOptions(selected, scenario) {
     const people = scenario.people;
-    return [
+    const options = [
       ['automatic', 'Automatic - household drawdown order'],
       ['cash', 'Cash'], ['savings', 'Savings'],
       ['p0Super', `${people[0].name} super`], ['p1Super', `${people[1].name} super`],
-      ...scenario.shareholdings.map(item => [`share:${item.id}`, item.symbol || 'Shareholding']),
-      ...(scenario.otherAssets ?? []).map(item => [`asset:${item.id}`, item.label || 'Other asset'])
-    ].map(([value, label]) => `<option value="${value}"${selected === value ? ' selected' : ''}>${escapeHtml(label)}</option>`).join('');
+      ...activeOwnedEntries(scenario, scenario.shareholdings)
+        .map(({ item }) => [`share:${item.id}`, item.symbol || 'Shareholding']),
+      ...activeOwnedEntries(scenario, scenario.otherAssets ?? [])
+        .map(({ item }) => [`asset:${item.id}`, item.label || 'Other asset'])
+    ].filter(([value]) => value === 'automatic' || sourceIsActiveForScenario(scenario, value));
+    return options.map(([value, label]) =>
+      `<option value="${value}"${selected === value ? ' selected' : ''}>${escapeHtml(label)}</option>`
+    ).join('');
   }
 
   const expandedLumpIds = new Set();
@@ -3439,7 +3487,7 @@
   }
 
   function renderLumpSums(scenario) {
-    const horizonIndex = scenario.household.firstDeath.enabled
+    const horizonIndex = isSingleScenario(scenario) ? 0 : scenario.household.firstDeath.enabled
       ? 1 - (scenario.household.firstDeath.deceasedPerson === 'p1' ? 1 : 0) : 0;
     const horizonYear = scenario.startYear + scenario.household.modelEndAge -
       scenario.people[horizonIndex].age;
@@ -3475,7 +3523,7 @@
     }).join('') || '<p class="sub">No planned lump-sum withdrawals.</p>';
   }
 
-  function shareholdingFields(holding, index, people) {
+  function shareholdingFields(holding, index, scenario) {
     const path = `shareholdings.${index}`;
     const quoteMarket = holding.quoteMarket ??
       (holding.quoteCurrency === 'USD' ? 'stooq-us' : 'manual');
@@ -3501,7 +3549,7 @@
         <input type="number" min="0" step="0.0001" data-value-type="number"
           data-path="${path}.fxToAud" value="${holding.fxToAud}">
       </label>
-      ${ownerField('Owner', `${path}.owner`, holding.owner, people)}
+      ${ownerField('Owner', `${path}.owner`, holding.owner, scenario)}
       ${moneyField('Cost base', `${path}.costBaseAud`, holding.costBaseAud)}
       ${numberField('Expected share-price growth %/yr (excluding dividends)',
         `${path}.priceGrowthPct`, holding.priceGrowthPct,
@@ -3538,7 +3586,9 @@
         : '<p class="sub">Manual pricing makes no market-data network request.</p>'}`;
   }
 
-  function renderShareholding(holding, index, people) {
+  function renderShareholding(holding, index, scenario) {
+    const people = scenario.people;
+    const jointSingle = isSingleScenario(scenario) && holding.owner === 'joint';
     const returnSummary = [
       holding.priceGrowthPct !== 0 ? `${signedPct(holding.priceGrowthPct)} growth` : '',
       holding.dividendYieldPct > 0 ? `${holding.dividendYieldPct}% yield` : '',
@@ -3550,21 +3600,22 @@
       <summary>
         <span>${escapeHtml(holding.symbol || 'New holding')}</span>
         <span>${holding.quantity.toLocaleString('en-AU')} shares</span>
-        <span>${escapeHtml(ownerLabel(holding.owner, people))}</span>
-        <span>${core.formatMoney(core.shareValueAud(holding), 'AUD')}</span>
+        <span>${escapeHtml(ownerLabel(holding.owner, people))}${jointSingle ? ' · 50% included' : ''}</span>
+        <span>${core.formatMoney(core.shareValueAud(holding) * (jointSingle ? 0.5 : 1), 'AUD')}</span>
         ${returnSummary ? `<span class="share-return-summary">${escapeHtml(returnSummary)}</span>` : ''}
       </summary>
       <div class="shareholding-fields">
-        ${shareholdingFields(holding, index, people)}
+        ${shareholdingFields(holding, index, scenario)}
         <button type="button" class="remove-share" data-index="${index}">Remove holding</button>
       </div>
     </details>`;
   }
 
-  function renderShareholdings(holdings, people) {
+  function renderShareholdings(scenario) {
+    const holdings = activeOwnedEntries(scenario, scenario.shareholdings);
     $('#shareholdingList').innerHTML = holdings.length
-      ? holdings.map((holding, index) =>
-          renderShareholding(holding, index, people)).join('')
+      ? holdings.map(({ item, index }) =>
+          renderShareholding(item, index, scenario)).join('')
       : '<p class="empty-state">No shareholdings added.</p>';
   }
 
@@ -3585,7 +3636,8 @@
       </label>`;
   }
 
-  function renderUkPensions(people, assumptions) {
+  function renderUkPensions(scenario) {
+    const { people, assumptions } = scenario;
     const enabled = assumptions.ukPensionsEnabled !== false;
     const toggle = $('#ukPensionsEnabled');
     if (toggle) toggle.checked = enabled;
@@ -3595,7 +3647,9 @@
     $('#gbpAudRow').hidden = dbMode;
     $('#uppRow').hidden = dbMode;
     $('#ukPerson0').innerHTML = ukPersonFields(people[0], 0, assumptions);
-    $('#ukPerson1').innerHTML = ukPersonFields(people[1], 1, assumptions);
+    $('#ukPerson1').hidden = isSingleScenario(scenario);
+    $('#ukPerson1').innerHTML = isSingleScenario(scenario)
+      ? '' : ukPersonFields(people[1], 1, assumptions);
     // v0.98: dim the per-person inputs when the pensions are excluded so it is
     // clear they no longer feed the projection, chart columns, or legend.
     const fields = $('#ukPensionFields');
@@ -3611,7 +3665,7 @@
     ).join('');
   }
 
-  function otherIncomeFields(item, index) {
+  function otherIncomeFields(item, index, scenario) {
     const path = `otherIncomes.${index}`;
     return `<div class="other-item" data-other-id="${escapeHtml(item.id)}">
       <label><span class="k">Label</span>
@@ -3632,15 +3686,17 @@
       </label>
       <label><span class="k">Income owner</span>
         <select data-path="${path}.owner">
-          ${ownerOptions(item.owner, currentScenario.people)}
+          ${ownerOptions(item.owner, scenario)}
         </select>
+        ${isSingleScenario(scenario) && item.owner === 'joint'
+          ? '<span class="sub">50% included for Person 1.</span>' : ''}
       </label>
       ${numberField('Paid to survivor %', `${path}.survivorPct`, item.survivorPct, 'min="0" max="100" step="5"')}
       <button type="button" class="remove-other" data-kind="otherIncomes" data-index="${index}">Remove income</button>
     </div>`;
   }
 
-  function otherAssetFields(item, index) {
+  function otherAssetFields(item, index, scenario) {
     const path = `otherAssets.${index}`;
     return `<div class="other-item" data-other-id="${escapeHtml(item.id)}">
       <label><span class="k">Label</span>
@@ -3656,6 +3712,13 @@
           data-path="${path}.fxToAud" value="${item.fxToAud}">
       </label>
       ${moneyField('Current value', `${path}.amount`, item.amount, item.currency)}
+      <label><span class="k">Asset owner</span>
+        <select data-path="${path}.owner">
+          ${ownerOptions(item.owner, scenario)}
+        </select>
+        ${isSingleScenario(scenario) && item.owner === 'joint'
+          ? '<span class="sub">50% included for Person 1.</span>' : ''}
+      </label>
       <label><span class="k">Treat as financial investment for Age Pension deeming</span>
         <input type="checkbox" data-path="${path}.agePensionDeemed"${item.agePensionDeemed ? ' checked' : ''}>
       </label>
@@ -3666,50 +3729,62 @@
   }
 
   function renderOtherItems(scenario) {
-    const incomes = scenario.otherIncomes ?? [];
-    const assets = scenario.otherAssets ?? [];
+    const incomes = activeOwnedEntries(scenario, scenario.otherIncomes ?? []);
+    const assets = activeOwnedEntries(scenario, scenario.otherAssets ?? []);
     $('#otherIncomeList').innerHTML = incomes.length
-      ? incomes.map(otherIncomeFields).join('')
+      ? incomes.map(({ item, index }) => otherIncomeFields(item, index, scenario)).join('')
       : '<p class="sub">No other income added.</p>';
     $('#otherAssetList').innerHTML = assets.length
-      ? assets.map(otherAssetFields).join('')
+      ? assets.map(({ item, index }) => otherAssetFields(item, index, scenario)).join('')
       : '<p class="sub">No other assets added.</p>';
   }
 
-  function drawdownSourceOptions(selected, people) {
+  function drawdownSourceOptions(selected, scenario) {
+    const people = scenario.people;
     const options = [
       ['p0Super', `${people[0].name} super`],
       ['p1Super', `${people[1].name} super`],
       ['savings', 'Savings'],
       ['cash', 'Cash']
-    ];
+    ].filter(([value]) => sourceIsActiveForScenario(scenario, value));
     return options.map(([value, label]) =>
       `<option value="${value}"${value === selected ? ' selected' : ''}>${escapeHtml(label)}</option>`
     ).join('');
   }
 
-  function tierFields(tier, tierIndex, people, tierCount) {
-    const path = `household.drawdownPriority.${tierIndex}`;
-    const [a, b] = tier;
+  function activeDrawdownTiers(scenario) {
+    return scenario.household.drawdownPriority
+      .map((tier, tierIndex) => ({
+        tierIndex,
+        entries: tier
+          .map((entry, entryIndex) => ({ entry, entryIndex }))
+          .filter(({ entry }) => sourceIsActiveForScenario(scenario, entry.source))
+      }))
+      .filter(({ entries }) => entries.length);
+  }
+
+  function tierFields(tierView, displayIndex, scenario, tierCount) {
+    const { tierIndex, entries } = tierView;
+    const [a, b] = entries;
     const weightAPct = b
-      ? Math.round((a.weight / (a.weight + b.weight)) * 100)
+      ? Math.round((a.entry.weight / (a.entry.weight + b.entry.weight)) * 100)
       : 100;
     return `<div class="tier" data-tier-index="${tierIndex}">
       <div class="tier-head">
-        <strong>Priority ${tierIndex + 1}</strong>
-        <button type="button" class="tier-up" data-index="${tierIndex}"${tierIndex === 0 ? ' disabled' : ''}>Up</button>
-        <button type="button" class="tier-down" data-index="${tierIndex}"${tierIndex === tierCount - 1 ? ' disabled' : ''}>Down</button>
+        <strong>Priority ${displayIndex + 1}</strong>
+        <button type="button" class="tier-up" data-index="${tierIndex}"${displayIndex === 0 ? ' disabled' : ''}>Up</button>
+        <button type="button" class="tier-down" data-index="${tierIndex}"${displayIndex === tierCount - 1 ? ' disabled' : ''}>Down</button>
         <button type="button" class="tier-remove" data-index="${tierIndex}"${tierCount <= 1 ? ' disabled' : ''}>Remove</button>
       </div>
       <label><span class="k">Source${b ? ' A' : ''}</span>
-        <select data-path="${path}.0.source">${drawdownSourceOptions(a.source, people)}</select>
+        <select data-path="household.drawdownPriority.${tierIndex}.${a.entryIndex}.source">${drawdownSourceOptions(a.entry.source, scenario)}</select>
       </label>
-      <label><span class="k">Split this tier with a second source</span>
+      ${isSingleScenario(scenario) ? '' : `<label><span class="k">Split this tier with a second source</span>
         <input type="checkbox" class="tier-split-toggle" data-index="${tierIndex}"${b ? ' checked' : ''}>
-      </label>
+      </label>`}
       ${b ? `
       <label><span class="k">Source B</span>
-        <select data-path="${path}.1.source">${drawdownSourceOptions(b.source, people)}</select>
+        <select data-path="household.drawdownPriority.${tierIndex}.${b.entryIndex}.source">${drawdownSourceOptions(b.entry.source, scenario)}</select>
       </label>
       <label><span class="k">Source A share %</span>
         <input type="number" min="0" max="100" step="5" class="tier-weight" data-index="${tierIndex}" value="${weightAPct}">
@@ -3717,20 +3792,31 @@
     </div>`;
   }
 
-  function drawdownPriorityFields(drawdownPriority, people) {
+  function drawdownPriorityFields(scenario) {
+    const tiers = activeDrawdownTiers(scenario);
     return `<div id="drawdownPriorityList">
-      ${drawdownPriority.map((tier, index) =>
-        tierFields(tier, index, people, drawdownPriority.length)).join('')}
+      ${tiers.map((tier, index) =>
+        tierFields(tier, index, scenario, tiers.length)).join('')}
     </div>
     <button type="button" id="addDrawdownTier">Add drawdown tier</button>`;
   }
 
-  function renderHousehold(household, assumptions, people) {
+  function renderHousehold(scenario) {
+    const { household, people } = scenario;
+    const single = isSingleScenario(scenario);
     const firstDeath = household.firstDeath;
     const deathPersonIndex = firstDeath.deceasedPerson === 'p1' ? 1 : 0;
-    const horizonLabel = firstDeath.enabled
+    const horizonLabel = !single && firstDeath.enabled
       ? 'Model to survivor age' : 'Model to Person 1 age';
+    const excludedCount = hiddenPerson2Count(scenario);
     $('#householdFields').innerHTML = `
+      <label><span class="k">Household type</span>
+        <select data-path="household.type">
+          <option value="couple"${household.type === 'couple' ? ' selected' : ''}>Couple</option>
+          <option value="single"${household.type === 'single' ? ' selected' : ''}>Single</option>
+        </select>
+      </label>
+      ${single ? `<p class="sub" id="singleExcludedNotice">${excludedCount} Person 2-owned ${excludedCount === 1 ? 'item is' : 'items are'} hidden and excluded from every calculation. Joint 50/50 entries contribute only Person 1’s 50% share. Switching back to Couple restores the saved Person 2 data.</p>` : ''}
       ${moneyField('Preferred Retirement Income', 'household.targetAfterTax', household.targetAfterTax)}
       ${moneyField('Essential Annual Budget', 'household.annualBudget', household.annualBudget)}
       ${numberField(horizonLabel, 'household.modelEndAge', household.modelEndAge, 'min="65" max="120"')}
@@ -3743,7 +3829,7 @@
       <label><span class="k">Show illustrative survival band</span>
         <input type="checkbox" data-path="household.showSurvival"${household.showSurvival ? ' checked' : ''}>
       </label>
-      <h4>First-death scenario</h4>
+      ${single ? '' : `<h4>First-death scenario</h4>
       <label><span class="k">Model first death</span>
         <input type="checkbox" data-path="household.firstDeath.enabled"${firstDeath.enabled ? ' checked' : ''}>
       </label>
@@ -3759,9 +3845,9 @@
         ${numberField('Survivor Preferred Income %', 'household.firstDeath.survivorPreferredPct', firstDeath.survivorPreferredPct, 'min="0" max="100" step="5"')}
         ${numberField('Survivor Essential Budget %', 'household.firstDeath.survivorEssentialPct', firstDeath.survivorEssentialPct, 'min="0" max="100" step="5"')}
         <p class="sub">The transition occurs at the start of the selected year. Assets transfer immediately and survivor income rules apply from that row.</p>
-      </div>
+      </div>`}
       <h4>Drawdown order</h4>
-      ${drawdownPriorityFields(household.drawdownPriority, people)}`;
+      ${drawdownPriorityFields(scenario)}`;
   }
 
   function bindMoneyInputs() {
@@ -4614,23 +4700,46 @@
     currentScenario = structuredClone(scenario);
     $('#scenarioName').value = currentScenario.scenarioName;
     renderReturnAssumptions(currentScenario);
-    renderPeople(currentScenario.people);
+    renderPeople(currentScenario);
     renderCashAndSavings(currentScenario);
     renderLumpSums(currentScenario);
-    renderShareholdings(currentScenario.shareholdings, currentScenario.people);
-    renderUkPensions(currentScenario.people, currentScenario.assumptions);
+    renderShareholdings(currentScenario);
+    renderUkPensions(currentScenario);
     renderOtherItems(currentScenario);
-    renderHousehold(currentScenario.household, currentScenario.assumptions, currentScenario.people);
+    renderHousehold(currentScenario);
     bindMoneyInputs();
     recalculateAndRender();
   }
 
   function addShareholding(scenario) {
+    const owner = isSingleScenario(scenario) ? 'p0' : 'joint';
     return {
       ...scenario,
       shareholdings: [
         ...scenario.shareholdings,
-        core.makeShareholding(scenario.shareholdings.length)
+        core.makeShareholding(scenario.shareholdings.length, owner)
+      ]
+    };
+  }
+
+  function addOtherIncome(scenario) {
+    const owner = isSingleScenario(scenario) ? 'p0' : 'joint';
+    return {
+      ...scenario,
+      otherIncomes: [
+        ...(scenario.otherIncomes ?? []),
+        core.makeOtherIncome((scenario.otherIncomes ?? []).length, owner)
+      ]
+    };
+  }
+
+  function addOtherAsset(scenario) {
+    const owner = isSingleScenario(scenario) ? 'p0' : 'joint';
+    return {
+      ...scenario,
+      otherAssets: [
+        ...(scenario.otherAssets ?? []),
+        core.makeOtherAsset((scenario.otherAssets ?? []).length, owner)
       ]
     };
   }
@@ -4657,7 +4766,9 @@
 
   function addDrawdownTier(scenario) {
     const used = new Set(scenario.household.drawdownPriority.flat().map(entry => entry.source));
-    const next = ['p0Super', 'p1Super', 'savings', 'cash'].find(source => !used.has(source)) || 'cash';
+    const available = ['p0Super', 'p1Super', 'savings', 'cash']
+      .filter(source => sourceIsActiveForScenario(scenario, source));
+    const next = available.find(source => !used.has(source)) || 'cash';
     return {
       ...scenario,
       household: {
@@ -4695,13 +4806,15 @@
 
   function toggleTierSplit(scenario, tierIndex, split) {
     const allUsed = new Set(scenario.household.drawdownPriority.flat().map(entry => entry.source));
+    const available = ['p0Super', 'p1Super', 'savings', 'cash']
+      .filter(source => sourceIsActiveForScenario(scenario, source));
     const tiers = scenario.household.drawdownPriority.map((tier, index) => {
       if (index !== tierIndex) return tier;
       if (!split) return [tier[0]];
-      const candidates = ['p0Super', 'p1Super', 'savings', 'cash']
+      const candidates = available
         .filter(source => source !== tier[0].source && !allUsed.has(source));
       const second = candidates[0] ||
-        ['p0Super', 'p1Super', 'savings', 'cash'].find(source => source !== tier[0].source);
+        available.find(source => source !== tier[0].source);
       return [{ ...tier[0], weight: 0.5 }, { source: second, weight: 0.5 }];
     });
     return {
@@ -4859,6 +4972,13 @@
         path,
         readControlValue(event.target)
       );
+      if (path === 'household.type') {
+        const errors = core.validateScenario(currentScenario);
+        showValidation(errors);
+        if (!errors.length) scheduleSave(currentScenario);
+        renderScenario(currentScenario);
+        return;
+      }
     }
     if (event.target.matches('.quote-market')) {
       const index = Number(event.target.dataset.index);
@@ -4904,7 +5024,7 @@
   $('#addShareholding').addEventListener('click', () => {
     currentScenario = addShareholding(currentScenario);
     expandedShareIds.add(currentScenario.shareholdings.at(-1).id);
-    renderShareholdings(currentScenario.shareholdings, currentScenario.people);
+    renderShareholdings(currentScenario);
     bindMoneyInputs();
     showValidation(core.validateScenario(currentScenario));
   });
@@ -4917,26 +5037,14 @@
   });
 
   $('#addOtherIncome').addEventListener('click', () => {
-    currentScenario = {
-      ...currentScenario,
-      otherIncomes: [
-        ...(currentScenario.otherIncomes ?? []),
-        core.makeOtherIncome((currentScenario.otherIncomes ?? []).length)
-      ]
-    };
+    currentScenario = addOtherIncome(currentScenario);
     renderOtherItems(currentScenario);
     bindMoneyInputs();
     showValidation(core.validateScenario(currentScenario));
   });
 
   $('#addOtherAsset').addEventListener('click', () => {
-    currentScenario = {
-      ...currentScenario,
-      otherAssets: [
-        ...(currentScenario.otherAssets ?? []),
-        core.makeOtherAsset((currentScenario.otherAssets ?? []).length)
-      ]
-    };
+    currentScenario = addOtherAsset(currentScenario);
     renderOtherItems(currentScenario);
     bindMoneyInputs();
     showValidation(core.validateScenario(currentScenario));
@@ -4973,7 +5081,7 @@
   });
 
   function refreshAfterTierChange() {
-    renderHousehold(currentScenario.household, currentScenario.assumptions, currentScenario.people);
+    renderHousehold(currentScenario);
     scheduleSave(currentScenario);
     showValidation(core.validateScenario(currentScenario));
     recalculateAndRender();
@@ -4999,7 +5107,7 @@
     }
     const removeButton = event.target.closest('.tier-remove');
     if (removeButton) {
-      if (currentScenario.household.drawdownPriority.length <= 1) {
+      if (activeDrawdownTiers(currentScenario).length <= 1) {
         showScenarioMessage('At least one drawdown tier is required.', 'error');
         return;
       }

@@ -2288,6 +2288,29 @@ invalidMonth.lumpSumWithdrawals[0].month = 13;
 check('invalid lump-sum month is reported',
   core.validateScenario(invalidMonth).some(error => error.path === 'lumpSumWithdrawals.0.month'));
 
+console.log('\nsingle-household controls');
+check('household type selector is rendered',
+  html.includes('data-path="household.type"') &&
+  html.includes('<option value="couple"') &&
+  html.includes('<option value="single"'));
+check('single UI uses index-preserving active-entry helpers',
+  html.includes('function activePeople(scenario)') &&
+  html.includes('function activeOwnedEntries(scenario, items)') &&
+  html.includes('.map((item, index) => ({ item, index }))') &&
+  html.includes('function sourceIsActiveForScenario(scenario, source)'));
+check('single UI explains hidden Person 2 data and joint inclusion',
+  html.includes('id="singleExcludedNotice"') &&
+  html.includes('Person 2-owned') &&
+  html.includes('Joint 50/50 entries contribute only Person 1’s 50% share.'));
+check('single item creation defaults ownership to Person 1',
+  html.includes("const owner = isSingleScenario(scenario) ? 'p0' : 'joint';") &&
+  html.includes('core.makeShareholding(scenario.shareholdings.length, owner)') &&
+  html.includes('core.makeOtherIncome((scenario.otherIncomes ?? []).length, owner)') &&
+  html.includes('core.makeOtherAsset((scenario.otherAssets ?? []).length, owner)'));
+check('household type change immediately rerenders',
+  html.includes("if (path === 'household.type')") &&
+  html.includes('renderScenario(currentScenario);'));
+
 console.log('\nmigration v1 -> v14 (full chain)');
 const v1 = structuredClone(v5);
 v1.schemaVersion = 1;
