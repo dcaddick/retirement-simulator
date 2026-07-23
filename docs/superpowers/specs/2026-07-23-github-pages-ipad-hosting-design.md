@@ -1,7 +1,7 @@
 # GitHub Pages iPad Hosting Design
 
 **Date:** 2026-07-23  
-**Status:** Design approved; written specification awaiting user review
+**Status:** Design and combined v1.0.11 release scope approved
 
 ## Purpose
 
@@ -148,6 +148,39 @@ disclosures.
   Couple/Single switching.
 - Confirm the README's iPad link opens the root URL directly.
 
+## Combined v1.0.11 release
+
+GitHub Pages and issue #36 will ship as one coordinated deterministic release,
+v1.0.11 (`v1.11` in the application). The release contains the current
+Unreleased deterministic work, including the iPad-safe confirmation modal from
+issue #34 and Couple/Single household support from issue #36. The experimental
+Monte Carlo companion remains unchanged and is not attached to this release.
+
+Before advancing the canonical simulator to v1.11, preserve the exact tagged
+v1.0.10 deterministic executable as
+`archive/retirement-simulator-v1.0.10.html`, record its tag-blob provenance and
+SHA-256 digest, and enforce that provenance in CI. Update the deterministic
+title, visible version, version copy, documentation, screenshot and changelog
+consistently. Preserve compatibility with existing schema-14 scenarios and
+document the browser-origin boundary between local-file and hosted storage.
+
+The publication sequence is deliberately ordered:
+
+1. Merge the tested Pages and v1.0.11 release changes to `main`.
+2. Verify the deterministic suite and the existing repository CI.
+3. Deploy and verify the Pages root, including iPad-sized browser checks and
+   the Monte Carlo/README 404 boundaries.
+4. Tag the verified commit as `v1.0.11`.
+5. Publish `retirement-simulator.html` as the sole v1.0.11 release asset.
+6. Download the asset independently and confirm its SHA-256 digest matches the
+   tagged source file.
+7. Confirm the stable latest-release download resolves to the same asset.
+8. Close issue #36 only after all preceding checks succeed, with links to the
+   release and hosted simulator.
+
+If Pages or release verification fails, issue #36 remains open. A successful
+Pages deployment alone is not sufficient to close it.
+
 ## Out of scope
 
 - Publishing the experimental Monte Carlo tool.
@@ -156,7 +189,8 @@ disclosures.
 - PWA installation, service workers, offline caching or an App Store package.
 - Analytics or usage telemetry.
 - Moving local-file browser storage automatically to the hosted origin.
-- Changing the simulator's calculation model or release version.
+- Changing the simulator's calculation model.
+- Publishing a new Monte Carlo version or Monte Carlo release asset.
 
 ## Acceptance criteria
 
@@ -169,3 +203,9 @@ disclosures.
 5. The hosted app retains local-only scenario storage and existing disclosures.
 6. The experimental Monte Carlo tool is not published or changed.
 7. The deployed page passes the defined desktop and iPad-sized browser checks.
+8. The deterministic application and public documentation identify as v1.11,
+   with the exact outgoing v1.0.10 executable archived and provenance-checked.
+9. Release v1.0.11 contains only the deterministic HTML asset, and an
+   independently downloaded copy matches the tagged source by SHA-256.
+10. Issue #36 is closed only after the Pages deployment and v1.0.11 release
+    asset are both verified.

@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Publish the canonical deterministic simulator directly at the repository's GitHub Pages root and offer that hosted experience beneath the existing README download link.
+**Goal:** Publish the canonical deterministic simulator at the repository's GitHub Pages root, release the combined work as deterministic v1.0.11, and close issue #36 only after both delivery paths are verified.
 
-**Architecture:** A dedicated GitHub Actions workflow validates only the deterministic simulator, copies the canonical HTML to a temporary Pages artifact as `index.html`, adds `.nojekyll`, and deploys only those two files. The repository keeps no duplicate app entry point, the Monte Carlo tool remains unpublished, and the README explains iPad access, origin-specific browser storage, and GitHub request metadata.
+**Architecture:** A dedicated GitHub Actions workflow validates only the deterministic simulator, copies the canonical HTML to a temporary Pages artifact as `index.html`, adds `.nojekyll`, and deploys only those two files. The same tested `main` commit is tagged as v1.0.11 and publishes the canonical deterministic HTML as its sole release asset; Pages, the independently downloaded asset, and the stable latest-download URL are verified before issue #36 closes. The repository keeps no duplicate app entry point, and the Monte Carlo tool remains unpublished.
 
 **Tech Stack:** Static HTML, Node 20 regression tests, GitHub Actions, GitHub Pages actions, GitHub CLI, Playwright/Chromium browser verification.
 
@@ -28,10 +28,20 @@
 - Modify `docs/TESTING.md`
   - Document local packaging and live Pages/iPad checks.
 - Modify `CHANGELOG.md`
-  - Record the new deterministic hosting option under Unreleased.
+  - Publish the Pages, issue #34 and issue #36 entries under v1.11 while
+    retaining unrelated Monte Carlo work under Unreleased.
+- Create `archive/retirement-simulator-v1.0.10.html`
+  - Preserve the exact tagged outgoing deterministic executable.
+- Modify `archive/README.md`
+  - Record v1.0.10 tag-blob and SHA-256 provenance.
+- Modify `retirement-simulator.html`
+  - Advance deterministic identity to v1.11 and preserve v1.10 local-storage
+    migration.
+- Create `docs/assets/retirement-simulator-v1.11.png`
+  - Show the current deterministic release with fictional sample data.
 
-No simulator source, Monte Carlo source, archive, release asset, calculation
-model, or version number changes are planned.
+No Monte Carlo source, calculation model, schema, or Monte Carlo release asset
+changes are planned.
 
 ---
 
@@ -307,7 +317,222 @@ Expected: one documentation commit with its regression checks.
 
 ---
 
-### Task 3: Reproduce the Pages artifact and browser behaviour locally
+### Task 3: Prepare deterministic v1.0.11
+
+**Files:**
+- Modify: `tests/retirement-simulator.test.mjs:1-50`
+- Modify: `tests/retirement-simulator.test.mjs:215-350`
+- Create: `archive/retirement-simulator-v1.0.10.html`
+- Modify: `archive/README.md:5-19`
+- Modify: `.github/workflows/test.yml:19-31`
+- Modify: `retirement-simulator.html:7,212,437,3164-3180`
+- Modify: `README.md:18-20`
+- Modify: `CHANGELOG.md:5-16`
+- Create: `docs/assets/retirement-simulator-v1.11.png`
+
+- [ ] **Step 1: Add failing v1.0.11 release-contract checks**
+
+Add these fixtures beside the existing archive and screenshot fixtures:
+
+```js
+const ARCHIVE_110 = fileURLToPath(
+  new URL('../archive/retirement-simulator-v1.0.10.html', import.meta.url)
+);
+const ARCHIVE_README = fileURLToPath(
+  new URL('../archive/README.md', import.meta.url)
+);
+const TEST_WORKFLOW = fileURLToPath(
+  new URL('../.github/workflows/test.yml', import.meta.url)
+);
+const SCREENSHOT_111 = fileURLToPath(
+  new URL('../docs/assets/retirement-simulator-v1.11.png', import.meta.url)
+);
+```
+
+Add these reads beside the existing README, changelog and testing-guide reads:
+
+```js
+const archiveReadme = readFileSync(ARCHIVE_README, 'utf8');
+const testWorkflow = readFileSync(TEST_WORKFLOW, 'utf8');
+```
+
+Replace the current v1.10 identity, README, screenshot and changelog checks with:
+
+```js
+check('v1.11 document version is consistent',
+  html.includes('<title>Family Retirement Income Simulator v1.11</title>') &&
+  html.includes('<span class="version">v1.11</span>') &&
+  html.includes("const STORAGE_KEY = 'family-retirement-simulator:v1.11:scenario'") &&
+  html.includes("'family-retirement-simulator:v1.10:scenario'"));
+check('outgoing v1.0.10 executable is archived', existsSync(ARCHIVE_110));
+check('v1.0.10 archive provenance is recorded',
+  archiveReadme.includes('v1.0.10:retirement-simulator.html') &&
+  archiveReadme.includes('87d456f500a6f48f2289e91afb553d267faa8ff9') &&
+  archiveReadme.includes('6F9401E74709A67BDD539DD353ED9E4C78A71ACA4B78D8D2A8206811BAE9C394'));
+check('CI verifies the archived v1.0.10 tag blob',
+  testWorkflow.includes('Verify archived v1.0.10 source') &&
+  testWorkflow.includes('v1.0.10:retirement-simulator.html'));
+check('README identifies deterministic v1.11 and its screenshot',
+  readme.includes('v1.11') &&
+  readme.includes('docs/assets/retirement-simulator-v1.11.png') &&
+  existsSync(SCREENSHOT_111));
+check('changelog records v1.11 Pages and iPad household work',
+  changelog.includes('## 1.11 - 2026-07-23') &&
+  changelog.includes('GitHub Pages') &&
+  changelog.includes('[#34]') &&
+  changelog.includes('[#36]'));
+```
+
+- [ ] **Step 2: Run the deterministic suite and verify six release checks fail**
+
+Run:
+
+```powershell
+node tests/retirement-simulator.test.mjs
+```
+
+Expected: the Pages and public-copy checks pass and the six v1.0.11
+release-contract checks fail; replacing four prior v1.10 checks and adding two
+archive checks brings the suite total to 371.
+
+- [ ] **Step 3: Recover the exact v1.0.10 tagged executable**
+
+Run:
+
+```powershell
+$archiveExtractDir = Join-Path ([System.IO.Path]::GetTempPath()) ("retirement-v110-" + [guid]::NewGuid())
+$archiveTar = Join-Path $archiveExtractDir 'v1.0.10.tar'
+New-Item -ItemType Directory -Path $archiveExtractDir | Out-Null
+git archive --format=tar --output=$archiveTar v1.0.10 retirement-simulator.html
+tar -xf $archiveTar -C $archiveExtractDir
+Copy-Item -LiteralPath (Join-Path $archiveExtractDir 'retirement-simulator.html') -Destination 'archive/retirement-simulator-v1.0.10.html'
+git hash-object archive/retirement-simulator-v1.0.10.html
+git rev-parse v1.0.10:retirement-simulator.html
+Get-FileHash -Algorithm SHA256 -LiteralPath archive/retirement-simulator-v1.0.10.html
+```
+
+Expected:
+
+```text
+Git blob: 87d456f500a6f48f2289e91afb553d267faa8ff9
+SHA-256: 6F9401E74709A67BDD539DD353ED9E4C78A71ACA4B78D8D2A8206811BAE9C394
+```
+
+Remove only the verified extraction directory:
+
+```powershell
+$resolvedArchiveExtractDir = (Resolve-Path -LiteralPath $archiveExtractDir).Path
+$resolvedArchiveTempRoot = (Resolve-Path -LiteralPath ([System.IO.Path]::GetTempPath())).Path
+if (-not $resolvedArchiveExtractDir.StartsWith($resolvedArchiveTempRoot, [System.StringComparison]::OrdinalIgnoreCase)) {
+  throw "Refusing to remove non-temporary path: $resolvedArchiveExtractDir"
+}
+Remove-Item -LiteralPath $resolvedArchiveExtractDir -Recurse -Force
+```
+
+- [ ] **Step 4: Record and enforce archive provenance**
+
+Append this row to `archive/README.md`:
+
+```markdown
+| `retirement-simulator-v1.0.10.html` | `v1.0.10:retirement-simulator.html` | `87d456f500a6f48f2289e91afb553d267faa8ff9` | `6F9401E74709A67BDD539DD353ED9E4C78A71ACA4B78D8D2A8206811BAE9C394` |
+```
+
+Add this step after the v1.0.9 archive check in `.github/workflows/test.yml`:
+
+```yaml
+      - name: Verify archived v1.0.10 source
+        run: test "$(git hash-object archive/retirement-simulator-v1.0.10.html)" = "$(git rev-parse v1.0.10:retirement-simulator.html)"
+```
+
+- [ ] **Step 5: Advance the deterministic release identity**
+
+Make these exact replacements in `retirement-simulator.html`:
+
+```text
+Family Retirement Income Simulator v1.10
+→ Family Retirement Income Simulator v1.11
+
+<span class="version">v1.10</span>
+→ <span class="version">v1.11</span>
+
+<b>v1.10.</b>
+→ <b>v1.11.</b>
+
+family-retirement-simulator:v1.10:scenario
+→ family-retirement-simulator:v1.11:scenario
+```
+
+Then add the outgoing key as the first legacy key:
+
+```js
+const LEGACY_STORAGE_KEYS = [
+  'family-retirement-simulator:v1.10:scenario',
+  'family-retirement-simulator:v1.09:scenario',
+```
+
+Do not change schema 14, calculation logic, sample data or any Monte Carlo
+file.
+
+- [ ] **Step 6: Publish the v1.11 changelog section**
+
+Keep the Monte Carlo issue #8 and issue #1 bullets under `Unreleased`. Move the
+Pages bullet and the existing issue #34 and #36 bullets beneath:
+
+```markdown
+## 1.11 - 2026-07-23
+```
+
+The three v1.11 bullets must remain substantively unchanged and ordered:
+GitHub Pages, iPad-safe confirmations, then deterministic Couple/Single
+households.
+
+- [ ] **Step 7: Update the current-release screenshot and README identity**
+
+Change the README image and caption from v1.10 to v1.11:
+
+```markdown
+![Retirement Income Simulator v1.11 showing a fictional single-person household](docs/assets/retirement-simulator-v1.11.png)
+
+*Shown with fictional sample data in the default dark theme. The deterministic v1.11 simulator supports Couple and Single households, and the optional hosted version offers easier iPad access. Results are estimates, not financial advice.*
+```
+
+Open `retirement-simulator.html` in Chromium, select **Single**, keep only the
+fictional sample values, render at 1440 × 1000 in the default dark theme, and
+save the full-page screenshot to:
+
+```text
+docs/assets/retirement-simulator-v1.11.png
+```
+
+Visually inspect the saved PNG and confirm it contains no personal data,
+validation banner, clipped primary controls or open modal.
+
+- [ ] **Step 8: Run release-contract and repository checks**
+
+Run:
+
+```powershell
+node tests/retirement-simulator.test.mjs
+git diff --check
+git hash-object archive/retirement-simulator-v1.0.10.html
+git rev-parse v1.0.10:retirement-simulator.html
+```
+
+Expected: 371 deterministic checks pass, diff-check is clean, and both Git blob
+commands return `87d456f500a6f48f2289e91afb553d267faa8ff9`.
+
+- [ ] **Step 9: Commit v1.0.11 preparation**
+
+```powershell
+git add retirement-simulator.html archive/retirement-simulator-v1.0.10.html archive/README.md .github/workflows/test.yml README.md CHANGELOG.md docs/assets/retirement-simulator-v1.11.png tests/retirement-simulator.test.mjs
+git commit -m "release: prepare deterministic v1.0.11"
+```
+
+Expected: one release-preparation commit with no Monte Carlo changes.
+
+---
+
+### Task 4: Reproduce the Pages artifact and browser behaviour locally
 
 **Files:**
 - Verify: `retirement-simulator.html`
@@ -398,15 +623,15 @@ git log -3 --oneline
 Expected:
 
 ```text
-369 passed, 0 failed
+371 passed, 0 failed
 no diff-check errors
 clean codex/github-pages-hosting worktree
-two implementation commits above the design commit
+three implementation commits above the planning commits
 ```
 
 ---
 
-### Task 4: Enable Pages and deploy the tested main commit
+### Task 5: Enable Pages and deploy the tested main commit
 
 **Files:**
 - External repository setting: GitHub Pages source
@@ -425,7 +650,7 @@ git log --oneline origin/main..HEAD
 
 Expected: the worktree is clean and the output contains only the design,
 workflow, and hosting-documentation commits. If `origin/main` has advanced,
-merge it into the feature branch and rerun Task 3 before continuing.
+merge it into the feature branch and rerun Task 4 before continuing.
 
 - [ ] **Step 2: Enable the workflow publishing source**
 
@@ -489,7 +714,7 @@ git diff --check origin/main...main
 git status --short --branch
 ```
 
-Expected: 369 checks pass, diff check is clean, and `main` is ahead of
+Expected: 371 checks pass, diff check is clean, and `main` is ahead of
 `origin/main` with no working-tree changes.
 
 - [ ] **Step 5: Push main and identify the deployment run**
@@ -517,7 +742,7 @@ complete successfully.
 
 ---
 
-### Task 5: Verify the live iPad/browser experience
+### Task 6: Verify the live iPad/browser experience
 
 **Files:**
 - Verify live URL: `https://dcaddick.github.io/retirement-simulator/`
@@ -627,3 +852,131 @@ Pages status is built
 Report the merge commit, workflow run URL, live Pages URL, deterministic test
 count, iPad viewport results, and the confirmed Monte Carlo/README 404
 boundaries.
+
+---
+
+### Task 7: Publish v1.0.11 and close issue #36
+
+**Files:**
+- External tag: `v1.0.11`
+- External release: `Retirement Simulator v1.0.11`
+- Release asset: `retirement-simulator.html`
+- GitHub issue: `dcaddick/retirement-simulator#36`
+
+- [ ] **Step 1: Confirm the release commit and repository CI**
+
+Run:
+
+```powershell
+$releaseCommit = git rev-parse HEAD
+if ($releaseCommit -ne (git rev-parse origin/main)) { throw 'Local main and origin/main differ' }
+gh run list --workflow test.yml --branch main --limit 1 --json databaseId,status,conclusion,headSha,url
+```
+
+Expected: the latest `test.yml` run targets `$releaseCommit` and succeeds. If
+the existing experimental Monte Carlo parity check still fails, do not hide or
+waive it: report the exact failure and keep issue #36 open until the release
+gate is explicitly resolved.
+
+- [ ] **Step 2: Create and push the annotated release tag**
+
+Run:
+
+```powershell
+git tag -a v1.0.11 -m "Retirement Simulator v1.0.11"
+git push origin v1.0.11
+git rev-parse v1.0.11^{}
+```
+
+Expected: the peeled tag commit equals `$releaseCommit`.
+
+- [ ] **Step 3: Publish the deterministic-only GitHub release**
+
+Run:
+
+```powershell
+gh release create v1.0.11 retirement-simulator.html `
+  --repo dcaddick/retirement-simulator `
+  --verify-tag `
+  --latest `
+  --title "Retirement Simulator v1.0.11" `
+  --notes "Adds deterministic Couple/Single household modelling (#36), iPad-safe confirmation dialogs (#34), and an optional GitHub Pages entry point for easier iPad/browser access. The downloadable self-contained HTML remains the primary distribution. The experimental Monte Carlo companion is unchanged and is not included in this release. Results remain estimates, not financial advice."
+```
+
+Expected: the release publishes successfully with
+`retirement-simulator.html` as its only asset.
+
+- [ ] **Step 4: Independently verify the release asset**
+
+Run:
+
+```powershell
+$releaseVerifyDir = Join-Path ([System.IO.Path]::GetTempPath()) ("retirement-v111-release-" + [guid]::NewGuid())
+New-Item -ItemType Directory -Path $releaseVerifyDir | Out-Null
+gh release download v1.0.11 --repo dcaddick/retirement-simulator --pattern retirement-simulator.html --dir $releaseVerifyDir
+$sourceReleaseHash = (Get-FileHash -Algorithm SHA256 -LiteralPath retirement-simulator.html).Hash
+$downloadedReleaseHash = (Get-FileHash -Algorithm SHA256 -LiteralPath (Join-Path $releaseVerifyDir 'retirement-simulator.html')).Hash
+if ($sourceReleaseHash -ne $downloadedReleaseHash) { throw 'Downloaded v1.0.11 asset differs from tagged source' }
+gh release view v1.0.11 --repo dcaddick/retirement-simulator --json url,tagName,assets
+gh api repos/dcaddick/retirement-simulator/releases/latest --jq '.tag_name'
+```
+
+Expected: one asset is reported, the latest tag is `v1.0.11`, and the
+source/download SHA-256 values match.
+
+- [ ] **Step 5: Verify the stable latest-download URL**
+
+Run:
+
+```powershell
+$latestDownload = Join-Path $releaseVerifyDir 'latest-retirement-simulator.html'
+Invoke-WebRequest -Uri 'https://github.com/dcaddick/retirement-simulator/releases/latest/download/retirement-simulator.html' -OutFile $latestDownload
+$latestDownloadHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $latestDownload).Hash
+if ($sourceReleaseHash -ne $latestDownloadHash) { throw 'Stable latest-download asset differs from v1.0.11 source' }
+```
+
+Expected: the stable download resolves and matches the tagged source by
+SHA-256.
+
+Remove only the verified release-download directory:
+
+```powershell
+$resolvedReleaseVerifyDir = (Resolve-Path -LiteralPath $releaseVerifyDir).Path
+$resolvedReleaseTempRoot = (Resolve-Path -LiteralPath ([System.IO.Path]::GetTempPath())).Path
+if (-not $resolvedReleaseVerifyDir.StartsWith($resolvedReleaseTempRoot, [System.StringComparison]::OrdinalIgnoreCase)) {
+  throw "Refusing to remove non-temporary path: $resolvedReleaseVerifyDir"
+}
+Remove-Item -LiteralPath $resolvedReleaseVerifyDir -Recurse -Force
+```
+
+- [ ] **Step 6: Close issue #36 with verified delivery links**
+
+Run:
+
+```powershell
+gh issue comment 36 --repo dcaddick/retirement-simulator --body "Released in v1.0.11 after deterministic regression, GitHub Pages and independent release-asset verification. Release: https://github.com/dcaddick/retirement-simulator/releases/tag/v1.0.11 Hosted deterministic simulator: https://dcaddick.github.io/retirement-simulator/"
+gh issue close 36 --repo dcaddick/retirement-simulator --reason completed
+gh issue view 36 --repo dcaddick/retirement-simulator --json state,stateReason,url
+```
+
+Expected: issue #36 is closed as completed only after the release and hosted
+links are live.
+
+- [ ] **Step 7: Final release audit**
+
+Run:
+
+```powershell
+git status --short --branch
+git rev-parse HEAD
+git rev-parse origin/main
+git rev-parse v1.0.11^{}
+gh release view v1.0.11 --repo dcaddick/retirement-simulator --json url,tagName,assets
+gh api repos/dcaddick/retirement-simulator/releases/latest --jq '.tag_name'
+gh api repos/dcaddick/retirement-simulator/pages --jq '{build_type,html_url,status}'
+gh issue view 36 --repo dcaddick/retirement-simulator --json state,stateReason,url
+```
+
+Expected: clean synchronized `main`, all three commit values match, the latest
+tag is v1.0.11 with one deterministic asset, Pages is built, and issue #36 is
+closed as completed.
