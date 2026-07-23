@@ -71,12 +71,16 @@ vm.runInContext(extract('simulator-core'), context, { filename: 'simulator-core.
 const core = context.RetirementSimulatorCore;
 
 console.log('\nschema + sample');
-check('schema version is 13', core.SCHEMA_VERSION === 13);
+check('schema version is 14', core.SCHEMA_VERSION === 14);
 const sample = core.makeSampleScenario();
 check('sample validates', core.validateScenario(sample).length === 0,
   JSON.stringify(core.validateScenario(sample)[0] ?? null));
+check('sample defaults to a couple household',
+  sample.household.type === 'couple');
 check('new Other Assets default outside Age Pension deeming',
   core.makeOtherAsset(0).agePensionDeemed === false);
+check('new Other Assets default to joint ownership',
+  core.makeOtherAsset(0).owner === 'joint');
 
 const schema12 = structuredClone(sample);
 schema12.schemaVersion = 12;
@@ -86,8 +90,31 @@ schema12.otherAssets = [{
 }];
 const migrated13 = core.migrateScenario(schema12);
 check('schema 12 Other Assets migrate outside Age Pension deeming',
-  migrated13.schemaVersion === 13 &&
-  migrated13.otherAssets[0].agePensionDeemed === false);
+  migrated13.schemaVersion === 14 &&
+  migrated13.otherAssets[0].agePensionDeemed === false &&
+  migrated13.otherAssets[0].owner === 'joint');
+
+const schema13Household = structuredClone(sample);
+schema13Household.schemaVersion = 13;
+delete schema13Household.household.type;
+schema13Household.otherAssets = [{
+  ...core.makeOtherAsset(0),
+  id: 'schema-13-asset',
+  label: 'Legacy household asset'
+}];
+delete schema13Household.otherAssets[0].owner;
+const migrated14 = core.migrateScenario(schema13Household);
+check('schema 13 migrates to an explicit couple household',
+  migrated14.schemaVersion === 14 &&
+  migrated14.household.type === 'couple' &&
+  migrated14.otherAssets[0].owner === 'joint' &&
+  core.validateScenario(migrated14).length === 0);
+
+const invalidHouseholdType = structuredClone(sample);
+invalidHouseholdType.household.type = 'widowed';
+check('invalid household type is rejected',
+  core.validateScenario(invalidHouseholdType).some(error =>
+    error.path === 'household.type'));
 
 const invalidDeemingFlag = structuredClone(sample);
 invalidDeemingFlag.otherAssets = [{
@@ -220,7 +247,7 @@ delete schema10.shareholdings[0].companyTaxRatePct;
 delete schema10.shareholdings[0].frankingEligible;
 const migrated11 = core.migrateScenario(schema10);
 check('schema 10 migrates inert v1.06 tax and share defaults',
-  migrated11.schemaVersion === 13 &&
+  migrated11.schemaVersion === 14 &&
   migrated11.otherIncomes[0].owner === 'joint' &&
   migrated11.otherIncomes[0].survivorPct === 0 &&
   migrated11.household.firstDeath.enabled === false &&
@@ -241,7 +268,7 @@ schema11.otherIncomes = [{
 delete schema11.otherIncomes[0].survivorPct;
 const migrated12 = core.migrateScenario(schema11);
 check('schema 11 migrates inert first-death defaults',
-  migrated12.schemaVersion === 13 &&
+  migrated12.schemaVersion === 14 &&
   migrated12.household.firstDeath.enabled === false &&
   migrated12.household.firstDeath.survivorPreferredPct === 70 &&
   migrated12.household.firstDeath.survivorEssentialPct === 70 &&
@@ -564,6 +591,165 @@ check('six months of exposure prorates the cash dividend',
 check('dividend and franking credit follow share ownership',
   dividendFlows.cashByPerson[1] === 0 &&
   dividendFlows.frankingByPerson[0] > 25);
+
+console.log('\nsingle household ownership');
+check('single ownership fractions are explicit',
+  core.singleHouseholdInclusion('p0') === 1 &&
+  core.singleHouseholdInclusion('p1') === 0 &&
+  core.singleHouseholdInclusion('joint') === 0.5);
+
+const ownershipSingle = structuredClone(sample);
+ownershipSingle.household.type = 'single';
+ownershipSingle.household.modelEndAge = ownershipSingle.people[0].age;
+ownershipSingle.people[0].super = 0;
+ownershipSingle.people[0].salary = 0;
+ownershipSingle.cash = { amount: 10000, interestPct: 0, owner: 'p0' };
+ownershipSingle.savings = { amount: 20000, interestPct: 0, owner: 'p1' };
+ownershipSingle.shareholdings = [{
+  ...core.makeShareholding(0),
+  id: 'joint-share',
+  symbol: 'JOINT',
+  owner: 'joint',
+  quantity: 10,
+  price: 1000,
+  costBaseAud: 8000,
+  saleYear: ownershipSingle.startYear + 20
+}];
+ownershipSingle.otherIncomes = [{
+  ...core.makeOtherIncome(0),
+  id: 'joint-income',
+  label: 'Joint income',
+  owner: 'joint',
+  amount: 12000,
+  taxable: false
+}];
+ownershipSingle.otherAssets = [{
+  ...core.makeOtherAsset(0),
+  id: 'p1-asset',
+  label: 'Person 2 asset',
+  owner: 'p1',
+  amount: 500000,
+  disposalYear: ownershipSingle.startYear + 20
+}];
+ownershipSingle.lumpSumWithdrawals = [];
+ownershipSingle.household.includeAgePension = false;
+ownershipSingle.household.targetAfterTax = 6000;
+ownershipSingle.household.annualBudget = 6000;
+
+const ownershipSingleRow = core.projectScenario(ownershipSingle).rows[0];
+check('single projection applies p0, p1 and joint inclusion',
+  ownershipSingleRow.cash === 10000 &&
+  ownershipSingleRow.savings === 0 &&
+  ownershipSingleRow.shares === 5000 &&
+  ownershipSingleRow.otherAssets === 0 &&
+  ownershipSingleRow.otherIncomeByPerson[0] === 6000 &&
+  ownershipSingleRow.otherIncomeByPerson[1] === 0,
+  JSON.stringify({
+    cash: ownershipSingleRow.cash,
+    savings: ownershipSingleRow.savings,
+    shares: ownershipSingleRow.shares,
+    otherAssets: ownershipSingleRow.otherAssets,
+    otherIncomeByPerson: ownershipSingleRow.otherIncomeByPerson
+  }));
+
+const jointRuntimeSingle = structuredClone(ownershipSingle);
+jointRuntimeSingle.cash = { amount: 10000, interestPct: 0, owner: 'joint' };
+jointRuntimeSingle.savings = { amount: 20000, interestPct: 0, owner: 'joint' };
+jointRuntimeSingle.shareholdings[0].dividendYieldPct = 12;
+jointRuntimeSingle.otherAssets[0].owner = 'joint';
+const jointRuntimeState = core.makeProjectionState(jointRuntimeSingle);
+check('included single runtime ownership allocates only to Person 1',
+  jointRuntimeState.cash === 5000 &&
+  jointRuntimeState.savings === 10000 &&
+  jointRuntimeState.ownership.cash === 'p0' &&
+  jointRuntimeState.ownership.savings === 'p0' &&
+  jointRuntimeState.holdings[0].owner === 'p0' &&
+  jointRuntimeState.holdings[0].quantity === 5 &&
+  jointRuntimeState.holdings[0].costBaseAud === 4000 &&
+  jointRuntimeState.otherAssets[0].owner === 'p0' &&
+  jointRuntimeState.otherAssets[0].value === 250000);
+core.beginShareYear(jointRuntimeState);
+const jointRuntimeDividends = core.shareDividendFlows(jointRuntimeState);
+check('single joint share dividends include half only for Person 1',
+  jointRuntimeDividends.cashByPerson[0] === 600 &&
+  jointRuntimeDividends.cashByPerson[1] === 0);
+
+const jointCgtSingle = structuredClone(ownershipSingle);
+jointCgtSingle.cash = { amount: 0, interestPct: 0, owner: 'p0' };
+jointCgtSingle.shareholdings[0].saleYear = jointCgtSingle.startYear;
+jointCgtSingle.shareholdings[0].cgtDiscountEligible = false;
+const jointCgtSingleRow = core.projectScenario(jointCgtSingle).rows[0];
+check('single joint share CGT includes half and belongs only to Person 1',
+  jointCgtSingleRow.capitalLedger[0].nonDiscountGain === 1000 &&
+  jointCgtSingleRow.capitalLedger[1].nonDiscountGain === 0);
+
+const inactiveInvalid = structuredClone(sample);
+inactiveInvalid.household.type = 'single';
+inactiveInvalid.people[1].name = '';
+inactiveInvalid.people[1].age = NaN;
+inactiveInvalid.people[1].superAccessAge = NaN;
+inactiveInvalid.cash = { amount: NaN, interestPct: NaN, owner: 'p1' };
+inactiveInvalid.savings = { amount: NaN, interestPct: NaN, owner: 'p1' };
+inactiveInvalid.shareholdings = [{
+  ...core.makeShareholding(0),
+  id: 'hidden-invalid-share',
+  symbol: '',
+  owner: 'p1',
+  quantity: NaN,
+  costBaseAud: NaN
+}];
+inactiveInvalid.otherIncomes = [{
+  ...core.makeOtherIncome(0),
+  id: 'hidden-invalid-income',
+  label: '',
+  owner: 'p1',
+  amount: NaN
+}];
+inactiveInvalid.otherAssets = [{
+  ...core.makeOtherAsset(0),
+  id: 'hidden-invalid-asset',
+  label: '',
+  owner: 'p1',
+  amount: NaN
+}];
+check('inactive Person 2 values do not block single projection',
+  core.validateScenario(inactiveInvalid).length === 0);
+const inactiveBadOwner = structuredClone(inactiveInvalid);
+inactiveBadOwner.otherIncomes[0].owner = 'nobody';
+check('inactive record owner discriminators still validate',
+  core.validateScenario(inactiveBadOwner).some(error =>
+    error.path === 'otherIncomes.0.owner'));
+const inactiveState = core.makeProjectionState(inactiveInvalid);
+check('inactive malformed Person 2 owned values are never read into runtime state',
+  inactiveState.cash === 0 &&
+  inactiveState.savings === 0 &&
+  inactiveState.holdings.length === 0 &&
+  inactiveState.otherAssets.length === 0);
+const inactiveRows = core.projectScenario(inactiveInvalid).rows;
+check('single projection never reads inactive Person 2 numeric fields',
+  inactiveRows.every(row =>
+    row.ages[1] === null &&
+    row.rawAges[1] === null &&
+    Number.isFinite(row.totalAssets)));
+inactiveInvalid.household.type = 'couple';
+check('restored Person 2 values validate in couple mode',
+  core.validateScenario(inactiveInvalid).some(error =>
+    error.path.startsWith('people.1.') ||
+    error.path.startsWith('cash.') ||
+    error.path.startsWith('savings.') ||
+    error.path.startsWith('shareholdings.0.') ||
+    error.path.startsWith('otherIncomes.0.') ||
+    error.path.startsWith('otherAssets.0.')));
+
+const retainedSingle = structuredClone(ownershipSingle);
+retainedSingle.savings.amount = 23456;
+retainedSingle.otherAssets[0].amount = 654321;
+const retainedRoundTrip = core.importScenario(core.exportScenario(retainedSingle));
+check('single export roundtrip preserves excluded Person 2 owned data',
+  retainedRoundTrip.savings.owner === 'p1' &&
+  retainedRoundTrip.savings.amount === 23456 &&
+  retainedRoundTrip.otherAssets[0].owner === 'p1' &&
+  retainedRoundTrip.otherAssets[0].amount === 654321);
 
 const taxState = {
   superRetire: [1000, 1000], cash: 300, savings: 400
@@ -1191,6 +1377,206 @@ if (typeof core.applyFirstDeathTransition === 'function') {
       openingDeceasedSuper);
 }
 
+console.log('\ndeterministic single household');
+check('output person indexes are exported',
+  typeof core.outputPersonIndexes === 'function');
+const singleLifecycleScenario = structuredClone(sample);
+singleLifecycleScenario.household.type = 'single';
+check('single outputs only Person 1 while couple outputs both people',
+  JSON.stringify(core.outputPersonIndexes(singleLifecycleScenario)) === '[0]' &&
+  JSON.stringify(core.outputPersonIndexes(sample)) === '[0,1]');
+check('single tooltip context omits Person 2 age',
+  core.outputAgeContext({ year: 2030, ages: [64, 61] }, singleLifecycleScenario) ===
+    '2030 · age 64');
+singleLifecycleScenario.household.targetAfterTax = 80000;
+singleLifecycleScenario.household.annualBudget = 70000;
+singleLifecycleScenario.household.modelEndAge =
+  singleLifecycleScenario.people[0].age + 1;
+singleLifecycleScenario.household.firstDeath = {
+  enabled: true,
+  deceasedPerson: 'p0',
+  deathAge: singleLifecycleScenario.people[0].age + 1,
+  survivorPreferredPct: 70,
+  survivorEssentialPct: 70
+};
+singleLifecycleScenario.people[1].salary = 999999;
+singleLifecycleScenario.people[1].super = 999999;
+singleLifecycleScenario.lumpSumWithdrawals = [];
+
+const singleInitialState = core.makeProjectionState(singleLifecycleScenario);
+check('single state starts with only Person 1 alive',
+  singleInitialState.lifecycle.householdStatus === 'single' &&
+  JSON.stringify(singleInitialState.lifecycle.alive) ===
+    JSON.stringify([true, false]) &&
+  singleInitialState.lifecycle.survivorIndex === null);
+check('single lifecycle helpers identify the active rule status and person',
+  core.isSingleHousehold(singleLifecycleScenario) &&
+  core.householdRuleStatus(
+    singleLifecycleScenario, singleInitialState.lifecycle) === 'single' &&
+  core.solePersonIndex(
+    singleLifecycleScenario, singleInitialState.lifecycle) === 0);
+
+const inertSingleFirstDeath = structuredClone(singleLifecycleScenario);
+inertSingleFirstDeath.household.modelEndAge =
+  inertSingleFirstDeath.people[0].age;
+inertSingleFirstDeath.people[1].age =
+  inertSingleFirstDeath.people[0].age + 10;
+inertSingleFirstDeath.household.firstDeath = {
+  enabled: 'invalid',
+  deceasedPerson: 'invalid',
+  deathAge: NaN,
+  survivorPreferredPct: NaN,
+  survivorEssentialPct: NaN
+};
+check('single validation ignores saved first-death settings and Person 2 horizon',
+  !core.validateScenario(inertSingleFirstDeath).some(error =>
+    error.path === 'household.modelEndAge' ||
+    error.path.startsWith('household.firstDeath.')));
+inertSingleFirstDeath.household.type = 'couple';
+check('couple validation restores saved first-death settings and horizon',
+  core.validateScenario(inertSingleFirstDeath).some(error =>
+    error.path === 'household.modelEndAge') &&
+  core.validateScenario(inertSingleFirstDeath).some(error =>
+    error.path.startsWith('household.firstDeath.')));
+
+const singleLifecycleRows =
+  core.projectScenario(singleLifecycleScenario).rows;
+check('single household keeps entered targets at 100 percent',
+  singleLifecycleRows.every(row =>
+    row.target === 80000 && row.budget === 70000));
+check('single household never emits a first-death event',
+  singleLifecycleRows.every(row =>
+    !row.events.some(event => event.type === 'first-death')));
+check('Person 2 personal flows remain inactive',
+  singleLifecycleRows.every(row =>
+    row.salaryByPerson[1] === 0 &&
+    row.superBalances[1] === 0 &&
+    row.taxByPerson[1] === 0));
+
+const singleRules = structuredClone(sample);
+singleRules.household.type = 'single';
+singleRules.people[0].age = 67;
+singleRules.people[0].retireAge = 67;
+singleRules.people[0].salary = 0;
+singleRules.people[0].super = 0;
+singleRules.people[1].age = 67;
+singleRules.people[1].salary = 999999;
+singleRules.people[1].super = 999999;
+singleRules.cash = { amount: 0, interestPct: 0, owner: 'p0' };
+singleRules.savings = { amount: 0, interestPct: 0, owner: 'p0' };
+singleRules.shareholdings = [];
+singleRules.otherIncomes = [];
+singleRules.otherAssets = [];
+singleRules.lumpSumWithdrawals = [];
+singleRules.household.modelEndAge = 67;
+singleRules.household.targetAfterTax = 0;
+singleRules.household.annualBudget = 0;
+singleRules.household.applyMinimumDrawdown = false;
+singleRules.household.includeAgePension = true;
+singleRules.assumptions.ukPensionsEnabled = false;
+
+const singleRulesRow = core.projectScenario(singleRules).rows[0];
+check('single rules apply from year zero',
+  singleRulesRow.agePensionStatus === 'single' &&
+  singleRulesRow.components.agePensionNet ===
+    core.SERVICES_AUSTRALIA_2026.agePensionMaxSingleAnnual &&
+  singleRulesRow.cshc.threshold ===
+    core.SERVICES_AUSTRALIA_2026.cshcSingleThreshold &&
+  singleRulesRow.taxLedger[0].totalTax.saptoSchedule === 'single' &&
+  singleRulesRow.taxLedger[0].totalTax
+    .medicareFamilyReductionNominal === 0);
+check('single pension and tax allocate only to Person 1',
+  singleRulesRow.agePensionByPerson[1] === 0 &&
+  singleRulesRow.taxByPerson[1] === 0);
+
+const equivalentSingleRate = core.agePensionForHousehold({
+  ages: [67, 0],
+  alive: [true, false],
+  survivorIndex: 0,
+  assets: 0,
+  assessableIncome: 0,
+  included: true
+});
+check('year-zero single uses the established survivor rule result',
+  singleRulesRow.components.agePensionNet ===
+    equivalentSingleRate.household &&
+  singleRulesRow.target === singleRules.household.targetAfterTax &&
+  singleRulesRow.budget === singleRules.household.annualBudget);
+
+const priorityScenario = structuredClone(sample);
+priorityScenario.household.type = 'single';
+priorityScenario.household.drawdownPriority = [
+  [{ source: 'p1Super', weight: 1 }],
+  [
+    { source: 'p0Super', weight: 0.25 },
+    { source: 'p1Super', weight: 0.75 }
+  ],
+  [{ source: 'savings', weight: 1 }]
+];
+check('single drawdown removes Person 2 super and empty tiers',
+  JSON.stringify(core.effectiveDrawdownPriority(priorityScenario)) ===
+    JSON.stringify([
+      [{ source: 'p0Super', weight: 1 }],
+      [{ source: 'savings', weight: 1 }]
+    ]));
+const storedPriority = JSON.stringify(priorityScenario.household.drawdownPriority);
+core.effectiveDrawdownPriority(priorityScenario);
+check('effective drawdown leaves stored couple priority unchanged',
+  JSON.stringify(priorityScenario.household.drawdownPriority) === storedPriority);
+
+const unusableSinglePriority = structuredClone(sample);
+unusableSinglePriority.household.type = 'single';
+unusableSinglePriority.household.drawdownPriority = [
+  [{ source: 'p1Super', weight: 1 }]
+];
+check('single household requires an active drawdown source',
+  core.validateScenario(unusableSinglePriority).some(error =>
+    error.path === 'household.drawdownPriority' &&
+    error.message.includes('Person 1, cash, or savings')));
+
+const singleLumpFallback = structuredClone(sample);
+singleLumpFallback.household.type = 'single';
+singleLumpFallback.people[0] = {
+  ...singleLumpFallback.people[0],
+  age: 67,
+  retireAge: 67,
+  superAccessAge: 60,
+  superAccessPct: 100,
+  super: 10000,
+  salary: 0,
+  accumulationReturnPct: 0,
+  retirementReturnPct: 0
+};
+singleLumpFallback.cash = { amount: 0, interestPct: 0, owner: 'p0' };
+singleLumpFallback.savings = { amount: 0, interestPct: 0, owner: 'p0' };
+singleLumpFallback.household.modelEndAge = 67;
+singleLumpFallback.household.targetAfterTax = 0;
+singleLumpFallback.household.annualBudget = 0;
+singleLumpFallback.household.applyMinimumDrawdown = false;
+singleLumpFallback.household.includeAgePension = false;
+singleLumpFallback.household.drawdownPriority = [
+  [{ source: 'p1Super', weight: 1 }],
+  [{ source: 'p0Super', weight: 1 }]
+];
+singleLumpFallback.lumpSumWithdrawals = [{
+  id: 'single-p1-source',
+  amount: 5000,
+  reason: 'Single fallback',
+  month: 1,
+  year: singleLumpFallback.startYear,
+  source: 'p1Super',
+  enabled: true
+}];
+singleLumpFallback.shareholdings = [];
+singleLumpFallback.otherIncomes = [];
+singleLumpFallback.otherAssets = [];
+const singleLumpFallbackRow =
+  core.projectScenario(singleLumpFallback).rows[0];
+check('stored Person 2 lump source falls back to active Person 1 funds',
+  singleLumpFallbackRow.lumpSumDraws.p0Super === 5000 &&
+  singleLumpFallbackRow.lumpSumDraws.p1Super === 0 &&
+  singleLumpFallbackRow.lumpSumFundingShortfall === 0);
+
 console.log('\ndeterministic survivor projection');
 const survivorProjectionScenario = structuredClone(sample);
 survivorProjectionScenario.assumptions.inflationMode = 'manual';
@@ -1305,7 +1691,7 @@ check('transition-year projection uses the single Age Pension rules',
 const unflaggedSurvivorDeemingScenario = structuredClone(survivorPensionScenario);
 unflaggedSurvivorDeemingScenario.otherAssets = [{
   id: 'survivor-loan', label: 'Survivor private loan',
-  currency: 'AUD', fxToAud: 1, amount: 300000,
+  currency: 'AUD', fxToAud: 1, amount: 300000, owner: 'joint',
   agePensionDeemed: false, growthPct: 0,
   disposalYear: unflaggedSurvivorDeemingScenario.startYear + 20
 }];
@@ -1322,7 +1708,7 @@ check('survivor projection applies single-person deeming to flagged assets',
     unflaggedSurvivorRow.components.agePensionNet);
 const survivorRoundTrip = core.importScenario(
   core.exportScenario(survivorProjectionScenario));
-check('JSON round-trip retains all schema-v13 survivor fields',
+check('JSON round-trip retains all schema-v14 survivor fields',
   JSON.stringify(survivorRoundTrip.household.firstDeath) ===
     JSON.stringify(survivorProjectionScenario.household.firstDeath) &&
   survivorRoundTrip.people[0].ukStateSurvivorPct === 50 &&
@@ -1500,7 +1886,7 @@ const withAsset = structuredClone(sample);
 const disposalYear = sample.startYear + 5;
 withAsset.otherAssets = [
   { id: 'a1', label: 'Boat', currency: 'AUD', fxToAud: 1, amount: 100000,
-    agePensionDeemed: false, growthPct: 3, disposalYear }
+    owner: 'joint', agePensionDeemed: false, growthPct: 3, disposalYear }
 ];
 check('scenario with asset validates', core.validateScenario(withAsset).length === 0,
   JSON.stringify(core.validateScenario(withAsset)[0] ?? null));
@@ -1542,7 +1928,7 @@ function privateLoanScenario(agePensionDeemed) {
   scenario.household.includeAgePension = true;
   scenario.otherAssets = [{
     id: 'private-loan', label: 'Private loan', currency: 'AUD', fxToAud: 1,
-    amount: 500000, agePensionDeemed, growthPct: 0,
+    amount: 500000, owner: 'joint', agePensionDeemed, growthPct: 0,
     disposalYear: scenario.startYear + 20
   }];
   return scenario;
@@ -1765,7 +2151,7 @@ check('disabled lump sum does not block validation', core.validateScenario(disab
 const assetFunded = structuredClone(withLump);
 assetFunded.cash.amount = 0;
 assetFunded.savings.amount = 0;
-assetFunded.otherAssets = [{ id: 'car-fund', label: 'Investment property', currency: 'AUD', fxToAud: 1, amount: 40000, agePensionDeemed: false, growthPct: 0, disposalYear: assetFunded.startYear + 10 }];
+assetFunded.otherAssets = [{ id: 'car-fund', label: 'Investment property', currency: 'AUD', fxToAud: 1, amount: 40000, owner: 'joint', agePensionDeemed: false, growthPct: 0, disposalYear: assetFunded.startYear + 10 }];
 assetFunded.lumpSumWithdrawals = [{ id: 'l2', amount: 25000, reason: 'Help kids', month: 1, year: assetFunded.startYear, source: 'asset:car-fund' }];
 const assetFundedRow = core.projectScenario(assetFunded).rows[0];
 check('named asset can fund a lump sum', assetFundedRow.lumpSumTotal === 25000 &&
@@ -1797,7 +2183,7 @@ const incomeErrors = core.validateScenario(badIncome);
 check('bad income: label/currency/fx/amount/taxable all flagged', incomeErrors.length >= 5,
   JSON.stringify(incomeErrors));
 const badAsset = structuredClone(sample);
-badAsset.otherAssets = [{ id: 'y', label: 'ok', currency: 'AUD', fxToAud: 1, amount: 100, agePensionDeemed: false, growthPct: 500, disposalYear: 1999 }];
+badAsset.otherAssets = [{ id: 'y', label: 'ok', currency: 'AUD', fxToAud: 1, amount: 100, owner: 'joint', agePensionDeemed: false, growthPct: 500, disposalYear: 1999 }];
 const assetErrors = core.validateScenario(badAsset);
 check('bad asset: growth + disposal year flagged', assetErrors.length >= 2,
   JSON.stringify(assetErrors));
@@ -1867,7 +2253,7 @@ v5.people[1].ukPrivateAmountGbp = 20000;
 v5.people[1].ukPrivateTakeAge = 66;
 v5.people[1].ukPrivateType = 'lump';
 const migrated = core.migrateScenario(structuredClone(v5));
-check('migrates to v13', migrated.schemaVersion === 13);
+check('migrates to v14', migrated.schemaVersion === 14);
 check('annuity becomes other income', migrated.otherIncomes.length === 1 &&
   migrated.otherIncomes[0].amount === 5000 && migrated.otherIncomes[0].currency === 'GBP');
 check('lump becomes other asset with disposal year',
@@ -1887,14 +2273,14 @@ schema7.schemaVersion = 7;
 schema7.lumpSumWithdrawals.forEach(item => delete item.enabled);
 const migrated8 = core.migrateScenario(schema7);
 check('schema 7 lump sums migrate enabled',
-  migrated8.schemaVersion === 13 && migrated8.lumpSumWithdrawals.every(item => item.enabled === true));
+  migrated8.schemaVersion === 14 && migrated8.lumpSumWithdrawals.every(item => item.enabled === true));
 
 const schema8 = structuredClone(sample);
 schema8.schemaVersion = 8;
 schema8.lumpSumWithdrawals.forEach(item => delete item.month);
 const migrated9 = core.migrateScenario(schema8);
 check('schema 8 lump sums migrate to January and salary growth defaults to zero',
-  migrated9.schemaVersion === 13 &&
+  migrated9.schemaVersion === 14 &&
   migrated9.lumpSumWithdrawals.every(item => item.month === 1) &&
   migrated9.people.every(person => person.salaryGrowthPct === 0));
 
@@ -1903,14 +2289,56 @@ schema9.schemaVersion = 9;
 schema9.people.forEach(person => delete person.salaryGrowthPct);
 const migrated10 = core.migrateScenario(schema9);
 check('schema 9 migrates salary growth to zero',
-  migrated10.schemaVersion === 13 && migrated10.people.every(person => person.salaryGrowthPct === 0));
+  migrated10.schemaVersion === 14 && migrated10.people.every(person => person.salaryGrowthPct === 0));
 
 const invalidMonth = structuredClone(sample);
 invalidMonth.lumpSumWithdrawals[0].month = 13;
 check('invalid lump-sum month is reported',
   core.validateScenario(invalidMonth).some(error => error.path === 'lumpSumWithdrawals.0.month'));
 
-console.log('\nmigration v1 -> v13 (full chain)');
+console.log('\nsingle-household controls');
+check('household type selector is rendered',
+  html.includes('data-path="household.type"') &&
+  html.includes('<option value="couple"') &&
+  html.includes('<option value="single"'));
+check('single UI uses index-preserving active-entry helpers',
+  html.includes('function activePeople(scenario)') &&
+  html.includes('function activeOwnedEntries(scenario, items)') &&
+  html.includes('.map((item, index) => ({ item, index }))') &&
+  html.includes('function sourceIsActiveForScenario(scenario, source)'));
+check('single UI explains hidden Person 2 data and joint inclusion',
+  html.includes('id="singleExcludedNotice"') &&
+  html.includes('Person 2-owned') &&
+  html.includes('Joint 50/50 entries contribute only Person 1’s 50% share.'));
+check('single item creation defaults ownership to Person 1',
+  html.includes("const owner = isSingleScenario(scenario) ? 'p0' : 'joint';") &&
+  html.includes('core.makeShareholding(scenario.shareholdings.length, owner)') &&
+  html.includes('core.makeOtherIncome((scenario.otherIncomes ?? []).length, owner)') &&
+  html.includes('core.makeOtherAsset((scenario.otherAssets ?? []).length, owner)'));
+check('household type change immediately rerenders',
+  html.includes("if (path === 'household.type')") &&
+  html.includes('renderScenario(currentScenario);'));
+check('single reports use the output-person boundary',
+  html.includes('core.outputPersonIndexes(scenario)') &&
+  html.includes('function enteredAssetsNow(scenario)') &&
+  html.includes('function outputAgeContext(row, scenario)'));
+check('single assumptions omit inactive people and owned records',
+  html.includes('activePeople(scenario).map') &&
+  html.includes('activeOwnedEntries(scenario, scenario.otherIncomes ?? [])') &&
+  html.includes('activeOwnedEntries(scenario, scenario.otherAssets ?? [])'));
+check('public docs define deterministic single household boundaries',
+  readme.includes('Person 2-owned records are hidden') &&
+  methodology.includes('### Explicit single household') &&
+  methodology.includes('Person 2-owned cash, savings, shares, Other income and Other assets') &&
+  methodology.includes('currently deterministic-only'));
+check('browser checklist covers single data restoration',
+  testingGuide.includes('switching a fictional scenario from Couple to Single') &&
+  testingGuide.includes('switching the same scenario back to Couple'));
+check('changelog records issue 36 deterministic scope',
+  changelog.includes('Couple/Single household selection') &&
+  changelog.includes('/issues/36'));
+
+console.log('\nmigration v1 -> v14 (full chain)');
 const v1 = structuredClone(v5);
 v1.schemaVersion = 1;
 delete v1.lumpSumWithdrawals;
@@ -1918,7 +2346,7 @@ delete v1.household.annualBudget;
 v1.people = v1.people.map(({ superAccessAge, superAccessPct, ukStateIndexation, ...rest }) => rest);
 delete v1.assumptions.ukPensionsEnabled;
 const chained = core.migrateScenario(structuredClone(v1));
-check('v1 chains to v13', chained.schemaVersion === 13);
+check('v1 chains to v14', chained.schemaVersion === 14);
 check('migration adds empty lump sums', Array.isArray(chained.lumpSumWithdrawals) && chained.lumpSumWithdrawals.length === 0);
 check('chained validates', core.validateScenario(chained).length === 0,
   JSON.stringify(core.validateScenario(chained)[0] ?? null));

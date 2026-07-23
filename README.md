@@ -50,7 +50,7 @@ Scenario data stays in the browser's local storage unless you explicitly import 
 
 ## Retirement Simulator
 
-The deterministic simulator models a reusable two-person household and includes:
+The deterministic simulator models either a couple or a single-person household and includes:
 
 - salaries, retirement ages and superannuation contributions;
 - accumulation and retirement-phase super balances;
@@ -69,6 +69,8 @@ The deterministic simulator models a reusable two-person household and includes:
 - today's-dollar and nominal-dollar views;
 - year-by-year projection tables, visible-table CSV export and inspectable charts;
 - local autosave plus JSON import and export.
+
+In **Single** mode, Person 1 is the sole modelled person from the first year. Saved Person 2 details and Person 2-owned records are hidden, preserved for a later switch back to **Couple**, and contribute nothing to calculations or output. Joint 50/50 records contribute only Person 1's 50% share. Single mode uses the entered Preferred Retirement Income and Essential Annual Budget in full, applies single-person tax and government-support rules immediately, and does not trigger first-death, inheritance or survivor-percentage logic. This household-type control is currently deterministic-only; the experimental Monte Carlo companion is unchanged.
 
 Return assumptions and inflation are shown together. The interface calculates the nominal-minus-inflation spread live, showing both the long-run 2.5% view and the near-term Treasury rate when they differ.
 

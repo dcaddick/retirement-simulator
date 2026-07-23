@@ -882,6 +882,7 @@ deterministicSalaryParity.assumptions.manualInflationPct = 0;
 deterministicSalaryParity.assumptions.ukPensionsEnabled = false;
 deterministicSalaryParity.household = structuredClone(
   monteCarloSalaryParity.household);
+deterministicSalaryParity.household.type = 'couple';
 deterministicSalaryParity.cash.amount = 0;
 deterministicSalaryParity.savings.amount = 0;
 deterministicSalaryParity.shareholdings = [];
@@ -1029,6 +1030,7 @@ Object.assign(deterministicIncomeParity.assumptions, {
 });
 deterministicIncomeParity.household = structuredClone(
   monteCarloIncomeParity.household);
+deterministicIncomeParity.household.type = 'couple';
 deterministicIncomeParity.cash = structuredClone(monteCarloIncomeParity.cash);
 deterministicIncomeParity.savings = structuredClone(
   monteCarloIncomeParity.savings);

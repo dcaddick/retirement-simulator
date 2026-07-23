@@ -219,7 +219,7 @@
     <input type="file" id="scenarioFile" accept=".json,application/json" hidden>
   </nav>
   </div>
-  <div class="sub">A transparent two-person household projection. Working estimate, not financial advice.</div>
+  <div class="sub">A transparent single- or two-person household projection. Working estimate, not financial advice.</div>
   <div class="header-meta">
     <p id="scenarioMessage" class="scenario-message" aria-live="polite"></p>
     <p class="privacy-note">Scenario data is saved locally and not uploaded. Optional US quote/FX fetches contact Stooq and Frankfurter.</p>
@@ -368,11 +368,12 @@
           <ul id="sourceList"></ul>
           <ul id="limitationsList">
             <li>Annual projection rows; retirement and pension starts use whole ages.</li>
-            <li>Age Pension estimate assumes homeowners and excludes the principal residence. Couple tests apply before first death; the configured survivor uses the single-person income, asset, deeming and CSHC thresholds immediately from the transition year.</li>
+            <li>Age Pension estimate assumes homeowners and excludes the principal residence. An explicit Single household uses single-person income, asset, deeming and CSHC thresholds from the first year. Couple tests apply before first death; the configured survivor uses the single-person thresholds immediately from the transition year.</li>
             <li>Nominal share-price growth is applied before dividends and sales; cost base stays unchanged. Dividend yield excludes price growth and is prorated by months held.</li>
             <li>Dividends and optional franking credits follow ownership. Eligibility is a user assumption; integrity rules are not automated.</li>
             <li>Capital losses are tracked per person, applied before discounts and carried forward from a zero opening balance. CGT is funded from assets and never counts as retirement income.</li>
-            <li>The survival band remains illustrative. The optional first-death scenario is a separate fixed event at the start of the selected year; it is not a mortality simulation and includes no bereavement payment.</li>
+            <li>The survival band remains illustrative. Single household mode is a starting state, not a death event: Person 2 is excluded, entered spending targets remain at 100%, and no inheritance or survivor percentages apply. The optional couple first-death scenario is a separate fixed event at the start of the selected year; it is not a mortality simulation and includes no bereavement payment.</li>
+            <li>In Single mode, Person 2-owned entries contribute zero and Joint 50/50 entries contribute only Person 1’s half. Hidden Person 2 data is preserved and restored when the household returns to Couple.</li>
             <li>Other income is CPI-indexed. Ownership controls tax allocation and survivor continuation; deceased-owned income continues at its entered percentage, while joint and survivor-owned income continue in full. All Other Assets count in the Age Pension assets test. Select “Treat as financial investment for Age Pension deeming” only when appropriate; the selection does not change CSHC treatment, and you should enter actual returns separately under Other Income—for example, interest or rent. Disposal proceeds move to savings and CGT is not modelled.</li>
             <li>Super access age is limited to 60 or older. The simulator treats super withdrawals as tax-free and does not model the additional tax rules that may apply before age 60.</li>
             <li>Tax status estimate: SAPTO uses an age-and-income proxy and does not establish legal eligibility. Couple Medicare estimates assume no dependent children. Confirm current rules and personal eligibility before relying on the result.</li>
@@ -488,7 +489,7 @@
 <script id="simulator-core">
 (function () {
   'use strict';
-  const SCHEMA_VERSION = 13;
+  const SCHEMA_VERSION = 14;
   const VALID_OWNERS = new Set(['p0', 'p1', 'joint']);
   const DRAWDOWN_SOURCES = new Set(['p0Super', 'p1Super', 'cash', 'savings']);
   const OTHER_CURRENCIES = new Set(['AUD', 'GBP', 'USD']);
@@ -1191,6 +1192,7 @@
       otherIncomes: [],
       otherAssets: [],
       household: {
+        type: 'couple',
         targetAfterTax: 80000,
         annualBudget: 70000,
         modelEndAge: 95,
@@ -1250,6 +1252,34 @@
     if (owner === 'p1') return [0, 1];
     if (owner === 'joint') return [0.5, 0.5];
     throw new Error(`Invalid owner: ${owner}`);
+  }
+
+  function effectiveDrawdownPriority(scenario) {
+    const tiers = scenario.household.drawdownPriority.map(tier =>
+      Array.isArray(tier) ? tier.map(entry => ({ ...entry })) : []);
+    if (!isSingleHousehold(scenario)) return tiers;
+    return tiers
+      .map(tier => tier.filter(entry => entry.source !== 'p1Super'))
+      .filter(tier => tier.length)
+      .map(tier => {
+        const total = tier.reduce((sum, entry) => sum + entry.weight, 0);
+        return tier.map(entry => ({
+          ...entry,
+          weight: total > 0 ? entry.weight / total : entry.weight
+        }));
+      });
+  }
+
+  function singleHouseholdInclusion(owner) {
+    if (owner === 'p0') return 1;
+    if (owner === 'joint') return 0.5;
+    return 0;
+  }
+
+  function householdInclusion(scenario, owner) {
+    return isSingleHousehold(scenario)
+      ? singleHouseholdInclusion(owner)
+      : 1;
   }
 
   function hitTestSegments(segments, x, y) {
@@ -1436,6 +1466,19 @@
       }));
       current = migrated;
     }
+    if (current.schemaVersion === 13) {
+      const migrated = structuredClone(current);
+      migrated.schemaVersion = 14;
+      migrated.household = {
+        ...migrated.household,
+        type: 'couple'
+      };
+      migrated.otherAssets = (migrated.otherAssets ?? []).map(asset => ({
+        ...asset,
+        owner: asset.owner ?? 'joint'
+      }));
+      current = migrated;
+    }
     if (current.schemaVersion !== SCHEMA_VERSION) {
       throw new Error(`Unsupported schema version: ${raw.schemaVersion}.`);
     }
@@ -1588,7 +1631,7 @@
     return allocateOwnedAmount(taxableGain, holding.owner);
   }
 
-  function makeShareholding(index) {
+  function makeShareholding(index, owner = 'joint') {
     return {
       id: `share-${Date.now()}-${index}`,
       symbol: '',
@@ -1597,7 +1640,7 @@
       quoteMarket: 'manual',
       price: 0,
       fxToAud: 1,
-      owner: 'joint',
+      owner,
       costBaseAud: 0,
       cgtDiscountEligible: true,
       saleYear: new Date().getFullYear() + 1,
@@ -1619,7 +1662,7 @@
     return `https://stooq.com/q/l/?s=${symbol}.us&f=sd2t2ohlcv&h&e=csv`;
   }
 
-  function makeOtherIncome(index) {
+  function makeOtherIncome(index, owner = 'joint') {
     return {
       id: `income-${Date.now()}-${index}`,
       label: '',
@@ -1627,18 +1670,19 @@
       fxToAud: 1,
       amount: 0,
       taxable: true,
-      owner: 'joint',
+      owner,
       survivorPct: 0
     };
   }
 
-  function makeOtherAsset(index) {
+  function makeOtherAsset(index, owner = 'joint') {
     return {
       id: `asset-${Date.now()}-${index}`,
       label: '',
       currency: 'AUD',
       fxToAud: 1,
       amount: 0,
+      owner,
       agePensionDeemed: false,
       growthPct: 0,
       disposalYear: new Date().getFullYear() + 5
@@ -1679,33 +1723,91 @@
     };
   }
 
+  function isSingleHousehold(scenario) {
+    return scenario.household?.type === 'single';
+  }
+
+  function outputPersonIndexes(scenario) {
+    return isSingleHousehold(scenario) ? [0] : [0, 1];
+  }
+
+  function householdRuleStatus(scenario, lifecycle) {
+    return isSingleHousehold(scenario) ||
+      lifecycle.householdStatus === 'survivor'
+      ? 'single'
+      : 'couple';
+  }
+
+  function solePersonIndex(scenario, lifecycle) {
+    if (isSingleHousehold(scenario)) return 0;
+    return lifecycle.householdStatus === 'survivor'
+      ? lifecycle.survivorIndex
+      : null;
+  }
+
   function makeProjectionState(scenario) {
-    const splits = scenario.people.map(superAccessSplit);
+    const single = isSingleHousehold(scenario);
+    const splits = scenario.people.map((person, index) =>
+      single && index === 1
+        ? { accum: 0, retire: 0, transitioned: true }
+        : superAccessSplit(person));
+    const cashFraction = householdInclusion(scenario, scenario.cash.owner);
+    const savingsFraction =
+      householdInclusion(scenario, scenario.savings.owner);
+    const activeHoldings = scenario.shareholdings.flatMap(holding => {
+      const fraction = householdInclusion(scenario, holding.owner);
+      return fraction === 0 ? [] : [{
+        ...holding,
+        owner: single ? 'p0' : holding.owner,
+        quantity: holding.quantity * fraction,
+        costBaseAud: holding.costBaseAud * fraction,
+        sold: false
+      }];
+    });
+    const activeOtherAssets = (scenario.otherAssets ?? []).flatMap(asset => {
+      const fraction = householdInclusion(scenario, asset.owner);
+      return fraction === 0 ? [] : [{
+        ...asset,
+        owner: single ? 'p0' : asset.owner,
+        value: asset.amount * otherItemFx(asset) * fraction,
+        sold: false
+      }];
+    });
     return {
       superAccum: splits.map(split => split.accum),
       superRetire: splits.map(split => split.retire),
       superTransitioned: splits.map(split => split.transitioned),
-      cash: scenario.cash.amount,
-      savings: scenario.savings.amount,
+      cash: cashFraction === 0 ? 0 : scenario.cash.amount * cashFraction,
+      savings: savingsFraction === 0
+        ? 0
+        : scenario.savings.amount * savingsFraction,
       capitalLossCarryForward: [0, 0],
-      lifecycle: {
-        householdStatus: 'couple',
-        alive: [true, true],
-        survivorIndex: null,
-        deceasedIndex: null,
-        transitionYear: null
-      },
+      lifecycle: single
+        ? {
+            householdStatus: 'single',
+            alive: [true, false],
+            survivorIndex: null,
+            deceasedIndex: null,
+            transitionYear: null
+          }
+        : {
+            householdStatus: 'couple',
+            alive: [true, true],
+            survivorIndex: null,
+            deceasedIndex: null,
+            transitionYear: null
+          },
       ownership: {
-        cash: scenario.cash.owner,
-        savings: scenario.savings.owner
+        cash: single ? 'p0' : scenario.cash.owner,
+        savings: single ? 'p0' : scenario.savings.owner
+      },
+      interestPct: {
+        cash: cashFraction === 0 ? 0 : scenario.cash.interestPct,
+        savings: savingsFraction === 0 ? 0 : scenario.savings.interestPct
       },
       inheritedSuper: { accum: 0, retire: 0, ownerIndex: null },
-      holdings: scenario.shareholdings.map(holding => ({ ...holding, sold: false })),
-      otherAssets: (scenario.otherAssets ?? []).map(asset => ({
-        ...asset,
-        value: asset.amount * otherItemFx(asset),
-        sold: false
-      }))
+      holdings: activeHoldings,
+      otherAssets: activeOtherAssets
     };
   }
 
@@ -1729,7 +1831,9 @@
 
   function applyFirstDeathTransition({ scenario, state, year, ages }) {
     const firstDeath = scenario.household.firstDeath;
-    if (!firstDeath.enabled || state.lifecycle.householdStatus === 'survivor') {
+    if (isSingleHousehold(scenario) ||
+        !firstDeath.enabled ||
+        state.lifecycle.householdStatus === 'survivor') {
       return lifecycleContext(scenario, state, false);
     }
     const deceasedIndex = firstDeath.deceasedPerson === 'p1' ? 1 : 0;
@@ -2006,10 +2110,12 @@
     const errors = validateScenario(scenario);
     if (errors.length) throw new Error(`${errors[0].path}: ${errors[0].message}`);
 
-    const configuredDeceasedIndex =
-      scenario.household.firstDeath.deceasedPerson === 'p1' ? 1 : 0;
-    const horizonIndex = scenario.household.firstDeath.enabled
-      ? 1 - configuredDeceasedIndex : 0;
+    const single = isSingleHousehold(scenario);
+    const horizonIndex = single
+      ? 0
+      : scenario.household.firstDeath.enabled
+        ? 1 - (scenario.household.firstDeath.deceasedPerson === 'p1' ? 1 : 0)
+        : 0;
     const rowCount = scenario.household.modelEndAge -
       scenario.people[horizonIndex].age + 1;
     const factors = inflationFactors(scenario, rowCount);
@@ -2019,7 +2125,8 @@
     for (let index = 0; index < rowCount; index += 1) {
       const year = scenario.startYear + index;
       const inflationFactor = factors[index];
-      const ages = scenario.people.map(person => person.age + index);
+      const ages = scenario.people.map((person, personIndex) =>
+        single && personIndex === 1 ? null : person.age + index);
       const events = [];
 
       const lifecycle = applyFirstDeathTransition({
@@ -2075,6 +2182,7 @@
   }) {
     const salaries = [0, 0];
     const ukState = [0, 0];
+    const drawdownPriority = effectiveDrawdownPriority(scenario);
 
     scenario.people.forEach((person, index) => {
       if (!state.lifecycle.alive[index]) return;
@@ -2176,8 +2284,12 @@
         if (named.event) events.push(named.event);
         saleRecords.push(...named.saleRecords);
         const result = drawForLumpSum(
-          state, scenario.household.drawdownPriority, requestedNominal - named.drawn,
-          DRAWDOWN_SOURCES.has(withdrawal.source) ? withdrawal.source : 'automatic');
+          state, drawdownPriority, requestedNominal - named.drawn,
+          isSingleHousehold(scenario) && withdrawal.source === 'p1Super'
+            ? 'automatic'
+            : DRAWDOWN_SOURCES.has(withdrawal.source)
+              ? withdrawal.source
+              : 'automatic');
         const actualDraws = { ...result.drawsBySource };
         if (named.drawn > 0) actualDraws[`named:${named.label}`] = named.drawn;
         Object.keys(lumpSumDrawsNominal).forEach(source => {
@@ -2242,7 +2354,10 @@
     const otherTaxableByPerson = [0, 0];
     const otherNonTaxableByPerson = [0, 0];
     (scenario.otherIncomes ?? []).forEach(item => {
-      let nominal = item.amount * otherItemFx(item) * inflationFactor;
+      const inclusion = householdInclusion(scenario, item.owner);
+      if (inclusion === 0) return;
+      let nominal =
+        item.amount * otherItemFx(item) * inflationFactor * inclusion;
       let owner = item.owner;
       if (state.lifecycle.householdStatus === 'survivor') {
         const deceasedOwner = `p${state.lifecycle.deceasedIndex}`;
@@ -2252,6 +2367,7 @@
         }
         owner = survivorOwner;
       }
+      if (isSingleHousehold(scenario)) owner = 'p0';
       const target = item.taxable
         ? otherTaxableByPerson : otherNonTaxableByPerson;
       allocateOwnedAmount(nominal, owner).forEach((amount, index) => {
@@ -2263,9 +2379,9 @@
     const otherNonTaxableNominal = otherNonTaxableByPerson.reduce(
       (sum, amount) => sum + amount, 0);
 
-    const cashInterest = state.cash * scenario.cash.interestPct / 100;
+    const cashInterest = state.cash * state.interestPct.cash / 100;
     const savingsInterest =
-      openingSavings * scenario.savings.interestPct / 100 +
+      openingSavings * state.interestPct.savings / 100 +
       saleYearInterest;
     state.cash += cashInterest;
     state.savings += savingsInterest;
@@ -2294,17 +2410,18 @@
     });
     const otherAssetsReal = otherAssetsNominal / inflationFactor;
     const deemableOtherAssetsReal = deemableOtherAssetsNominal / inflationFactor;
+    const ruleStatus = householdRuleStatus(scenario, state.lifecycle);
+    const singleIndex = solePersonIndex(scenario, state.lifecycle);
     const agePensionIncomeReal =
       salaries.reduce((sum, value) => sum + value, 0) / inflationFactor +
       ukState.reduce((sum, value) => sum + value, 0) / inflationFactor +
       (otherTaxableNominal + otherNonTaxableNominal) / inflationFactor +
       deemedIncome(assessableAssetsReal + deemableOtherAssetsReal,
-        state.lifecycle.householdStatus === 'survivor'
-        ? 'single' : 'couple');
+        ruleStatus);
     const agePension = agePensionForHousehold({
       ages,
       alive: state.lifecycle.alive,
-      survivorIndex: state.lifecycle.survivorIndex,
+      survivorIndex: singleIndex,
       assets: assessableAssetsReal + otherAssetsReal,
       assessableIncome: agePensionIncomeReal,
       included: scenario.household.includeAgePension
@@ -2350,11 +2467,8 @@
     const totalTaxableNominalByPerson = [0, 1].map(index =>
       ordinaryTaxableNominal[index] + netCapitalGainByPerson[index]);
     const frankingNominal = dividendFlows.frankingByPerson;
-    const householdTaxStatus = state.lifecycle.alive.every(Boolean)
-      ? 'couple'
-      : 'survivor';
     const householdTaxInput = {
-      status: householdTaxStatus,
+      status: ruleStatus,
       alive: state.lifecycle.alive,
       ages,
       inflationFactor,
@@ -2417,7 +2531,7 @@
       grossNonDividendTaxableSources - baseTaxNominal +
       dividendNetNominal + otherNonTaxableNominal;
     const cgtFunding = fundTaxExpense(
-      state, scenario.household.drawdownPriority, cgtTaxNominal);
+      state, drawdownPriority, cgtTaxNominal);
     if (cgtTaxNominal > 0) {
       events.push({
         type: 'cgt-payment',
@@ -2441,7 +2555,7 @@
     // act as the modelling lever while the essential budget reflects actual spending.
     const gap = Math.max(0, targetNominal - guaranteedNet - mandatoryTotal);
 
-    const waterfall = drawFromTiers(state, scenario.household.drawdownPriority, gap);
+    const waterfall = drawFromTiers(state, drawdownPriority, gap);
     const extraSuperDraws = [waterfall.drawsBySource.p0Super, waterfall.drawsBySource.p1Super];
     if (state.lifecycle.householdStatus === 'survivor') {
       const deceasedIndex = state.lifecycle.deceasedIndex;
@@ -2486,7 +2600,7 @@
     const cshc = cshcEstimate({
       adjustedTaxableIncome: adjustedTaxableIncomeReal,
       accountBasedPensionBalance: abpBalanceReal,
-      status: state.lifecycle.householdStatus === 'survivor' ? 'single' : 'couple'
+      status: ruleStatus
     });
 
     return {
@@ -2535,6 +2649,7 @@
       taxRefund: taxLedger.reduce(
         (sum, person) => sum + person.refundNominal, 0) / inflationFactor,
       taxLedger: taxLedger.map(person => ({ ...person })),
+      agePensionByPerson: [...agePension.byPerson],
       cshc,
       agePensionStatus: agePension.status,
       totalIncome: totalIncomeNominal / inflationFactor,
@@ -2574,6 +2689,56 @@
     };
   }
 
+  function validatePerson(person, index, add) {
+    const finiteNonNegative = value => Number.isFinite(value) && value >= 0;
+    if (!person.name || typeof person.name !== 'string') {
+      add(`people.${index}.name`, 'Name is required.');
+    }
+    if (!finiteNonNegative(person.age) || person.age > 120) {
+      add(`people.${index}.age`, 'Age must be between 0 and 120.');
+    }
+    if (!finiteNonNegative(person.super)) {
+      add(`people.${index}.super`, 'Super must be zero or greater.');
+    }
+    if (!finiteNonNegative(person.salary)) {
+      add(`people.${index}.salary`, 'Salary must be zero or greater.');
+    }
+    if (!Number.isFinite(person.sgPct) || person.sgPct < 0 || person.sgPct > 30) {
+      add(`people.${index}.sgPct`, 'SG % must be between 0 and 30.');
+    }
+    if (!Number.isFinite(person.accumulationReturnPct) ||
+        person.accumulationReturnPct < -20 || person.accumulationReturnPct > 30) {
+      add(`people.${index}.accumulationReturnPct`,
+        'Accumulation return % must be between -20 and 30.');
+    }
+    if (!Number.isFinite(person.retirementReturnPct) ||
+        person.retirementReturnPct < -20 || person.retirementReturnPct > 30) {
+      add(`people.${index}.retirementReturnPct`,
+        'Retirement return % must be between -20 and 30.');
+    }
+    if (!finiteNonNegative(person.salaryGrowthPct)) {
+      add(`people.${index}.salaryGrowthPct`,
+        'Salary growth above inflation must be zero or greater.');
+    }
+    if (!finiteNonNegative(person.retireAge) || person.retireAge < person.age) {
+      add(`people.${index}.retireAge`, 'Retirement age cannot be below current age.');
+    }
+    if (!Number.isFinite(person.superAccessAge) ||
+        person.superAccessAge < 60 || person.superAccessAge > 120) {
+      add(`people.${index}.superAccessAge`,
+        'Super access age must be 60 or older because this simulator does not model taxation of withdrawals before age 60.');
+    }
+    if (!Number.isFinite(person.superAccessPct) ||
+        person.superAccessPct < 0 || person.superAccessPct > 100) {
+      add(`people.${index}.superAccessPct`, 'Super access % must be between 0 and 100.');
+    }
+    if (!Number.isFinite(person.ukStateSurvivorPct) ||
+        person.ukStateSurvivorPct < 0 || person.ukStateSurvivorPct > 100) {
+      add(`people.${index}.ukStateSurvivorPct`,
+        'UK State Pension survivor % must be between 0 and 100.');
+    }
+  }
+
   function validateScenario(scenario) {
     const errors = [];
     const add = (path, message) => errors.push({ path, message });
@@ -2585,64 +2750,30 @@
     if (scenario.schemaVersion !== SCHEMA_VERSION) {
       add('schemaVersion', `Expected schema version ${SCHEMA_VERSION}.`);
     }
+    if (!['couple', 'single'].includes(scenario.household?.type)) {
+      add('household.type', 'Household type must be Couple or Single.');
+    }
     if (!Array.isArray(scenario.people) || scenario.people.length !== 2) {
       add('people', 'Exactly two people are required.');
     } else {
       scenario.people.forEach((person, index) => {
-        if (!person.name || typeof person.name !== 'string') {
-          add(`people.${index}.name`, 'Name is required.');
-        }
-        if (!finiteNonNegative(person.age) || person.age > 120) {
-          add(`people.${index}.age`, 'Age must be between 0 and 120.');
-        }
-        if (!finiteNonNegative(person.super)) {
-          add(`people.${index}.super`, 'Super must be zero or greater.');
-        }
-        if (!finiteNonNegative(person.salary)) {
-          add(`people.${index}.salary`, 'Salary must be zero or greater.');
-        }
-        if (!Number.isFinite(person.sgPct) || person.sgPct < 0 || person.sgPct > 30) {
-          add(`people.${index}.sgPct`, 'SG % must be between 0 and 30.');
-        }
-        if (!Number.isFinite(person.accumulationReturnPct) ||
-            person.accumulationReturnPct < -20 || person.accumulationReturnPct > 30) {
-          add(`people.${index}.accumulationReturnPct`,
-            'Accumulation return % must be between -20 and 30.');
-        }
-        if (!Number.isFinite(person.retirementReturnPct) ||
-            person.retirementReturnPct < -20 || person.retirementReturnPct > 30) {
-          add(`people.${index}.retirementReturnPct`,
-            'Retirement return % must be between -20 and 30.');
-        }
-        if (!finiteNonNegative(person.salaryGrowthPct)) {
-          add(`people.${index}.salaryGrowthPct`,
-            'Salary growth above inflation must be zero or greater.');
-        }
-        if (!finiteNonNegative(person.retireAge) || person.retireAge < person.age) {
-          add(`people.${index}.retireAge`, 'Retirement age cannot be below current age.');
-        }
-        if (!Number.isFinite(person.superAccessAge) ||
-            person.superAccessAge < 60 || person.superAccessAge > 120) {
-          add(`people.${index}.superAccessAge`,
-            'Super access age must be 60 or older because this simulator does not model taxation of withdrawals before age 60.');
-        }
-        if (!Number.isFinite(person.superAccessPct) ||
-            person.superAccessPct < 0 || person.superAccessPct > 100) {
-          add(`people.${index}.superAccessPct`, 'Super access % must be between 0 and 100.');
-        }
-        if (!Number.isFinite(person.ukStateSurvivorPct) ||
-            person.ukStateSurvivorPct < 0 || person.ukStateSurvivorPct > 100) {
-          add(`people.${index}.ukStateSurvivorPct`,
-            'UK State Pension survivor % must be between 0 and 100.');
-        }
+        if (isSingleHousehold(scenario) && index === 1) return;
+        validatePerson(person, index, add);
       });
     }
     ['cash', 'savings'].forEach(key => {
-      if (!scenario[key] || !finiteNonNegative(scenario[key].amount)) {
+      const item = scenario[key];
+      if (!item || !VALID_OWNERS.has(item.owner)) {
+        add(`${key}.owner`, 'Owner must be Person 1, Person 2, or Joint 50/50.');
+        return;
+      }
+      if (isSingleHousehold(scenario) && item.owner === 'p1') return;
+      if (!finiteNonNegative(item.amount)) {
         add(`${key}.amount`, 'Amount must be zero or greater.');
       }
-      if (!scenario[key] || !VALID_OWNERS.has(scenario[key].owner)) {
-        add(`${key}.owner`, 'Owner must be Person 1, Person 2, or Joint 50/50.');
+      if (!Number.isFinite(item.interestPct) ||
+          item.interestPct < 0 || item.interestPct > 30) {
+        add(`${key}.interestPct`, 'Interest rate must be between 0 and 30%.');
       }
     });
     if (!Array.isArray(scenario.shareholdings)) {
@@ -2650,6 +2781,12 @@
     } else {
       scenario.shareholdings.forEach((holding, index) => {
         const path = `shareholdings.${index}`;
+        if (!VALID_OWNERS.has(holding.owner)) {
+          add(`${path}.owner`,
+            'Owner must be Person 1, Person 2, or Joint 50/50.');
+          return;
+        }
+        if (isSingleHousehold(scenario) && holding.owner === 'p1') return;
         if (!holding.symbol || typeof holding.symbol !== 'string') {
           add(`${path}.symbol`, 'Symbol is required.');
         }
@@ -2664,9 +2801,6 @@
         }
         if (!(Number.isFinite(holding.fxToAud) && holding.fxToAud > 0)) {
           add(`${path}.fxToAud`, 'FX rate must be greater than zero.');
-        }
-        if (!VALID_OWNERS.has(holding.owner)) {
-          add(`${path}.owner`, 'Owner must be Person 1, Person 2, or Joint 50/50.');
         }
         if (!finiteNonNegative(holding.costBaseAud)) {
           add(`${path}.costBaseAud`, 'Cost base must be zero or greater.');
@@ -2707,6 +2841,12 @@
     } else {
       scenario.otherIncomes.forEach((item, index) => {
         const path = `otherIncomes.${index}`;
+        if (!VALID_OWNERS.has(item.owner)) {
+          add(`${path}.owner`,
+            'Tax owner must be Person 1, Person 2, or Joint 50/50.');
+          return;
+        }
+        if (isSingleHousehold(scenario) && item.owner === 'p1') return;
         if (!item.label || typeof item.label !== 'string') {
           add(`${path}.label`, 'Label is required.');
         }
@@ -2723,9 +2863,6 @@
         if (typeof item.taxable !== 'boolean') {
           add(`${path}.taxable`, 'Taxable must be true or false.');
         }
-        if (!['p0', 'p1', 'joint'].includes(item.owner)) {
-          add(`${path}.owner`, 'Tax owner must be Person 1, Person 2, or Joint 50/50.');
-        }
         if (!Number.isFinite(item.survivorPct) ||
             item.survivorPct < 0 || item.survivorPct > 100) {
           add(`${path}.survivorPct`, 'Survivor % must be between 0 and 100.');
@@ -2737,6 +2874,12 @@
     } else {
       scenario.otherAssets.forEach((item, index) => {
         const path = `otherAssets.${index}`;
+        if (!VALID_OWNERS.has(item.owner)) {
+          add(`${path}.owner`,
+            'Owner must be Person 1, Person 2, or Joint 50/50.');
+          return;
+        }
+        if (isSingleHousehold(scenario) && item.owner === 'p1') return;
         if (!item.label || typeof item.label !== 'string') {
           add(`${path}.label`, 'Label is required.');
         }
@@ -2771,41 +2914,47 @@
       add('household.annualBudget', 'Essential Annual Budget must be zero or greater.');
     }
     const firstDeath = scenario.household?.firstDeath;
-    const horizonIndex = firstDeath?.enabled
-      ? 1 - (firstDeath.deceasedPerson === 'p1' ? 1 : 0) : 0;
+    const horizonIndex = isSingleHousehold(scenario)
+      ? 0
+      : firstDeath?.enabled
+        ? 1 - (firstDeath.deceasedPerson === 'p1' ? 1 : 0)
+        : 0;
     if (!(scenario.household?.modelEndAge >= scenario.people?.[horizonIndex]?.age)) {
-      add('household.modelEndAge', firstDeath?.enabled
+      add('household.modelEndAge',
+        !isSingleHousehold(scenario) && firstDeath?.enabled
         ? 'Model end age cannot be below the survivor current age.'
         : 'Model end age cannot be below Person 1 current age.');
     }
-    if (!firstDeath || typeof firstDeath.enabled !== 'boolean') {
-      add('household.firstDeath.enabled',
-        'First-death inclusion must be true or false.');
-    } else if (firstDeath.enabled) {
-      const validDeceased = ['p0', 'p1'].includes(firstDeath.deceasedPerson);
-      if (!validDeceased) {
-        add('household.firstDeath.deceasedPerson',
-          'Select the person who dies first.');
-      }
-      const deceasedIndex = firstDeath.deceasedPerson === 'p1' ? 1 : 0;
-      const survivorIndex = 1 - deceasedIndex;
-      const deceased = scenario.people?.[deceasedIndex];
-      const survivor = scenario.people?.[survivorIndex];
-      if (!deceased || !Number.isInteger(firstDeath.deathAge) ||
-          firstDeath.deathAge <= deceased.age) {
-        add('household.firstDeath.deathAge',
-          'Death age must be above the current age.');
-      } else if (survivor &&
-          survivor.age + firstDeath.deathAge - deceased.age >=
-            scenario.household.modelEndAge) {
-        add('household.firstDeath.deathAge',
-          'Death must occur before the survivor reaches Model End Age.');
-      }
-      for (const field of ['survivorPreferredPct', 'survivorEssentialPct']) {
-        if (!Number.isFinite(firstDeath[field]) ||
-            firstDeath[field] < 0 || firstDeath[field] > 100) {
-          add(`household.firstDeath.${field}`,
-            'Survivor percentage must be from 0% to 100%.');
+    if (!isSingleHousehold(scenario)) {
+      if (!firstDeath || typeof firstDeath.enabled !== 'boolean') {
+        add('household.firstDeath.enabled',
+          'First-death inclusion must be true or false.');
+      } else if (firstDeath.enabled) {
+        const validDeceased = ['p0', 'p1'].includes(firstDeath.deceasedPerson);
+        if (!validDeceased) {
+          add('household.firstDeath.deceasedPerson',
+            'Select the person who dies first.');
+        }
+        const deceasedIndex = firstDeath.deceasedPerson === 'p1' ? 1 : 0;
+        const survivorIndex = 1 - deceasedIndex;
+        const deceased = scenario.people?.[deceasedIndex];
+        const survivor = scenario.people?.[survivorIndex];
+        if (!deceased || !Number.isInteger(firstDeath.deathAge) ||
+            firstDeath.deathAge <= deceased.age) {
+          add('household.firstDeath.deathAge',
+            'Death age must be above the current age.');
+        } else if (survivor &&
+            survivor.age + firstDeath.deathAge - deceased.age >=
+              scenario.household.modelEndAge) {
+          add('household.firstDeath.deathAge',
+            'Death must occur before the survivor reaches Model End Age.');
+        }
+        for (const field of ['survivorPreferredPct', 'survivorEssentialPct']) {
+          if (!Number.isFinite(firstDeath[field]) ||
+              firstDeath[field] < 0 || firstDeath[field] > 100) {
+            add(`household.firstDeath.${field}`,
+              'Survivor percentage must be from 0% to 100%.');
+          }
         }
       }
     }
@@ -2834,6 +2983,12 @@
           }
         });
       });
+    }
+    if (Array.isArray(scenario.household?.drawdownPriority) &&
+        isSingleHousehold(scenario) &&
+        effectiveDrawdownPriority(scenario).length === 0) {
+      add('household.drawdownPriority',
+        'A single household needs at least one Person 1, cash, or savings drawdown source.');
     }
     if (!['treasury', 'manual'].includes(scenario.assumptions?.inflationMode)) {
       add('assumptions.inflationMode', 'Inflation mode must be Treasury or manual.');
@@ -2879,9 +3034,14 @@
     }));
   }
 
+  function outputAgeContext(row, scenario) {
+    const ages = outputPersonIndexes(scenario)
+      .map(index => row.ages[index] ?? '—');
+    return `${row.year} · ${ages.length === 1 ? 'age' : 'ages'} ${ages.join(' and ')}`;
+  }
+
   function chartTooltipLines(segment, row, scenario) {
-    const ages = row.ages.map(age => age ?? '—');
-    const context = `${row.year} · ages ${ages[0]} and ${ages[1]}`;
+    const context = outputAgeContext(row, scenario);
     if (segment.key === 'lumpSum') {
       const detail = row.events.filter(event => event.type === 'lump-sum')
         .map(event => lumpSumEventLabel(event, scenario.people))
@@ -2911,11 +3071,14 @@
     sourceSummary,
     lumpSumEventLabel,
     chartTooltipLines,
+    outputAgeContext,
     validateScenario,
     parseMoney,
     formatMoney,
     csvFromMatrix,
     ownerWeights,
+    singleHouseholdInclusion,
+    householdInclusion,
     hitTestSegments,
     exportScenario,
     importScenario,
@@ -2970,6 +3133,10 @@
     agePensionForHousehold,
     cshcEstimate,
     assessableFinancialAssets,
+    isSingleHousehold,
+    outputPersonIndexes,
+    householdRuleStatus,
+    solePersonIndex,
     makeProjectionState,
     applyFirstDeathTransition,
     superAccessSplit,
@@ -2979,6 +3146,7 @@
     drawFromTiers,
     fundTaxExpense,
     defaultDrawdownPriority,
+    effectiveDrawdownPriority,
     defaultFirstDeath,
     migrateScenario,
     inflationFactors,
@@ -3110,10 +3278,11 @@
       base.push(['ukStateNet', '#C99A45', statePensionLabel(scenario)]);
     }
     base.push(['agePensionNet', colour('--chart-pension'), 'Aust. Aged Pension']);
-    if ((scenario.otherIncomes ?? []).length) {
+    if (activeOwnedEntries(scenario, scenario.otherIncomes ?? []).length) {
       base.push(['otherIncomeNet', '#E38A56', 'Other income']);
     }
-    if ((scenario.shareholdings ?? []).some(holding => holding.dividendYieldPct > 0)) {
+    if (activeOwnedEntries(scenario, scenario.shareholdings ?? [])
+      .some(({ item }) => item.dividendYieldPct > 0)) {
       base.push(['shareDividendNet', '#E7B85C', 'Share dividends']);
     }
     const sourceMeta = {
@@ -3123,8 +3292,8 @@
       cash: ['cashDraw', colour('--chart-label'), 'Cash drawdown']
     };
     const discretionary = [];
-    scenario.household.drawdownPriority.forEach(tier => {
-      tier.forEach(entry => {
+    activeDrawdownTiers(scenario).forEach(({ entries }) => {
+      entries.forEach(({ entry }) => {
         if (sourceMeta[entry.source]) discretionary.push(sourceMeta[entry.source]);
       });
     });
@@ -3152,12 +3321,48 @@
       .replace(/^-|-$/g, '') || 'retirement-scenario';
   }
 
-  function ownerOptions(selected, people) {
+  function isSingleScenario(scenario) {
+    return scenario.household.type === 'single';
+  }
+
+  function activePeople(scenario) {
+    return scenario.people
+      .map((person, index) => ({ person, index }))
+      .filter(({ index }) => !isSingleScenario(scenario) || index === 0);
+  }
+
+  function activeOwnedEntries(scenario, items) {
+    return items
+      .map((item, index) => ({ item, index }))
+      .filter(({ item }) => !isSingleScenario(scenario) || item.owner !== 'p1');
+  }
+
+  function hiddenPerson2Count(scenario) {
+    if (!isSingleScenario(scenario)) return 0;
     return [
-      ['p0', people[0].name],
-      ['p1', people[1].name],
+      scenario.cash,
+      scenario.savings,
+      ...(scenario.shareholdings ?? []),
+      ...(scenario.otherIncomes ?? []),
+      ...(scenario.otherAssets ?? [])
+    ].filter(item => item?.owner === 'p1').length;
+  }
+
+  function sourceIsActiveForScenario(scenario, source) {
+    if (!isSingleScenario(scenario)) return true;
+    if (source === 'p1Super') return false;
+    if (source === 'cash') return scenario.cash.owner !== 'p1';
+    if (source === 'savings') return scenario.savings.owner !== 'p1';
+    return true;
+  }
+
+  function ownerOptions(selected, scenario) {
+    const options = [
+      ['p0', scenario.people[0].name],
+      ['p1', scenario.people[1].name],
       ['joint', 'Joint 50/50']
-    ].map(([value, label]) =>
+    ].filter(([value]) => !isSingleScenario(scenario) || value !== 'p1');
+    return options.map(([value, label]) =>
       `<option value="${value}"${value === selected ? ' selected' : ''}>${escapeHtml(label)}</option>`
     ).join('');
   }
@@ -3202,9 +3407,11 @@
     </label>`;
   }
 
-  function ownerField(label, path, selected, people) {
+  function ownerField(label, path, selected, scenario) {
     return `<label><span class="k">${escapeHtml(label)}</span>
-      <select data-path="${path}">${ownerOptions(selected, people)}</select>
+      <select data-path="${path}">${ownerOptions(selected, scenario)}</select>
+      ${isSingleScenario(scenario) && selected === 'joint'
+        ? '<span class="sub">50% included for Person 1.</span>' : ''}
     </label>`;
   }
 
@@ -3228,8 +3435,9 @@
     </fieldset>`;
   }
 
-  function renderPeople(people) {
-    $('#peopleFields').innerHTML = people.map(personFields).join('');
+  function renderPeople(scenario) {
+    $('#peopleFields').innerHTML = activePeople(scenario)
+      .map(({ person, index }) => personFields(person, index)).join('');
   }
 
   function signedPct(value) {
@@ -3267,7 +3475,7 @@
   }
 
   function renderReturnAssumptions(scenario) {
-    $('#returnFields').innerHTML = scenario.people.map((person, index) =>
+    $('#returnFields').innerHTML = activePeople(scenario).map(({ person, index }) =>
       returnFields(person, index, scenario.assumptions)).join('');
     $('#inflationMode').value = scenario.assumptions.inflationMode;
     $('#manualInflationPct').value = scenario.assumptions.manualInflationPct;
@@ -3290,30 +3498,39 @@
   }
 
   function renderCashAndSavings(scenario) {
-    $('#cashSavingsFields').innerHTML = `
+    const cash = isSingleScenario(scenario) && scenario.cash.owner === 'p1' ? '' : `
       <fieldset>
         <legend>Cash on hand</legend>
         ${moneyField('Amount', 'cash.amount', scenario.cash.amount)}
         ${numberField('Interest rate %', 'cash.interestPct', scenario.cash.interestPct, 'min="0" max="30" step="0.1"')}
-        ${ownerField('Owner', 'cash.owner', scenario.cash.owner, scenario.people)}
-      </fieldset>
+        ${ownerField('Owner', 'cash.owner', scenario.cash.owner, scenario)}
+      </fieldset>`;
+    const savings = isSingleScenario(scenario) && scenario.savings.owner === 'p1' ? '' : `
       <fieldset>
         <legend>Savings Pot (Term Deposits, etc..)</legend>
         ${moneyField('Amount', 'savings.amount', scenario.savings.amount)}
         ${numberField('Interest rate %', 'savings.interestPct', scenario.savings.interestPct, 'min="0" max="30" step="0.1"')}
-        ${ownerField('Owner', 'savings.owner', scenario.savings.owner, scenario.people)}
+        ${ownerField('Owner', 'savings.owner', scenario.savings.owner, scenario)}
       </fieldset>`;
+    $('#cashSavingsFields').innerHTML = cash || savings
+      ? `${cash}${savings}`
+      : '<p class="sub">Person 2-owned cash and savings are hidden and excluded.</p>';
   }
 
   function lumpSourceOptions(selected, scenario) {
     const people = scenario.people;
-    return [
+    const options = [
       ['automatic', 'Automatic - household drawdown order'],
       ['cash', 'Cash'], ['savings', 'Savings'],
       ['p0Super', `${people[0].name} super`], ['p1Super', `${people[1].name} super`],
-      ...scenario.shareholdings.map(item => [`share:${item.id}`, item.symbol || 'Shareholding']),
-      ...(scenario.otherAssets ?? []).map(item => [`asset:${item.id}`, item.label || 'Other asset'])
-    ].map(([value, label]) => `<option value="${value}"${selected === value ? ' selected' : ''}>${escapeHtml(label)}</option>`).join('');
+      ...activeOwnedEntries(scenario, scenario.shareholdings)
+        .map(({ item }) => [`share:${item.id}`, item.symbol || 'Shareholding']),
+      ...activeOwnedEntries(scenario, scenario.otherAssets ?? [])
+        .map(({ item }) => [`asset:${item.id}`, item.label || 'Other asset'])
+    ].filter(([value]) => value === 'automatic' || sourceIsActiveForScenario(scenario, value));
+    return options.map(([value, label]) =>
+      `<option value="${value}"${selected === value ? ' selected' : ''}>${escapeHtml(label)}</option>`
+    ).join('');
   }
 
   const expandedLumpIds = new Set();
@@ -3344,7 +3561,7 @@
   }
 
   function renderLumpSums(scenario) {
-    const horizonIndex = scenario.household.firstDeath.enabled
+    const horizonIndex = isSingleScenario(scenario) ? 0 : scenario.household.firstDeath.enabled
       ? 1 - (scenario.household.firstDeath.deceasedPerson === 'p1' ? 1 : 0) : 0;
     const horizonYear = scenario.startYear + scenario.household.modelEndAge -
       scenario.people[horizonIndex].age;
@@ -3380,7 +3597,7 @@
     }).join('') || '<p class="sub">No planned lump-sum withdrawals.</p>';
   }
 
-  function shareholdingFields(holding, index, people) {
+  function shareholdingFields(holding, index, scenario) {
     const path = `shareholdings.${index}`;
     const quoteMarket = holding.quoteMarket ??
       (holding.quoteCurrency === 'USD' ? 'stooq-us' : 'manual');
@@ -3406,7 +3623,7 @@
         <input type="number" min="0" step="0.0001" data-value-type="number"
           data-path="${path}.fxToAud" value="${holding.fxToAud}">
       </label>
-      ${ownerField('Owner', `${path}.owner`, holding.owner, people)}
+      ${ownerField('Owner', `${path}.owner`, holding.owner, scenario)}
       ${moneyField('Cost base', `${path}.costBaseAud`, holding.costBaseAud)}
       ${numberField('Expected share-price growth %/yr (excluding dividends)',
         `${path}.priceGrowthPct`, holding.priceGrowthPct,
@@ -3443,7 +3660,9 @@
         : '<p class="sub">Manual pricing makes no market-data network request.</p>'}`;
   }
 
-  function renderShareholding(holding, index, people) {
+  function renderShareholding(holding, index, scenario) {
+    const people = scenario.people;
+    const jointSingle = isSingleScenario(scenario) && holding.owner === 'joint';
     const returnSummary = [
       holding.priceGrowthPct !== 0 ? `${signedPct(holding.priceGrowthPct)} growth` : '',
       holding.dividendYieldPct > 0 ? `${holding.dividendYieldPct}% yield` : '',
@@ -3455,21 +3674,22 @@
       <summary>
         <span>${escapeHtml(holding.symbol || 'New holding')}</span>
         <span>${holding.quantity.toLocaleString('en-AU')} shares</span>
-        <span>${escapeHtml(ownerLabel(holding.owner, people))}</span>
-        <span>${core.formatMoney(core.shareValueAud(holding), 'AUD')}</span>
+        <span>${escapeHtml(ownerLabel(holding.owner, people))}${jointSingle ? ' · 50% included' : ''}</span>
+        <span>${core.formatMoney(core.shareValueAud(holding) * (jointSingle ? 0.5 : 1), 'AUD')}</span>
         ${returnSummary ? `<span class="share-return-summary">${escapeHtml(returnSummary)}</span>` : ''}
       </summary>
       <div class="shareholding-fields">
-        ${shareholdingFields(holding, index, people)}
+        ${shareholdingFields(holding, index, scenario)}
         <button type="button" class="remove-share" data-index="${index}">Remove holding</button>
       </div>
     </details>`;
   }
 
-  function renderShareholdings(holdings, people) {
+  function renderShareholdings(scenario) {
+    const holdings = activeOwnedEntries(scenario, scenario.shareholdings);
     $('#shareholdingList').innerHTML = holdings.length
-      ? holdings.map((holding, index) =>
-          renderShareholding(holding, index, people)).join('')
+      ? holdings.map(({ item, index }) =>
+          renderShareholding(item, index, scenario)).join('')
       : '<p class="empty-state">No shareholdings added.</p>';
   }
 
@@ -3490,7 +3710,8 @@
       </label>`;
   }
 
-  function renderUkPensions(people, assumptions) {
+  function renderUkPensions(scenario) {
+    const { people, assumptions } = scenario;
     const enabled = assumptions.ukPensionsEnabled !== false;
     const toggle = $('#ukPensionsEnabled');
     if (toggle) toggle.checked = enabled;
@@ -3500,7 +3721,9 @@
     $('#gbpAudRow').hidden = dbMode;
     $('#uppRow').hidden = dbMode;
     $('#ukPerson0').innerHTML = ukPersonFields(people[0], 0, assumptions);
-    $('#ukPerson1').innerHTML = ukPersonFields(people[1], 1, assumptions);
+    $('#ukPerson1').hidden = isSingleScenario(scenario);
+    $('#ukPerson1').innerHTML = isSingleScenario(scenario)
+      ? '' : ukPersonFields(people[1], 1, assumptions);
     // v0.98: dim the per-person inputs when the pensions are excluded so it is
     // clear they no longer feed the projection, chart columns, or legend.
     const fields = $('#ukPensionFields');
@@ -3516,7 +3739,7 @@
     ).join('');
   }
 
-  function otherIncomeFields(item, index) {
+  function otherIncomeFields(item, index, scenario) {
     const path = `otherIncomes.${index}`;
     return `<div class="other-item" data-other-id="${escapeHtml(item.id)}">
       <label><span class="k">Label</span>
@@ -3537,15 +3760,17 @@
       </label>
       <label><span class="k">Income owner</span>
         <select data-path="${path}.owner">
-          ${ownerOptions(item.owner, currentScenario.people)}
+          ${ownerOptions(item.owner, scenario)}
         </select>
+        ${isSingleScenario(scenario) && item.owner === 'joint'
+          ? '<span class="sub">50% included for Person 1.</span>' : ''}
       </label>
       ${numberField('Paid to survivor %', `${path}.survivorPct`, item.survivorPct, 'min="0" max="100" step="5"')}
       <button type="button" class="remove-other" data-kind="otherIncomes" data-index="${index}">Remove income</button>
     </div>`;
   }
 
-  function otherAssetFields(item, index) {
+  function otherAssetFields(item, index, scenario) {
     const path = `otherAssets.${index}`;
     return `<div class="other-item" data-other-id="${escapeHtml(item.id)}">
       <label><span class="k">Label</span>
@@ -3561,6 +3786,13 @@
           data-path="${path}.fxToAud" value="${item.fxToAud}">
       </label>
       ${moneyField('Current value', `${path}.amount`, item.amount, item.currency)}
+      <label><span class="k">Asset owner</span>
+        <select data-path="${path}.owner">
+          ${ownerOptions(item.owner, scenario)}
+        </select>
+        ${isSingleScenario(scenario) && item.owner === 'joint'
+          ? '<span class="sub">50% included for Person 1.</span>' : ''}
+      </label>
       <label><span class="k">Treat as financial investment for Age Pension deeming</span>
         <input type="checkbox" data-path="${path}.agePensionDeemed"${item.agePensionDeemed ? ' checked' : ''}>
       </label>
@@ -3571,50 +3803,62 @@
   }
 
   function renderOtherItems(scenario) {
-    const incomes = scenario.otherIncomes ?? [];
-    const assets = scenario.otherAssets ?? [];
+    const incomes = activeOwnedEntries(scenario, scenario.otherIncomes ?? []);
+    const assets = activeOwnedEntries(scenario, scenario.otherAssets ?? []);
     $('#otherIncomeList').innerHTML = incomes.length
-      ? incomes.map(otherIncomeFields).join('')
+      ? incomes.map(({ item, index }) => otherIncomeFields(item, index, scenario)).join('')
       : '<p class="sub">No other income added.</p>';
     $('#otherAssetList').innerHTML = assets.length
-      ? assets.map(otherAssetFields).join('')
+      ? assets.map(({ item, index }) => otherAssetFields(item, index, scenario)).join('')
       : '<p class="sub">No other assets added.</p>';
   }
 
-  function drawdownSourceOptions(selected, people) {
+  function drawdownSourceOptions(selected, scenario) {
+    const people = scenario.people;
     const options = [
       ['p0Super', `${people[0].name} super`],
       ['p1Super', `${people[1].name} super`],
       ['savings', 'Savings'],
       ['cash', 'Cash']
-    ];
+    ].filter(([value]) => sourceIsActiveForScenario(scenario, value));
     return options.map(([value, label]) =>
       `<option value="${value}"${value === selected ? ' selected' : ''}>${escapeHtml(label)}</option>`
     ).join('');
   }
 
-  function tierFields(tier, tierIndex, people, tierCount) {
-    const path = `household.drawdownPriority.${tierIndex}`;
-    const [a, b] = tier;
+  function activeDrawdownTiers(scenario) {
+    return scenario.household.drawdownPriority
+      .map((tier, tierIndex) => ({
+        tierIndex,
+        entries: tier
+          .map((entry, entryIndex) => ({ entry, entryIndex }))
+          .filter(({ entry }) => sourceIsActiveForScenario(scenario, entry.source))
+      }))
+      .filter(({ entries }) => entries.length);
+  }
+
+  function tierFields(tierView, displayIndex, scenario, tierCount) {
+    const { tierIndex, entries } = tierView;
+    const [a, b] = entries;
     const weightAPct = b
-      ? Math.round((a.weight / (a.weight + b.weight)) * 100)
+      ? Math.round((a.entry.weight / (a.entry.weight + b.entry.weight)) * 100)
       : 100;
     return `<div class="tier" data-tier-index="${tierIndex}">
       <div class="tier-head">
-        <strong>Priority ${tierIndex + 1}</strong>
-        <button type="button" class="tier-up" data-index="${tierIndex}"${tierIndex === 0 ? ' disabled' : ''}>Up</button>
-        <button type="button" class="tier-down" data-index="${tierIndex}"${tierIndex === tierCount - 1 ? ' disabled' : ''}>Down</button>
+        <strong>Priority ${displayIndex + 1}</strong>
+        <button type="button" class="tier-up" data-index="${tierIndex}"${displayIndex === 0 ? ' disabled' : ''}>Up</button>
+        <button type="button" class="tier-down" data-index="${tierIndex}"${displayIndex === tierCount - 1 ? ' disabled' : ''}>Down</button>
         <button type="button" class="tier-remove" data-index="${tierIndex}"${tierCount <= 1 ? ' disabled' : ''}>Remove</button>
       </div>
       <label><span class="k">Source${b ? ' A' : ''}</span>
-        <select data-path="${path}.0.source">${drawdownSourceOptions(a.source, people)}</select>
+        <select data-path="household.drawdownPriority.${tierIndex}.${a.entryIndex}.source">${drawdownSourceOptions(a.entry.source, scenario)}</select>
       </label>
-      <label><span class="k">Split this tier with a second source</span>
+      ${isSingleScenario(scenario) ? '' : `<label><span class="k">Split this tier with a second source</span>
         <input type="checkbox" class="tier-split-toggle" data-index="${tierIndex}"${b ? ' checked' : ''}>
-      </label>
+      </label>`}
       ${b ? `
       <label><span class="k">Source B</span>
-        <select data-path="${path}.1.source">${drawdownSourceOptions(b.source, people)}</select>
+        <select data-path="household.drawdownPriority.${tierIndex}.${b.entryIndex}.source">${drawdownSourceOptions(b.entry.source, scenario)}</select>
       </label>
       <label><span class="k">Source A share %</span>
         <input type="number" min="0" max="100" step="5" class="tier-weight" data-index="${tierIndex}" value="${weightAPct}">
@@ -3622,20 +3866,31 @@
     </div>`;
   }
 
-  function drawdownPriorityFields(drawdownPriority, people) {
+  function drawdownPriorityFields(scenario) {
+    const tiers = activeDrawdownTiers(scenario);
     return `<div id="drawdownPriorityList">
-      ${drawdownPriority.map((tier, index) =>
-        tierFields(tier, index, people, drawdownPriority.length)).join('')}
+      ${tiers.map((tier, index) =>
+        tierFields(tier, index, scenario, tiers.length)).join('')}
     </div>
     <button type="button" id="addDrawdownTier">Add drawdown tier</button>`;
   }
 
-  function renderHousehold(household, assumptions, people) {
+  function renderHousehold(scenario) {
+    const { household, people } = scenario;
+    const single = isSingleScenario(scenario);
     const firstDeath = household.firstDeath;
     const deathPersonIndex = firstDeath.deceasedPerson === 'p1' ? 1 : 0;
-    const horizonLabel = firstDeath.enabled
+    const horizonLabel = !single && firstDeath.enabled
       ? 'Model to survivor age' : 'Model to Person 1 age';
+    const excludedCount = hiddenPerson2Count(scenario);
     $('#householdFields').innerHTML = `
+      <label><span class="k">Household type</span>
+        <select data-path="household.type">
+          <option value="couple"${household.type === 'couple' ? ' selected' : ''}>Couple</option>
+          <option value="single"${household.type === 'single' ? ' selected' : ''}>Single</option>
+        </select>
+      </label>
+      ${single ? `<p class="sub" id="singleExcludedNotice">${excludedCount} Person 2-owned ${excludedCount === 1 ? 'item is' : 'items are'} hidden and excluded from every calculation. Joint 50/50 entries contribute only Person 1’s 50% share. Switching back to Couple restores the saved Person 2 data.</p>` : ''}
       ${moneyField('Preferred Retirement Income', 'household.targetAfterTax', household.targetAfterTax)}
       ${moneyField('Essential Annual Budget', 'household.annualBudget', household.annualBudget)}
       ${numberField(horizonLabel, 'household.modelEndAge', household.modelEndAge, 'min="65" max="120"')}
@@ -3648,7 +3903,7 @@
       <label><span class="k">Show illustrative survival band</span>
         <input type="checkbox" data-path="household.showSurvival"${household.showSurvival ? ' checked' : ''}>
       </label>
-      <h4>First-death scenario</h4>
+      ${single ? '' : `<h4>First-death scenario</h4>
       <label><span class="k">Model first death</span>
         <input type="checkbox" data-path="household.firstDeath.enabled"${firstDeath.enabled ? ' checked' : ''}>
       </label>
@@ -3664,9 +3919,9 @@
         ${numberField('Survivor Preferred Income %', 'household.firstDeath.survivorPreferredPct', firstDeath.survivorPreferredPct, 'min="0" max="100" step="5"')}
         ${numberField('Survivor Essential Budget %', 'household.firstDeath.survivorEssentialPct', firstDeath.survivorEssentialPct, 'min="0" max="100" step="5"')}
         <p class="sub">The transition occurs at the start of the selected year. Assets transfer immediately and survivor income rules apply from that row.</p>
-      </div>
+      </div>`}
       <h4>Drawdown order</h4>
-      ${drawdownPriorityFields(household.drawdownPriority, people)}`;
+      ${drawdownPriorityFields(scenario)}`;
   }
 
   function bindMoneyInputs() {
@@ -4082,16 +4337,18 @@
     hideChartTooltip();
     drawAxes(ctx, width, height, maximum, pads);
 
+    const superColours = ['#0B81A2', '#59A89C'];
     const series = [
-      ['superBalances', 0, '#0B81A2', `${scenario.people[0].name} super`],
-      ['superBalances', 1, '#59A89C', `${scenario.people[1].name} super`],
+      ...core.outputPersonIndexes(scenario).map(personIndex =>
+        ['superBalances', personIndex, superColours[personIndex],
+          `${scenario.people[personIndex].name} super`]),
       ...((rows.some(row => row.inheritedSuper.total > 0))
         ? [['inheritedSuper', 'total', '#E38A56', 'Inherited super']]
         : []),
       ['savings', null, '#7F8F98', 'Savings'],
       ['cash', null, '#9FB0C0', 'Cash'],
       ['shares', null, '#F0C571', 'Unsold shares'],
-      ...((scenario.otherAssets ?? []).length
+      ...(activeOwnedEntries(scenario, scenario.otherAssets ?? []).length
         ? [['otherAssets', null, '#C77DFF', 'Other assets']]
         : []),
       ['totalAssets', null, '#C8C8C8', 'Total assets']
@@ -4148,15 +4405,16 @@
     const factor = displayFactor(row);
     const money = value => core.formatMoney(value * factor, 'AUD');
     tooltip.innerHTML = `
-      <strong>${row.year} · ages ${row.ages.map(age => age ?? '—').join(' and ')}</strong>
-      <span>${escapeHtml(people[0].name)} super: ${money(row.superBalances[0])}</span>
-      <span>${escapeHtml(people[1].name)} super: ${money(row.superBalances[1])}</span>
+      <strong>${escapeHtml(core.outputAgeContext(row, currentScenario))}</strong>
+      ${core.outputPersonIndexes(currentScenario).map(personIndex =>
+        `<span>${escapeHtml(people[personIndex].name)} super: ${money(row.superBalances[personIndex])}</span>`
+      ).join('')}
       ${row.inheritedSuper.total > 0
         ? `<span>Inherited super: ${money(row.inheritedSuper.total)}</span>` : ''}
       <span>Savings: ${money(row.savings)}</span>
       <span>Cash: ${money(row.cash)}</span>
       <span>Unsold shares: ${money(row.shares)}</span>
-      ${(currentScenario.otherAssets ?? []).length
+      ${activeOwnedEntries(currentScenario, currentScenario.otherAssets ?? []).length
         ? `<span>Other assets: ${money(row.otherAssets)}</span>`
         : ''}
       <span><strong>Total: ${money(row.totalAssets)}</strong></span>`;
@@ -4181,6 +4439,21 @@
     showChartTooltip(segment, currentProjection.rows[segment.rowIndex], { x, y });
   }
 
+  function enteredAssetsNow(scenario) {
+    const included = (owner, readValue) => {
+      const fraction = core.householdInclusion(scenario, owner);
+      return fraction === 0 ? 0 : (readValue() || 0) * fraction;
+    };
+    return scenario.people.reduce((sum, person, index) =>
+      sum + included(`p${index}`, () => person.super), 0) +
+      included(scenario.cash.owner, () => scenario.cash.amount) +
+      included(scenario.savings.owner, () => scenario.savings.amount) +
+      (scenario.shareholdings ?? []).reduce((sum, holding) =>
+        sum + included(holding.owner, () => core.shareValueAud(holding)), 0) +
+      (scenario.otherAssets ?? []).reduce((sum, asset) =>
+        sum + included(asset.owner, () => asset.amount * core.otherItemFx(asset)), 0);
+  }
+
   function renderKpis(result, scenario) {
     const end = result.rows.at(-1);
     // Each row is stored in today's dollars; in nominal mode reinflate by that
@@ -4199,26 +4472,14 @@
       ...result.rows.map(row => row.cshc?.assessedIncome ?? 0)
     );
     const endAssets = end.totalAssets * displayFactor(end);
-    const assetsNow =
-      scenario.people.reduce((sum, person) => sum + (person.super || 0), 0) +
-      (scenario.cash?.amount || 0) +
-      (scenario.savings?.amount || 0) +
-      (scenario.shareholdings || []).reduce(
-        (sum, holding) =>
-          sum + (holding.quantity || 0) * (holding.price || 0) * (holding.fxToAud || 1),
-        0
-      ) +
-      (scenario.otherAssets || []).reduce(
-        (sum, asset) => sum + (asset.amount || 0) * core.otherItemFx(asset),
-        0
-      );
+    const assetsNow = enteredAssetsNow(scenario);
     const basis = displayMode === 'nominal' ? ' (nominal)' : '';
     const kpis = [
       { label: 'Assets now', value: core.formatMoney(assetsNow) },
       {
         label: 'First projected shortfall',
         value: result.firstShortfall
-          ? `${result.firstShortfall.year} · age ${result.firstShortfall.ages.find(age => age !== null) ?? '—'}`
+          ? core.outputAgeContext(result.firstShortfall, scenario)
           : 'None in model period'
       },
       { label: `Assets at age ${scenario.household.modelEndAge}${basis}`, value: core.formatMoney(endAssets) },
@@ -4235,19 +4496,18 @@
 
   function renderProjectionTable(rows, people, scenario) {
     const nominal = displayMode === 'nominal';
-    const hasOtherIncome = (scenario.otherIncomes ?? []).length > 0;
-    const hasOtherAssets = (scenario.otherAssets ?? []).length > 0;
+    const personIndexes = core.outputPersonIndexes(scenario);
+    const hasOtherIncome = activeOwnedEntries(scenario, scenario.otherIncomes ?? []).length > 0;
+    const hasOtherAssets = activeOwnedEntries(scenario, scenario.otherAssets ?? []).length > 0;
     const hasFranking = rows.some(row => Math.abs(row.frankingCredits) > 0.005);
     const hasCgt = rows.some(row => Math.abs(row.cgtTax) > 0.005);
     const hasInheritedSuper = rows.some(row => row.inheritedSuper.total > 0.005);
     const ageText = age => age ?? '—';
     const headings = [
       'Year',
-      people[0].name,
-      people[1].name,
+      ...personIndexes.map(index => people[index].name),
       'Total Assets',
-      `${people[0].name} super`,
-      `${people[1].name} super`,
+      ...personIndexes.map(index => `${people[index].name} super`),
       ...(hasInheritedSuper ? ['Inherited super'] : []),
       'Cash',
       'Savings',
@@ -4275,9 +4535,9 @@
         ? `Estimated tax refund ${money(-row.tax)}`
         : money(row.tax);
       const eventText = row.events.map(event => event.label).join('; ');
-      const minDraw = row.minDraws[0] + row.minDraws[1];
-      const topUpDraw = row.topUpDraws[0] + row.topUpDraws[1];
-      const rateLabels = row.minRates
+      const minDraw = personIndexes.reduce((sum, index) => sum + row.minDraws[index], 0);
+      const topUpDraw = personIndexes.reduce((sum, index) => sum + row.topUpDraws[index], 0);
+      const rateLabels = personIndexes.map(index => row.minRates[index])
         .filter(rate => rate > 0)
         .map(rate => `${(rate * 100).toFixed(0)}%`);
       const minDrawCell = minDraw > 0.5
@@ -4285,11 +4545,9 @@
         : '-';
       return `<tr class="${row.shortfall > 1 ? 'short' : ''}${row.events.length ? ' event' : ''}">
         <td>${row.year}</td>
-        <td>${ageText(row.ages[0])}</td>
-        <td>${ageText(row.ages[1])}</td>
+        ${personIndexes.map(index => `<td>${ageText(row.ages[index])}</td>`).join('')}
         <td>${money(row.totalAssets)}</td>
-        <td>${money(row.superBalances[0])}</td>
-        <td>${money(row.superBalances[1])}</td>
+        ${personIndexes.map(index => `<td>${money(row.superBalances[index])}</td>`).join('')}
         ${hasInheritedSuper ? `<td>${money(row.inheritedSuper.total)}</td>` : ''}
         <td>${money(row.cash)}</td>
         <td>${money(row.savings)}</td>
@@ -4457,9 +4715,17 @@
     const inflationText = assumptions.inflationMode === 'manual'
       ? `Manual ${assumptions.manualInflationPct}% every year`
       : 'Treasury forecast: 5% for calendar 2026, 2.5% from 2027 onward (Budget 2026-27, published 12 May 2026)';
+    const activeIncomes = activeOwnedEntries(scenario, scenario.otherIncomes ?? []);
+    const activeAssets = activeOwnedEntries(scenario, scenario.otherAssets ?? []);
+    const cashRates = [
+      ...(!isSingleScenario(scenario) || scenario.cash.owner !== 'p1'
+        ? [`Cash interest ${scenario.cash.interestPct}%/yr`] : []),
+      ...(!isSingleScenario(scenario) || scenario.savings.owner !== 'p1'
+        ? [`savings interest ${scenario.savings.interestPct}%/yr`] : [])
+    ];
     const items = [
       `Inflation: ${inflationText}. Returns below are estimated net nominal returns after fees and tax; today's-dollars figures are deflated by this path.`,
-      ...scenario.people.map(person =>
+      ...activePeople(scenario).map(({ person }) =>
         `${escapeHtml(person.name)}: accumulation return ${person.accumulationReturnPct}%/yr, ` +
         `ABP (drawdown) return ${person.retirementReturnPct}%/yr, ` +
         `retires at ${person.retireAge}, super access at ${person.superAccessAge} (${person.superAccessPct}% to ABP)`),
@@ -4473,19 +4739,25 @@
         ? `GBP to AUD ${assumptions.gbpAud} fixed for all years; UK State Pension indexation per person ` +
           `(frozen = fixed nominal GBP, so real value falls with inflation); UPP deduction ${assumptions.uppPct}% for tax`
         : 'UK/DB pensions excluded from the projection',
-      'Cash interest ' + scenario.cash.interestPct + '%/yr, savings interest ' +
-        scenario.savings.interestPct + '%/yr (taxable)',
+      ...(cashRates.length ? [`${cashRates.join(', ')} (taxable)`] : []),
       'Income-tax brackets and LITO stay fixed in nominal dollars after the legislated 2027 rate change, so inflation creates bracket creep; Medicare and SAPTO thresholds use an indexed approximation',
-      scenario.household.firstDeath.enabled
+      isSingleScenario(scenario)
+        ? 'Single household from the start: Person 2 data is preserved but excluded; no first-death, inheritance or survivor-income transition is applied'
+        : scenario.household.firstDeath.enabled
         ? `First death: ${scenario.people[scenario.household.firstDeath.deceasedPerson === 'p1' ? 1 : 0].name} at age ${scenario.household.firstDeath.deathAge}; ` +
           `survivor Preferred Income ${scenario.household.firstDeath.survivorPreferredPct}% and Essential Budget ${scenario.household.firstDeath.survivorEssentialPct}% from the transition year`
         : 'First-death scenario off',
-      'Age Pension uses combined couple tests before first death and single-person tests for the configured survivor; one eligible partner in a couple receives half of the means-tested combined rate'
+      isSingleScenario(scenario)
+        ? 'Age Pension, deeming, SAPTO, Medicare and CSHC use single-person rules from the first year'
+        : 'Age Pension uses combined couple tests before first death and single-person tests for the configured survivor; one eligible partner in a couple receives half of the means-tested combined rate',
+      ...(isSingleScenario(scenario)
+        ? ['Person 2-owned entries contribute zero; Joint 50/50 entries contribute only Person 1’s 50% share']
+        : [])
     ];
-    const otherIncomeCount = (scenario.otherIncomes ?? []).length;
-    const otherAssetCount = (scenario.otherAssets ?? []).length;
-    const deemedOtherAssetCount = (scenario.otherAssets ?? [])
-      .filter(asset => asset.agePensionDeemed === true).length;
+    const otherIncomeCount = activeIncomes.length;
+    const otherAssetCount = activeAssets.length;
+    const deemedOtherAssetCount = activeAssets
+      .filter(({ item }) => item.agePensionDeemed === true).length;
     if (otherIncomeCount || otherAssetCount) {
       items.push(
         `Other items: ${otherIncomeCount} income (CPI-indexed; taxable items follow their selected owner) ` +
@@ -4519,23 +4791,46 @@
     currentScenario = structuredClone(scenario);
     $('#scenarioName').value = currentScenario.scenarioName;
     renderReturnAssumptions(currentScenario);
-    renderPeople(currentScenario.people);
+    renderPeople(currentScenario);
     renderCashAndSavings(currentScenario);
     renderLumpSums(currentScenario);
-    renderShareholdings(currentScenario.shareholdings, currentScenario.people);
-    renderUkPensions(currentScenario.people, currentScenario.assumptions);
+    renderShareholdings(currentScenario);
+    renderUkPensions(currentScenario);
     renderOtherItems(currentScenario);
-    renderHousehold(currentScenario.household, currentScenario.assumptions, currentScenario.people);
+    renderHousehold(currentScenario);
     bindMoneyInputs();
     recalculateAndRender();
   }
 
   function addShareholding(scenario) {
+    const owner = isSingleScenario(scenario) ? 'p0' : 'joint';
     return {
       ...scenario,
       shareholdings: [
         ...scenario.shareholdings,
-        core.makeShareholding(scenario.shareholdings.length)
+        core.makeShareholding(scenario.shareholdings.length, owner)
+      ]
+    };
+  }
+
+  function addOtherIncome(scenario) {
+    const owner = isSingleScenario(scenario) ? 'p0' : 'joint';
+    return {
+      ...scenario,
+      otherIncomes: [
+        ...(scenario.otherIncomes ?? []),
+        core.makeOtherIncome((scenario.otherIncomes ?? []).length, owner)
+      ]
+    };
+  }
+
+  function addOtherAsset(scenario) {
+    const owner = isSingleScenario(scenario) ? 'p0' : 'joint';
+    return {
+      ...scenario,
+      otherAssets: [
+        ...(scenario.otherAssets ?? []),
+        core.makeOtherAsset((scenario.otherAssets ?? []).length, owner)
       ]
     };
   }
@@ -4562,7 +4857,9 @@
 
   function addDrawdownTier(scenario) {
     const used = new Set(scenario.household.drawdownPriority.flat().map(entry => entry.source));
-    const next = ['p0Super', 'p1Super', 'savings', 'cash'].find(source => !used.has(source)) || 'cash';
+    const available = ['p0Super', 'p1Super', 'savings', 'cash']
+      .filter(source => sourceIsActiveForScenario(scenario, source));
+    const next = available.find(source => !used.has(source)) || 'cash';
     return {
       ...scenario,
       household: {
@@ -4600,13 +4897,15 @@
 
   function toggleTierSplit(scenario, tierIndex, split) {
     const allUsed = new Set(scenario.household.drawdownPriority.flat().map(entry => entry.source));
+    const available = ['p0Super', 'p1Super', 'savings', 'cash']
+      .filter(source => sourceIsActiveForScenario(scenario, source));
     const tiers = scenario.household.drawdownPriority.map((tier, index) => {
       if (index !== tierIndex) return tier;
       if (!split) return [tier[0]];
-      const candidates = ['p0Super', 'p1Super', 'savings', 'cash']
+      const candidates = available
         .filter(source => source !== tier[0].source && !allUsed.has(source));
       const second = candidates[0] ||
-        ['p0Super', 'p1Super', 'savings', 'cash'].find(source => source !== tier[0].source);
+        available.find(source => source !== tier[0].source);
       return [{ ...tier[0], weight: 0.5 }, { source: second, weight: 0.5 }];
     });
     return {
@@ -4764,6 +5063,13 @@
         path,
         readControlValue(event.target)
       );
+      if (path === 'household.type') {
+        const errors = core.validateScenario(currentScenario);
+        showValidation(errors);
+        if (!errors.length) scheduleSave(currentScenario);
+        renderScenario(currentScenario);
+        return;
+      }
     }
     if (event.target.matches('.quote-market')) {
       const index = Number(event.target.dataset.index);
@@ -4809,7 +5115,7 @@
   $('#addShareholding').addEventListener('click', () => {
     currentScenario = addShareholding(currentScenario);
     expandedShareIds.add(currentScenario.shareholdings.at(-1).id);
-    renderShareholdings(currentScenario.shareholdings, currentScenario.people);
+    renderShareholdings(currentScenario);
     bindMoneyInputs();
     showValidation(core.validateScenario(currentScenario));
   });
@@ -4822,26 +5128,14 @@
   });
 
   $('#addOtherIncome').addEventListener('click', () => {
-    currentScenario = {
-      ...currentScenario,
-      otherIncomes: [
-        ...(currentScenario.otherIncomes ?? []),
-        core.makeOtherIncome((currentScenario.otherIncomes ?? []).length)
-      ]
-    };
+    currentScenario = addOtherIncome(currentScenario);
     renderOtherItems(currentScenario);
     bindMoneyInputs();
     showValidation(core.validateScenario(currentScenario));
   });
 
   $('#addOtherAsset').addEventListener('click', () => {
-    currentScenario = {
-      ...currentScenario,
-      otherAssets: [
-        ...(currentScenario.otherAssets ?? []),
-        core.makeOtherAsset((currentScenario.otherAssets ?? []).length)
-      ]
-    };
+    currentScenario = addOtherAsset(currentScenario);
     renderOtherItems(currentScenario);
     bindMoneyInputs();
     showValidation(core.validateScenario(currentScenario));
@@ -4880,7 +5174,7 @@
   });
 
   function refreshAfterTierChange() {
-    renderHousehold(currentScenario.household, currentScenario.assumptions, currentScenario.people);
+    renderHousehold(currentScenario);
     scheduleSave(currentScenario);
     showValidation(core.validateScenario(currentScenario));
     recalculateAndRender();
@@ -4906,7 +5200,7 @@
     }
     const removeButton = event.target.closest('.tier-remove');
     if (removeButton) {
-      if (currentScenario.household.drawdownPriority.length <= 1) {
+      if (activeDrawdownTiers(currentScenario).length <= 1) {
         showScenarioMessage('At least one drawdown tier is required.', 'error');
         return;
       }
