@@ -1495,6 +1495,80 @@ check('year-zero single uses the established survivor rule result',
   singleRulesRow.target === singleRules.household.targetAfterTax &&
   singleRulesRow.budget === singleRules.household.annualBudget);
 
+const priorityScenario = structuredClone(sample);
+priorityScenario.household.type = 'single';
+priorityScenario.household.drawdownPriority = [
+  [{ source: 'p1Super', weight: 1 }],
+  [
+    { source: 'p0Super', weight: 0.25 },
+    { source: 'p1Super', weight: 0.75 }
+  ],
+  [{ source: 'savings', weight: 1 }]
+];
+check('single drawdown removes Person 2 super and empty tiers',
+  JSON.stringify(core.effectiveDrawdownPriority(priorityScenario)) ===
+    JSON.stringify([
+      [{ source: 'p0Super', weight: 1 }],
+      [{ source: 'savings', weight: 1 }]
+    ]));
+const storedPriority = JSON.stringify(priorityScenario.household.drawdownPriority);
+core.effectiveDrawdownPriority(priorityScenario);
+check('effective drawdown leaves stored couple priority unchanged',
+  JSON.stringify(priorityScenario.household.drawdownPriority) === storedPriority);
+
+const unusableSinglePriority = structuredClone(sample);
+unusableSinglePriority.household.type = 'single';
+unusableSinglePriority.household.drawdownPriority = [
+  [{ source: 'p1Super', weight: 1 }]
+];
+check('single household requires an active drawdown source',
+  core.validateScenario(unusableSinglePriority).some(error =>
+    error.path === 'household.drawdownPriority' &&
+    error.message.includes('Person 1, cash, or savings')));
+
+const singleLumpFallback = structuredClone(sample);
+singleLumpFallback.household.type = 'single';
+singleLumpFallback.people[0] = {
+  ...singleLumpFallback.people[0],
+  age: 67,
+  retireAge: 67,
+  superAccessAge: 60,
+  superAccessPct: 100,
+  super: 10000,
+  salary: 0,
+  accumulationReturnPct: 0,
+  retirementReturnPct: 0
+};
+singleLumpFallback.cash = { amount: 0, interestPct: 0, owner: 'p0' };
+singleLumpFallback.savings = { amount: 0, interestPct: 0, owner: 'p0' };
+singleLumpFallback.household.modelEndAge = 67;
+singleLumpFallback.household.targetAfterTax = 0;
+singleLumpFallback.household.annualBudget = 0;
+singleLumpFallback.household.applyMinimumDrawdown = false;
+singleLumpFallback.household.includeAgePension = false;
+singleLumpFallback.household.drawdownPriority = [
+  [{ source: 'p1Super', weight: 1 }],
+  [{ source: 'p0Super', weight: 1 }]
+];
+singleLumpFallback.lumpSumWithdrawals = [{
+  id: 'single-p1-source',
+  amount: 5000,
+  reason: 'Single fallback',
+  month: 1,
+  year: singleLumpFallback.startYear,
+  source: 'p1Super',
+  enabled: true
+}];
+singleLumpFallback.shareholdings = [];
+singleLumpFallback.otherIncomes = [];
+singleLumpFallback.otherAssets = [];
+const singleLumpFallbackRow =
+  core.projectScenario(singleLumpFallback).rows[0];
+check('stored Person 2 lump source falls back to active Person 1 funds',
+  singleLumpFallbackRow.lumpSumDraws.p0Super === 5000 &&
+  singleLumpFallbackRow.lumpSumDraws.p1Super === 0 &&
+  singleLumpFallbackRow.lumpSumFundingShortfall === 0);
+
 console.log('\ndeterministic survivor projection');
 const survivorProjectionScenario = structuredClone(sample);
 survivorProjectionScenario.assumptions.inflationMode = 'manual';

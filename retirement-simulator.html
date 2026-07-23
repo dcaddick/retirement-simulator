@@ -1234,6 +1234,22 @@
     throw new Error(`Invalid owner: ${owner}`);
   }
 
+  function effectiveDrawdownPriority(scenario) {
+    const tiers = scenario.household.drawdownPriority.map(tier =>
+      Array.isArray(tier) ? tier.map(entry => ({ ...entry })) : []);
+    if (!isSingleHousehold(scenario)) return tiers;
+    return tiers
+      .map(tier => tier.filter(entry => entry.source !== 'p1Super'))
+      .filter(tier => tier.length)
+      .map(tier => {
+        const total = tier.reduce((sum, entry) => sum + entry.weight, 0);
+        return tier.map(entry => ({
+          ...entry,
+          weight: total > 0 ? entry.weight / total : entry.weight
+        }));
+      });
+  }
+
   function singleHouseholdInclusion(owner) {
     if (owner === 'p0') return 1;
     if (owner === 'joint') return 0.5;
@@ -2142,6 +2158,7 @@
   }) {
     const salaries = [0, 0];
     const ukState = [0, 0];
+    const drawdownPriority = effectiveDrawdownPriority(scenario);
 
     scenario.people.forEach((person, index) => {
       if (!state.lifecycle.alive[index]) return;
@@ -2243,8 +2260,12 @@
         if (named.event) events.push(named.event);
         saleRecords.push(...named.saleRecords);
         const result = drawForLumpSum(
-          state, scenario.household.drawdownPriority, requestedNominal - named.drawn,
-          DRAWDOWN_SOURCES.has(withdrawal.source) ? withdrawal.source : 'automatic');
+          state, drawdownPriority, requestedNominal - named.drawn,
+          isSingleHousehold(scenario) && withdrawal.source === 'p1Super'
+            ? 'automatic'
+            : DRAWDOWN_SOURCES.has(withdrawal.source)
+              ? withdrawal.source
+              : 'automatic');
         const actualDraws = { ...result.drawsBySource };
         if (named.drawn > 0) actualDraws[`named:${named.label}`] = named.drawn;
         Object.keys(lumpSumDrawsNominal).forEach(source => {
@@ -2486,7 +2507,7 @@
       grossNonDividendTaxableSources - baseTaxNominal +
       dividendNetNominal + otherNonTaxableNominal;
     const cgtFunding = fundTaxExpense(
-      state, scenario.household.drawdownPriority, cgtTaxNominal);
+      state, drawdownPriority, cgtTaxNominal);
     if (cgtTaxNominal > 0) {
       events.push({
         type: 'cgt-payment',
@@ -2510,7 +2531,7 @@
     // act as the modelling lever while the essential budget reflects actual spending.
     const gap = Math.max(0, targetNominal - guaranteedNet - mandatoryTotal);
 
-    const waterfall = drawFromTiers(state, scenario.household.drawdownPriority, gap);
+    const waterfall = drawFromTiers(state, drawdownPriority, gap);
     const extraSuperDraws = [waterfall.drawsBySource.p0Super, waterfall.drawsBySource.p1Super];
     if (state.lifecycle.householdStatus === 'survivor') {
       const deceasedIndex = state.lifecycle.deceasedIndex;
@@ -2939,6 +2960,12 @@
         });
       });
     }
+    if (Array.isArray(scenario.household?.drawdownPriority) &&
+        isSingleHousehold(scenario) &&
+        effectiveDrawdownPriority(scenario).length === 0) {
+      add('household.drawdownPriority',
+        'A single household needs at least one Person 1, cash, or savings drawdown source.');
+    }
     if (!['treasury', 'manual'].includes(scenario.assumptions?.inflationMode)) {
       add('assumptions.inflationMode', 'Inflation mode must be Treasury or manual.');
     }
@@ -3088,6 +3115,7 @@
     drawFromTiers,
     fundTaxExpense,
     defaultDrawdownPriority,
+    effectiveDrawdownPriority,
     defaultFirstDeath,
     migrateScenario,
     inflationFactors,
