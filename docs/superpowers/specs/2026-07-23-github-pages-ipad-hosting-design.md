@@ -1,6 +1,6 @@
 # GitHub Pages iPad Hosting Design
 
-**Date:** 2026-07-23  
+**Date:** 2026-07-23
 **Status:** Design and combined v1.0.11 release scope approved
 
 ## Purpose
@@ -22,7 +22,7 @@ The GitHub Pages project URL opens the deterministic simulator immediately:
 The README keeps the existing download link as the primary option and adds a
 secondary invitation directly beneath it:
 
-> **Using an iPad? Try the simulator in your browser**  
+> **Using an iPad? Try the simulator in your browser**
 > Open the deterministic simulator to explore its look and feel without
 > downloading the HTML file.
 
