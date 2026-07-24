@@ -19,9 +19,9 @@ Open the same deterministic simulator to explore its look and feel without downl
 
 Single HTML file · no installation · opens locally in a modern browser.
 
-![Retirement Income Simulator v1.10 showing a fictional private loan selected for Age Pension deeming](docs/assets/retirement-simulator-v1.10.png)
+![Retirement Income Simulator v1.11 showing a fictional single-person household](docs/assets/retirement-simulator-v1.11.png)
 
-*Shown with fictional data in the default dark theme. The deterministic v1.10 simulator lets the fictional private-loan example be classified as a financial investment for Age Pension deeming while every Other Asset remains in the assets test. This is a modelling classification, not financial advice.*
+*Shown with fictional sample data in the default dark theme. The deterministic v1.11 simulator supports Couple and Single households, and the optional hosted version offers easier iPad access. Results are estimates, not financial advice.*
 
 ## Yours to download and use
 
