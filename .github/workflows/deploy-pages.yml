@@ -1,0 +1,57 @@
+name: Deploy deterministic simulator to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'retirement-simulator.html'
+      - '.github/workflows/deploy-pages.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && 'main' || github.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Run deterministic regression suite
+        run: node tests/retirement-simulator.test.mjs
+      - name: Build controlled Pages artifact
+        shell: bash
+        run: |
+          mkdir -p _site
+          cp retirement-simulator.html _site/index.html
+          touch _site/.nojekyll
+          cmp retirement-simulator.html _site/index.html
+          test "$(find _site -maxdepth 1 -type f | wc -l)" -eq 2
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: '_site'
+
+  deploy:
+    needs: validate
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    steps:
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+      - name: Deploy Pages artifact
+        id: deployment
+        uses: actions/deploy-pages@v4

@@ -23,6 +23,15 @@ const ARCHIVE_108 = fileURLToPath(
 const ARCHIVE_109 = fileURLToPath(
   new URL('../archive/retirement-simulator-v1.0.9.html', import.meta.url)
 );
+const ARCHIVE_110 = fileURLToPath(
+  new URL('../archive/retirement-simulator-v1.0.10.html', import.meta.url)
+);
+const ARCHIVE_README = fileURLToPath(
+  new URL('../archive/README.md', import.meta.url)
+);
+const TEST_WORKFLOW = fileURLToPath(
+  new URL('../.github/workflows/test.yml', import.meta.url)
+);
 const DEFERRED_REVIEW = fileURLToPath(
   new URL('../docs/DEFERRED-REVIEW.md', import.meta.url)
 );
@@ -33,10 +42,13 @@ const TESTING = fileURLToPath(
   new URL('../docs/TESTING.md', import.meta.url)
 );
 const CHANGELOG = fileURLToPath(new URL('../CHANGELOG.md', import.meta.url));
-const SCREENSHOT_110 = fileURLToPath(
-  new URL('../docs/assets/retirement-simulator-v1.10.png', import.meta.url)
+const SCREENSHOT_111 = fileURLToPath(
+  new URL('../docs/assets/retirement-simulator-v1.11.png', import.meta.url)
 );
 const README = fileURLToPath(new URL('../README.md', import.meta.url));
+const PAGES_WORKFLOW = fileURLToPath(
+  new URL('../.github/workflows/deploy-pages.yml', import.meta.url)
+);
 const html = readFileSync(FILE, 'utf8');
 const deferredReview = existsSync(DEFERRED_REVIEW)
   ? readFileSync(DEFERRED_REVIEW, 'utf8')
@@ -45,6 +57,11 @@ const methodology = readFileSync(METHODOLOGY, 'utf8');
 const testingGuide = readFileSync(TESTING, 'utf8');
 const changelog = readFileSync(CHANGELOG, 'utf8');
 const readme = readFileSync(README, 'utf8');
+const archiveReadme = readFileSync(ARCHIVE_README, 'utf8');
+const testWorkflow = readFileSync(TEST_WORKFLOW, 'utf8');
+const pagesWorkflow = existsSync(PAGES_WORKFLOW)
+  ? readFileSync(PAGES_WORKFLOW, 'utf8')
+  : '';
 
 function extract(id) {
   const match = html.match(new RegExp(`<script id="${id}">([\\s\\S]*?)<\\/script>`));
@@ -219,17 +236,25 @@ check('return assumptions are explained below the table',
 check('assumptions and methodology moved out of the controls panel',
   html.indexOf('<summary>Model assumptions and sources</summary>') > html.indexOf('<div class="tblwrap">') &&
   html.indexOf('id="methodologySection"') > html.indexOf('<div class="tblwrap">'));
-check('v1.10 document version is consistent',
-  html.includes('<title>Family Retirement Income Simulator v1.10</title>') &&
-  html.includes('<span class="version">v1.10</span>') &&
-  html.includes("const STORAGE_KEY = 'family-retirement-simulator:v1.10:scenario'") &&
-  html.includes("'family-retirement-simulator:v1.09:scenario'"));
+check('v1.11 document version is consistent',
+  html.includes('<title>Family Retirement Income Simulator v1.11</title>') &&
+  html.includes('<span class="version">v1.11</span>') &&
+  html.includes("const STORAGE_KEY = 'family-retirement-simulator:v1.11:scenario'") &&
+  html.includes("'family-retirement-simulator:v1.10:scenario'"));
 check('outgoing v1.04 executable is archived', existsSync(ARCHIVE_104));
 check('outgoing v1.0.5 executable is archived', existsSync(ARCHIVE_105));
 check('outgoing v1.0.6 executable is archived', existsSync(ARCHIVE_106));
 check('outgoing v1.0.7 executable is archived', existsSync(ARCHIVE_107));
 check('outgoing v1.0.8 executable is archived', existsSync(ARCHIVE_108));
 check('outgoing v1.0.9 executable is archived', existsSync(ARCHIVE_109));
+check('outgoing v1.0.10 executable is archived', existsSync(ARCHIVE_110));
+check('v1.0.10 archive provenance is recorded',
+  archiveReadme.includes('v1.0.10:retirement-simulator.html') &&
+  archiveReadme.includes('87d456f500a6f48f2289e91afb553d267faa8ff9') &&
+  archiveReadme.includes('6F9401E74709A67BDD539DD353ED9E4C78A71ACA4B78D8D2A8206811BAE9C394'));
+check('CI verifies the archived v1.0.10 tag blob',
+  testWorkflow.includes('Verify archived v1.0.10 source') &&
+  testWorkflow.includes('v1.0.10:retirement-simulator.html'));
 
 const schema10 = structuredClone(sample);
 schema10.schemaVersion = 10;
@@ -311,9 +336,10 @@ check('methodology discloses childless Medicare family scope',
 check('methodology records prototype architecture rationale',
   methodology.includes('personal prototype') &&
   methodology.includes('thousands of users'));
-check('README identifies deterministic v1.10',
-  readme.includes('v1.10') &&
-  readme.includes('financial investment for Age Pension deeming') &&
+check('README identifies deterministic v1.11 and its screenshot',
+  readme.includes('v1.11') &&
+  readme.includes('docs/assets/retirement-simulator-v1.11.png') &&
+  existsSync(SCREENSHOT_111) &&
   readme.includes('retirement-monte-carlo-v0.7.html') &&
   readme.includes('one partner') && readme.includes('franking') &&
   readme.includes('capital-loss') && readme.includes('docs/DEFERRED-REVIEW.md'));
@@ -337,11 +363,11 @@ check('Monte Carlo scope issue remains linked as open work',
 check('browser checklist covers survivor state in both tools',
   testingGuide.includes('fixed first-death') &&
   testingGuide.includes('every Monte Carlo path'));
-check('v1.10 release screenshot exists', existsSync(SCREENSHOT_110));
-check('changelog records deterministic v1.10 and Issue #18',
-  changelog.includes('## 1.10 - 2026-07-19') &&
-  changelog.includes('issues/18') &&
-  changelog.includes('Archived the exact outgoing deterministic v1.0.9 executable'));
+check('changelog records v1.11 Pages and iPad household work',
+  changelog.includes('## 1.11 - 2026-07-23') &&
+  changelog.includes('GitHub Pages') &&
+  changelog.includes('[#34]') &&
+  changelog.includes('[#36]'));
 check('deferred register records the four v1.0.6 resolutions',
   ['#5', '#9', '#10', '#11'].every(issue => deferredReview.includes(issue)) &&
   (deferredReview.match(/Resolved in v1\.0\.6/g) ?? []).length >= 4);
@@ -2337,6 +2363,47 @@ check('browser checklist covers single data restoration',
 check('changelog records issue 36 deterministic scope',
   changelog.includes('Couple/Single household selection') &&
   changelog.includes('/issues/36'));
+
+console.log('\ngithub pages deployment');
+check('Pages workflow exists', pagesWorkflow.length > 0);
+check('Pages workflow validates only the deterministic simulator',
+  pagesWorkflow.includes('node tests/retirement-simulator.test.mjs') &&
+  !pagesWorkflow.includes('retirement-monte-carlo.test.mjs') &&
+  pagesWorkflow.includes('needs: validate'));
+check('Pages workflow publishes only the canonical simulator artifact',
+  pagesWorkflow.includes('cp retirement-simulator.html _site/index.html') &&
+  pagesWorkflow.includes('touch _site/.nojekyll') &&
+  pagesWorkflow.includes('cmp retirement-simulator.html _site/index.html') &&
+  pagesWorkflow.includes("path: '_site'"));
+check('Pages workflow is main-scoped and permission-bounded',
+  pagesWorkflow.includes('branches: [main]') &&
+  pagesWorkflow.includes('workflow_dispatch:') &&
+  pagesWorkflow.includes('pages: write') &&
+  pagesWorkflow.includes('id-token: write') &&
+  pagesWorkflow.includes('cancel-in-progress: false'));
+const pagesUrl = 'https://dcaddick.github.io/retirement-simulator/';
+const downloadLinkIndex = readme.indexOf(
+  'https://github.com/dcaddick/retirement-simulator/releases/latest/download/retirement-simulator.html'
+);
+const hostedLinkIndex = readme.indexOf(pagesUrl);
+check('README offers the hosted simulator beneath the download',
+  downloadLinkIndex >= 0 &&
+  hostedLinkIndex > downloadLinkIndex &&
+  readme.includes('Using an iPad? Try the simulator in your browser'));
+check('README explains hosted storage and transfer boundaries',
+  readme.includes("that browser's local storage") &&
+  readme.includes('do not automatically appear') &&
+  readme.includes('JSON export/import'));
+check('README discloses GitHub Pages request metadata',
+  readme.includes('GitHub Pages') &&
+  readme.includes('visitor IP address'));
+check('testing guide covers controlled Pages publishing',
+  testingGuide.includes('### GitHub Pages verification') &&
+  testingGuide.includes('retirement-monte-carlo-v0.7.html') &&
+  testingGuide.includes('return 404'));
+check('changelog records deterministic Pages hosting',
+  changelog.includes('GitHub Pages') &&
+  changelog.includes('iPad'));
 
 console.log('\nmigration v1 -> v14 (full chain)');
 const v1 = structuredClone(v5);
