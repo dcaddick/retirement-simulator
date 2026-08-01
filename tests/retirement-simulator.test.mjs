@@ -26,6 +26,9 @@ const ARCHIVE_109 = fileURLToPath(
 const ARCHIVE_110 = fileURLToPath(
   new URL('../archive/retirement-simulator-v1.0.10.html', import.meta.url)
 );
+const ARCHIVE_111 = fileURLToPath(
+  new URL('../archive/retirement-simulator-v1.0.11.html', import.meta.url)
+);
 const ARCHIVE_README = fileURLToPath(
   new URL('../archive/README.md', import.meta.url)
 );
@@ -236,11 +239,43 @@ check('return assumptions are explained below the table',
 check('assumptions and methodology moved out of the controls panel',
   html.indexOf('<summary>Model assumptions and sources</summary>') > html.indexOf('<div class="tblwrap">') &&
   html.indexOf('id="methodologySection"') > html.indexOf('<div class="tblwrap">'));
-check('v1.11 document version is consistent',
-  html.includes('<title>Family Retirement Income Simulator v1.11</title>') &&
-  html.includes('<span class="version">v1.11</span>') &&
-  html.includes("const STORAGE_KEY = 'family-retirement-simulator:v1.11:scenario'") &&
+check('v1.12 document version is consistent',
+  html.includes('<title>Family Retirement Income Simulator v1.12</title>') &&
+  html.includes('<span class="version">v1.12</span>') &&
+  html.includes("const STORAGE_KEY = 'family-retirement-simulator:v1.12:scenario'") &&
+  html.includes("'family-retirement-simulator:v1.11:scenario'") &&
   html.includes("'family-retirement-simulator:v1.10:scenario'"));
+check('v1.12 offers a manual latest-version link and no update callback',
+  html.includes('class="version-link"') &&
+  html.includes('https://github.com/dcaddick/retirement-simulator/releases/latest') &&
+  html.includes('never checks for updates by itself'));
+const scenarioBasicsMarkup = html.slice(
+  html.indexOf("$('#scenarioFields').innerHTML"),
+  html.indexOf('function renderHousehold(')
+);
+const householdMarkup = html.slice(
+  html.indexOf("$('#householdFields').innerHTML"),
+  html.indexOf('function bindMoneyInputs(')
+);
+check('v1.12 lifts household type and headline settings into the Scenario group',
+  html.indexOf('id="scenarioFields"') < html.indexOf('id="householdSection"') &&
+  scenarioBasicsMarkup.length > 0 && householdMarkup.length > 0 &&
+  ['data-path="household.type"', 'household.targetAfterTax', 'household.annualBudget',
+    'household.modelEndAge', 'household.applyMinimumDrawdown', 'household.includeAgePension',
+    'household.showSurvival'].every(field => scenarioBasicsMarkup.includes(field)) &&
+  // modelEndAge is excluded here: the first-death block still reads it as the
+  // upper bound of the death-age input without owning the control.
+  ['data-path="household.type"', 'household.targetAfterTax', 'household.annualBudget',
+    'household.applyMinimumDrawdown', 'household.includeAgePension',
+    'household.showSurvival'].every(field => !householdMarkup.includes(field)) &&
+  householdMarkup.includes('First-death scenario') &&
+  householdMarkup.includes('Drawdown order'));
+check('v1.12 leads the Household group with drawdown order',
+  householdMarkup.indexOf('Drawdown order') <
+    householdMarkup.indexOf('First-death scenario'));
+check('v1.12 orders the controls Scenario, People, then Returns',
+  html.indexOf('id="scenarioSection"') < html.indexOf('id="peopleSection"') &&
+  html.indexOf('id="peopleSection"') < html.indexOf('id="returnsSection"'));
 check('outgoing v1.04 executable is archived', existsSync(ARCHIVE_104));
 check('outgoing v1.0.5 executable is archived', existsSync(ARCHIVE_105));
 check('outgoing v1.0.6 executable is archived', existsSync(ARCHIVE_106));
@@ -248,6 +283,14 @@ check('outgoing v1.0.7 executable is archived', existsSync(ARCHIVE_107));
 check('outgoing v1.0.8 executable is archived', existsSync(ARCHIVE_108));
 check('outgoing v1.0.9 executable is archived', existsSync(ARCHIVE_109));
 check('outgoing v1.0.10 executable is archived', existsSync(ARCHIVE_110));
+check('outgoing v1.0.11 executable is archived', existsSync(ARCHIVE_111));
+check('v1.0.11 archive provenance is recorded',
+  archiveReadme.includes('v1.0.11:retirement-simulator.html') &&
+  archiveReadme.includes('582dab6b6597d1d7facbf2b0daec33869b97f289') &&
+  archiveReadme.includes('58380381311A4D8402CADCE5DF93A65A85CBD2558AE23EA59454A4EAD3EE8039'));
+check('CI verifies the archived v1.0.11 tag blob',
+  testWorkflow.includes('Verify archived v1.0.11 source') &&
+  testWorkflow.includes('v1.0.11:retirement-simulator.html'));
 check('v1.0.10 archive provenance is recorded',
   archiveReadme.includes('v1.0.10:retirement-simulator.html') &&
   archiveReadme.includes('87d456f500a6f48f2289e91afb553d267faa8ff9') &&
@@ -336,8 +379,8 @@ check('methodology discloses childless Medicare family scope',
 check('methodology records prototype architecture rationale',
   methodology.includes('personal prototype') &&
   methodology.includes('thousands of users'));
-check('README identifies deterministic v1.11 and its screenshot',
-  readme.includes('v1.11') &&
+check('README identifies deterministic v1.12 and its screenshot',
+  readme.includes('v1.12') &&
   readme.includes('docs/assets/retirement-simulator-v1.11.png') &&
   existsSync(SCREENSHOT_111) &&
   readme.includes('retirement-monte-carlo-v0.7.html') &&
@@ -368,6 +411,13 @@ check('changelog records v1.11 Pages and iPad household work',
   changelog.includes('GitHub Pages') &&
   changelog.includes('[#34]') &&
   changelog.includes('[#36]'));
+check('changelog records the v1.12 header link and control reordering',
+  changelog.includes('## 1.12 - 2026-08-01') &&
+  changelog.includes('Get the latest version') &&
+  changelog.includes('no automatic update check') &&
+  changelog.includes('Moved Household type into the Scenario group') &&
+  changelog.includes('[#39]') &&
+  changelog.includes('[#40]'));
 check('deferred register records the four v1.0.6 resolutions',
   ['#5', '#9', '#10', '#11'].every(issue => deferredReview.includes(issue)) &&
   (deferredReview.match(/Resolved in v1\.0\.6/g) ?? []).length >= 4);
@@ -393,8 +443,10 @@ check('deferred register resolves the pre-60 taxation item',
   deferredReview.includes('| AIPR-003-SUPER-TAXFREE |') &&
   deferredReview.includes('| Resolved | Super access ages below 60 are rejected') &&
   deferredReview.includes('taxation of withdrawals before age 60'));
+// v1.12 put People second, so Returns & inflation now sits below it. It is
+// still an upper block: it precedes every asset and income section.
 check('returns and inflation share a dedicated upper controls block',
-  html.indexOf('id="returnAssumptions"') < html.indexOf('id="peopleFields"') &&
+  html.indexOf('id="returnAssumptions"') < html.indexOf('id="cashSavingsSection"') &&
   html.includes('Estimated net returns after fees and tax'));
 check('defined benefit wording leads the combined pension section',
   html.includes('Defined Benefit/UK Pensions') &&
