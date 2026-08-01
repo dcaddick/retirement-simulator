@@ -73,6 +73,8 @@ Automated tests do not replace a real-browser pass. For user-interface changes, 
 - switching the same scenario back to Couple, confirming Person 2 values, original array indexes, drawdown tiers and owner selections are restored;
 - adding new shares, Other income and Other assets in Single mode, confirming ownership defaults to Person 1;
 - the same fixed first-death scenario in the Monte Carlo report, confirming the assumptions disclosure and the same transition year in every Monte Carlo path;
+- the reordered v1.12 controls panel, confirming Scenario carries Scenario name, Household type, the spending targets, the horizon age and the three headline toggles, that People follows it, and that Household holds only drawdown order and then the first-death scenario;
+- the header "Get the latest version" link, confirming it opens the GitHub releases page in a new tab and that no request leaves the page until it is clicked;
 - Model assumptions and sources in light and dark themes at desktop and mobile widths, confirming the tax-status estimate wraps without overflow and remains readable;
 
 ### GitHub Pages verification

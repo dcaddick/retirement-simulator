@@ -9,6 +9,14 @@ This changelog summarizes public, non-personal milestones. Early development use
 - Added Other-income parity as the second issue #1 Monte Carlo import-support slice, including currency conversion, CPI indexation, ownership, tax treatment and survivor continuation; four compatibility guards remain active ([#1](https://github.com/dcaddick/retirement-simulator/issues/1)).
 - Added Defined Benefit/UK Pension parity as the third issue #1 Monte Carlo slice, replacing obsolete private-pension controls and preserving legacy values through migration; three compatibility guards remain active ([#1](https://github.com/dcaddick/retirement-simulator/issues/1)).
 
+## 1.12 - 2026-08-01
+
+- Added a "Get the latest version" link beside the header version, pointing at the GitHub releases page. It is a plain link the reader chooses to follow, so the file still makes no automatic update check or other background callback ([#39](https://github.com/dcaddick/retirement-simulator/issues/39)).
+- Moved Household type into the Scenario group at the top of the controls, alongside Scenario name, so the household shape is set before anything that depends on it ([#40](https://github.com/dcaddick/retirement-simulator/issues/40)).
+- Moved Preferred Retirement Income, Essential Annual Budget, the model horizon age and the Apply ABP minimum drawdown, Include Age Pension estimate and Show illustrative survival band toggles into the same Scenario group. The Household group now holds only drawdown order and the first-death scenario, in that order ([#40](https://github.com/dcaddick/retirement-simulator/issues/40)).
+- Moved People to second place in the controls panel, ahead of Returns & inflation, so ages and retirement ages are entered directly after the scenario is defined ([#40](https://github.com/dcaddick/retirement-simulator/issues/40)).
+- Archived the exact outgoing deterministic v1.0.11 executable.
+
 ## 1.11 - 2026-07-23
 
 - Added an optional GitHub Pages entry point for iPad and browser users, publishing only the deterministic simulator while retaining the downloadable HTML as the primary distribution.

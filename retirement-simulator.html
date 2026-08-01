@@ -4,7 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src https://api.frankfurter.app https://stooq.com; base-uri 'none'; form-action 'none'" />
-<title>Family Retirement Income Simulator v1.11</title>
+<title>Family Retirement Income Simulator v1.12</title>
 <style>
   :root{
     --bg:#0f1720; --panel:#18232f; --panel2:#1e2c3a; --line:#2b3d4f;
@@ -28,6 +28,9 @@
   .header-actions{display:flex;gap:7px;flex-wrap:wrap;margin-left:auto;padding-left:18px;border-left:1px solid var(--line)}
   .header-meta{max-width:620px;margin:-1px 0 0 auto;text-align:right}
   h1{margin:0;font-size:19px}
+  .version-link{margin-left:10px;font-size:12.5px;font-weight:400;color:var(--muted);
+    text-decoration:underline;text-underline-offset:2px;white-space:nowrap}
+  .version-link:hover,.version-link:focus-visible{color:var(--accent)}
   .sub{color:var(--muted);font-size:12.5px;margin-top:3px}
   .wrap{display:grid;grid-template-columns:var(--left-w,24vw) 6px 1fr;min-height:0;height:100%}
   #splitter{cursor:col-resize;background:var(--line);opacity:.6;transition:opacity .15s;touch-action:none}
@@ -209,7 +212,11 @@
 <div class="disclaimer-banner top" role="note">Local, reproducible retirement-risk analysis. Estimate only; not financial or tax advice.</div>
 <header>
   <div class="header-row">
-  <h1>Family Retirement Income Simulator <span class="version">v1.11</span></h1>
+  <h1>Family Retirement Income Simulator <span class="version">v1.12</span>
+    <a class="version-link"
+      href="https://github.com/dcaddick/retirement-simulator/releases/latest"
+      target="_blank" rel="noreferrer"
+      title="Opens the GitHub releases page. This page never checks for updates by itself.">Get the latest version</a></h1>
   <nav class="header-actions" aria-label="Scenario actions">
     <button type="button" id="newScenario">New</button>
     <button type="button" id="resetSample">Reset sample</button>
@@ -232,6 +239,11 @@
       <label><span class="k">Scenario name</span>
         <input id="scenarioName" data-path="scenarioName">
       </label>
+      <div id="scenarioFields"></div>
+    </details>
+    <details class="group" id="peopleSection" open>
+      <summary class="group-toggle"><h3>People</h3></summary>
+      <div id="peopleFields" class="people-split"></div>
     </details>
     <details class="group" id="returnsSection" open>
       <summary class="group-toggle"><h3 id="returnAssumptionsHeading">Returns &amp; inflation</h3></summary>
@@ -257,10 +269,6 @@
         </p>
       </div>
       </div>
-    </details>
-    <details class="group" id="peopleSection" open>
-      <summary class="group-toggle"><h3>People</h3></summary>
-      <div id="peopleFields" class="people-split"></div>
     </details>
     <details class="group pot" id="cashSavingsSection">
       <summary class="group-toggle"><h3>Cash &amp; Savings</h3></summary>
@@ -3161,11 +3169,12 @@
   'use strict';
 
   const core = globalThis.RetirementSimulatorCore;
-  const STORAGE_KEY = 'family-retirement-simulator:v1.11:scenario';
+  const STORAGE_KEY = 'family-retirement-simulator:v1.12:scenario';
   const THEME_STORAGE_KEY = 'retirement-simulator-theme';
   // Read-only fallbacks so scenarios saved under earlier versions carry over
   // on first load (they migrate to the current schema automatically).
   const LEGACY_STORAGE_KEYS = [
+    'family-retirement-simulator:v1.11:scenario',
     'family-retirement-simulator:v1.10:scenario',
     'family-retirement-simulator:v1.09:scenario',
     'family-retirement-simulator:v1.08:scenario',
@@ -3876,15 +3885,17 @@
     <button type="button" id="addDrawdownTier">Add drawdown tier</button>`;
   }
 
-  function renderHousehold(scenario) {
-    const { household, people } = scenario;
+  // v1.12: the fields that define the shape of a scenario (who is in the
+  // household, what it needs to spend, how long it runs and which headline
+  // rules apply) sit in the Scenario group at the top of the controls. The
+  // Household group keeps the mechanics: first death and drawdown order.
+  function renderScenarioBasics(scenario) {
+    const { household } = scenario;
     const single = isSingleScenario(scenario);
-    const firstDeath = household.firstDeath;
-    const deathPersonIndex = firstDeath.deceasedPerson === 'p1' ? 1 : 0;
-    const horizonLabel = !single && firstDeath.enabled
+    const horizonLabel = !single && household.firstDeath.enabled
       ? 'Model to survivor age' : 'Model to Person 1 age';
     const excludedCount = hiddenPerson2Count(scenario);
-    $('#householdFields').innerHTML = `
+    $('#scenarioFields').innerHTML = `
       <label><span class="k">Household type</span>
         <select data-path="household.type">
           <option value="couple"${household.type === 'couple' ? ' selected' : ''}>Couple</option>
@@ -3903,8 +3914,18 @@
       </label>
       <label><span class="k">Show illustrative survival band</span>
         <input type="checkbox" data-path="household.showSurvival"${household.showSurvival ? ' checked' : ''}>
-      </label>
-      ${single ? '' : `<h4>First-death scenario</h4>
+      </label>`;
+  }
+
+  function renderHousehold(scenario) {
+    const { household, people } = scenario;
+    const single = isSingleScenario(scenario);
+    const firstDeath = household.firstDeath;
+    const deathPersonIndex = firstDeath.deceasedPerson === 'p1' ? 1 : 0;
+    $('#householdFields').innerHTML = `
+      <h4>Drawdown order</h4>
+      ${drawdownPriorityFields(scenario)}
+      ${single ? '<p class="sub">Single households have no first-death transition. Household type, spending targets and the model horizon are set in the Scenario group above.</p>' : `<h4>First-death scenario</h4>
       <label><span class="k">Model first death</span>
         <input type="checkbox" data-path="household.firstDeath.enabled"${firstDeath.enabled ? ' checked' : ''}>
       </label>
@@ -3920,9 +3941,7 @@
         ${numberField('Survivor Preferred Income %', 'household.firstDeath.survivorPreferredPct', firstDeath.survivorPreferredPct, 'min="0" max="100" step="5"')}
         ${numberField('Survivor Essential Budget %', 'household.firstDeath.survivorEssentialPct', firstDeath.survivorEssentialPct, 'min="0" max="100" step="5"')}
         <p class="sub">The transition occurs at the start of the selected year. Assets transfer immediately and survivor income rules apply from that row.</p>
-      </div>`}
-      <h4>Drawdown order</h4>
-      ${drawdownPriorityFields(scenario)}`;
+      </div>`}`;
   }
 
   function bindMoneyInputs() {
@@ -4791,6 +4810,7 @@
     pendingUiContext = captureUiContext();
     currentScenario = structuredClone(scenario);
     $('#scenarioName').value = currentScenario.scenarioName;
+    renderScenarioBasics(currentScenario);
     renderReturnAssumptions(currentScenario);
     renderPeople(currentScenario);
     renderCashAndSavings(currentScenario);
