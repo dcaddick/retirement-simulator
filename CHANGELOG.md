@@ -4,6 +4,7 @@ This changelog summarizes public, non-personal milestones. Early development use
 
 ## Unreleased
 
+- Published [Independent Review Materials](docs/independent-review/README.md) so anyone can have the model examined by their own accountant, tax agent or adviser without requesting anything: release identity and hash, a rule-by-rule map from documented methodology to code, the external source and evidence registers, fictional reference scenarios with an independent-calculation protocol, the test evidence and its limits, and the project's own open-defect list. Every page states that no independent review has been performed.
 - Reject experimental Monte Carlo super access ages below 60 because pre-60 withdrawal taxation is outside the simplified model ([#8](https://github.com/dcaddick/retirement-simulator/issues/8)).
 - Established Monte Carlo schema 5 and salary-growth parity as the first issue #1 import-support slice; the companion remains experimental and the other compatibility guards remain active ([#1](https://github.com/dcaddick/retirement-simulator/issues/1)).
 - Added Other-income parity as the second issue #1 Monte Carlo import-support slice, including currency conversion, CPI indexation, ownership, tax treatment and survivor continuation; four compatibility guards remain active ([#1](https://github.com/dcaddick/retirement-simulator/issues/1)).

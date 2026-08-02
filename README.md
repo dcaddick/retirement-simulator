@@ -86,6 +86,12 @@ Both tools require a super access age of 60 or older. They treat super withdrawa
 
 The app favours transparent approximations over hidden precision. See [Model methodology](docs/MODEL-METHODOLOGY.md) for the calculation sequence and boundaries, and the maintained [Deferred Review Register](docs/DEFERRED-REVIEW.md) for known limitations that require later professional review, product decisions or separately designed remediation.
 
+## Having it checked by your own professional
+
+No independent review of this simulator has been performed. Nothing here is verified, certified or endorsed.
+
+If you want your own accountant, registered tax agent or financial adviser to examine the model before you rely on it, the [Independent Review Materials](docs/independent-review/README.md) give them what they need without asking anyone's permission: the exact release identity and hash, a rule-by-rule map from the documented methodology to the code, the external sources each rule depends on and their effective periods, fictional reference scenarios with an independent-calculation protocol, the test evidence and its limits, and the project's own list of open defects.
+
 ## Experimental Monte Carlo companion
 
 The Monte Carlo report is deliberately labelled **experimental**. It can help compare how an imported scenario behaves under different synthetic return sequences, risk modes, glide paths and deterministic stress cases.
