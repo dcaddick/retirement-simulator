@@ -603,6 +603,92 @@
     cshcSingleThreshold: 101105
   });
 
+  // Every rate in this file is a frozen constant checked on a stated date. This
+  // is a single-file tool that can be opened years after it was saved, so the
+  // figures need to answer to the clock rather than be presented as timelessly
+  // current. Staleness is measured in scheduled indexation rounds crossed, not
+  // in elapsed months: Age Pension rates and thresholds re-index on 20 March
+  // and 20 September, and tax, Medicare and SAPTO parameters change on 1 July.
+  // Crossing one of those dates is what actually supersedes a figure.
+  const INDEXATION_SCHEDULE = Object.freeze([
+    Object.freeze({ month: 3, day: 20, label: 'Age Pension indexation' }),
+    Object.freeze({ month: 7, day: 1, label: 'tax and Medicare parameters' }),
+    Object.freeze({ month: 9, day: 20, label: 'Age Pension indexation' })
+  ]);
+
+  function parseIsoDateUtc(value) {
+    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value ?? ''));
+    if (!match) return null;
+    const time = Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+    return Number.isFinite(time) ? time : null;
+  }
+
+  function datedRateSources() {
+    const services = SERVICES_AUSTRALIA_2026;
+    return [
+      { label: 'ATO resident tax rates', checkedDate: TAX_SOURCE.checkedDate },
+      { label: 'ATO SAPTO', checkedDate: SAPTO_RULES.checkedDate },
+      { label: 'ATO Medicare levy thresholds', checkedDate: MEDICARE_BASE.checkedDate },
+      {
+        label: 'Services Australia Age Pension and CSHC',
+        checkedDate: services.checkedDate
+      },
+      {
+        label: 'Services Australia deeming',
+        checkedDate: services.deemingSource?.checkedDate
+      }
+    ].filter(entry => parseIsoDateUtc(entry.checkedDate) !== null);
+  }
+
+  // Counts the scheduled indexation dates strictly after `fromTime` and at or
+  // before `toTime`, so a run on an indexation day counts that day as passed.
+  function indexationRoundsBetween(fromTime, toTime) {
+    if (!(toTime > fromTime)) return [];
+    const crossed = [];
+    const startYear = new Date(fromTime).getUTCFullYear();
+    const endYear = new Date(toTime).getUTCFullYear();
+    for (let year = startYear; year <= endYear; year += 1) {
+      for (const event of INDEXATION_SCHEDULE) {
+        const time = Date.UTC(year, event.month - 1, event.day);
+        if (time > fromTime && time <= toTime) {
+          crossed.push({ time, year, label: event.label });
+        }
+      }
+    }
+    return crossed.sort((a, b) => a.time - b.time);
+  }
+
+  // `today` is injectable so the advisory is testable without touching the clock.
+  function ratesStaleness(today = Date.now()) {
+    const todayTime = typeof today === 'number'
+      ? today
+      : (parseIsoDateUtc(today) ?? Date.parse(today));
+    const sources = datedRateSources();
+    if (!sources.length || !Number.isFinite(todayTime)) {
+      return { state: 'unknown', roundsPassed: 0, crossed: [], sources: [] };
+    }
+    const withTimes = sources.map(entry => ({
+      ...entry, time: parseIsoDateUtc(entry.checkedDate)
+    }));
+    // The oldest checked date governs: the household is only as current as the
+    // least recently verified input feeding its result.
+    const oldest = withTimes.reduce((worst, entry) =>
+      entry.time < worst.time ? entry : worst, withTimes[0]);
+    const crossed = indexationRoundsBetween(oldest.time, todayTime);
+    const roundsPassed = crossed.length;
+    const state = roundsPassed === 0 ? 'ok' : (roundsPassed === 1 ? 'warn' : 'bad');
+    return {
+      state,
+      roundsPassed,
+      crossed,
+      sources: withTimes,
+      oldestLabel: oldest.label,
+      oldestCheckedDate: oldest.checkedDate,
+      nextIndexation: indexationRoundsBetween(
+        todayTime, Date.UTC(new Date(todayTime).getUTCFullYear() + 2, 0, 1))[0] ?? null
+    };
+  }
+
   function inflationRateForYear(year, assumptions) {
     if (assumptions.inflationMode === 'manual') {
       return assumptions.manualInflationPct / 100;
@@ -3231,6 +3317,10 @@
     fundTaxExpense,
     defaultDrawdownPriority,
     orderSuperTiersByMeansTest,
+    INDEXATION_SCHEDULE,
+    datedRateSources,
+    indexationRoundsBetween,
+    ratesStaleness,
     effectiveDrawdownPriority,
     defaultFirstDeath,
     migrateScenario,
@@ -4193,6 +4283,40 @@
     </div>`;
   }
 
+  // Turns the staleness assessment into a card. The wording names the date the
+  // figures were verified rather than only how old they are, so a reader can
+  // check the sources themselves against that date.
+  function ratesStalenessCard() {
+    const staleness = core.ratesStaleness();
+    if (staleness.state === 'unknown') return '';
+    const checked = staleness.oldestCheckedDate;
+    if (staleness.roundsPassed === 0) {
+      const next = staleness.nextIndexation;
+      return statusCard(
+        'ok',
+        'Rates currency',
+        `Verified ${checked}. No scheduled indexation has passed since then` +
+          (next ? `; next is ${next.label} on ${isoFromTime(next.time)}.` : '.')
+      );
+    }
+    const rounds = staleness.roundsPassed === 1
+      ? 'one scheduled indexation round has'
+      : `${staleness.roundsPassed} scheduled indexation rounds have`;
+    const tail = staleness.state === 'bad'
+      ? 'These figures are likely superseded. Check the linked sources before relying on the result.'
+      : 'Some figures may be superseded. Check the linked sources before relying on the result.';
+    return statusCard(
+      staleness.state,
+      'Rates may be out of date',
+      `Oldest input verified ${checked} (${staleness.oldestLabel}); ` +
+        `${rounds} passed since. ${tail}`
+    );
+  }
+
+  function isoFromTime(time) {
+    return new Date(time).toISOString().slice(0, 10);
+  }
+
   function prepareChart() {
     const width = Math.max(320, chart.clientWidth || 900);
     const height = Math.max(330, chart.clientHeight || 396);
@@ -4741,6 +4865,7 @@
     const firstDeathRow = result.rows.find(row =>
       row.lifecycle?.transitionedThisYear);
     $('#flags').innerHTML = [
+      ratesStalenessCard(),
       statusCard(
         peakCshcRow.cshc.eligible ? 'warn' : 'bad',
         'CSHC estimate',
@@ -4867,19 +4992,24 @@
   }
 
   function renderSources() {
+    const services = core.SERVICES_AUSTRALIA_2026;
+    // The checked date travels with each link so a reader can tell how old any
+    // individual figure is, not just how old the oldest one is.
     const sources = [
-      ['Treasury inflation forecast', core.TREASURY_INFLATION.sourceUrl],
-      ['ATO resident tax rates', core.TAX_SOURCE.url],
-      ['ATO SAPTO eligibility and rates', core.SAPTO_RULES.sourceUrl],
-      ['SAPTO transfer regulations', core.SAPTO_RULES.regulationsUrl],
-      ['ATO Medicare levy thresholds', core.MEDICARE_BASE.sourceUrl],
-      ['Services Australia Age Pension assets test', core.SERVICES_AUSTRALIA_2026.assetsTestUrl],
-      ['Services Australia Age Pension income test', core.SERVICES_AUSTRALIA_2026.incomeTestUrl],
-      ['Services Australia deeming', core.SERVICES_AUSTRALIA_2026.deemingUrl],
-      ['Services Australia CSHC income test', core.SERVICES_AUSTRALIA_2026.cshcUrl]
+      ['Treasury inflation forecast', core.TREASURY_INFLATION.sourceUrl, ''],
+      ['ATO resident tax rates', core.TAX_SOURCE.url, core.TAX_SOURCE.checkedDate],
+      ['ATO SAPTO eligibility and rates', core.SAPTO_RULES.sourceUrl, core.SAPTO_RULES.checkedDate],
+      ['SAPTO transfer regulations', core.SAPTO_RULES.regulationsUrl, core.SAPTO_RULES.checkedDate],
+      ['ATO Medicare levy thresholds', core.MEDICARE_BASE.sourceUrl, core.MEDICARE_BASE.checkedDate],
+      ['Services Australia Age Pension assets test', services.assetsTestUrl, services.checkedDate],
+      ['Services Australia Age Pension income test', services.incomeTestUrl, services.checkedDate],
+      ['Services Australia deeming', services.deemingUrl, services.deemingSource?.checkedDate],
+      ['Services Australia CSHC income test', services.cshcUrl, services.checkedDate]
     ];
-    $('#sourceList').innerHTML = sources.map(([label, url]) =>
-      `<li><a href="${escapeHtml(url)}" target="_blank" rel="noreferrer">${escapeHtml(label)}</a></li>`
+    $('#sourceList').innerHTML = sources.map(([label, url, checked]) =>
+      `<li><a href="${escapeHtml(url)}" target="_blank" rel="noreferrer">${escapeHtml(label)}</a>` +
+      (checked ? ` <span class="sub">checked ${escapeHtml(checked)}</span>` : '') +
+      '</li>'
     ).join('');
   }
 

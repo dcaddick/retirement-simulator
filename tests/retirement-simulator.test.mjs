@@ -1438,6 +1438,61 @@ if (typeof core.taxScheduleForYear === 'function') {
 // assessed. Filling to Preferred and banking the excess therefore converts
 // exempt super into assessed savings, costing Age Pension for no benefit (#28).
 // Already-assessed super is spent first within a tier.
+// Frozen rate constants must answer to the clock, because this is a single-file
+// tool that can be opened years after it was saved (#33). Staleness is counted
+// in scheduled indexation rounds crossed, not elapsed months: Age Pension
+// re-indexes 20 March and 20 September, tax/Medicare/SAPTO change 1 July.
+console.log('\nrates staleness guard');
+if (typeof core.ratesStaleness === 'function') {
+  check('the indexation calendar is the two pension rounds plus 1 July',
+    core.INDEXATION_SCHEDULE.length === 3 &&
+    core.INDEXATION_SCHEDULE.some(e => e.month === 3 && e.day === 20) &&
+    core.INDEXATION_SCHEDULE.some(e => e.month === 7 && e.day === 1) &&
+    core.INDEXATION_SCHEDULE.some(e => e.month === 9 && e.day === 20));
+  check('every dated rate source exposes a parseable checked date',
+    core.datedRateSources().length >= 5 &&
+    core.datedRateSources().every(entry =>
+      /^\d{4}-\d{2}-\d{2}$/.test(entry.checkedDate)));
+  const between = (from, to) => core.indexationRoundsBetween(
+    Date.parse(`${from}T00:00:00Z`), Date.parse(`${to}T00:00:00Z`));
+  check('no rounds are counted inside a quiet window',
+    between('2026-07-02', '2026-09-19').length === 0);
+  check('an indexation day counts as passed on the day itself',
+    between('2026-07-02', '2026-09-20').length === 1);
+  // Sep 2026, Mar/Jul/Sep 2027, Mar/Jul 2028, with the endpoint inclusive.
+  check('rounds accumulate across years',
+    between('2026-07-02', '2028-07-01').length === 6,
+    JSON.stringify(between('2026-07-02', '2028-07-01').map(e => e.label)));
+  check('rounds are returned in chronological order',
+    between('2026-01-01', '2028-01-01').every((entry, index, all) =>
+      index === 0 || entry.time > all[index - 1].time));
+  check('a backwards window counts nothing',
+    between('2027-01-01', '2026-01-01').length === 0);
+  // The oldest checked date governs, so the advisory is only as current as the
+  // least recently verified input. That is 2026-07-06 today.
+  const freshRun = core.ratesStaleness('2026-07-10');
+  const oneRound = core.ratesStaleness('2026-09-21');
+  const manyRounds = core.ratesStaleness('2028-08-01');
+  check('a run before any indexation reports current rates',
+    freshRun.state === 'ok' && freshRun.roundsPassed === 0,
+    `${freshRun.state}/${freshRun.roundsPassed}`);
+  check('a run after one indexation round warns',
+    oneRound.state === 'warn' && oneRound.roundsPassed === 1,
+    `${oneRound.state}/${oneRound.roundsPassed}`);
+  check('a run years later escalates',
+    manyRounds.state === 'bad' && manyRounds.roundsPassed >= 4,
+    `${manyRounds.state}/${manyRounds.roundsPassed}`);
+  check('the governing date is the oldest checked source, not the newest',
+    core.datedRateSources().every(entry =>
+      entry.checkedDate >= freshRun.oldestCheckedDate),
+    `${freshRun.oldestCheckedDate} (${freshRun.oldestLabel})`);
+  check('a fresh run names the next scheduled indexation',
+    freshRun.nextIndexation !== null &&
+      freshRun.nextIndexation.time > Date.parse('2026-07-10T00:00:00Z'));
+  check('an unparseable clock degrades to unknown rather than a false all-clear',
+    core.ratesStaleness('not-a-date').state === 'unknown');
+}
+
 console.log('\ndrawdown preserves means-test-exempt super');
 if (typeof core.orderSuperTiersByMeansTest === 'function') {
   const superTier = [
