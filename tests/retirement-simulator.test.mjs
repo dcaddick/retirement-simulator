@@ -1429,6 +1429,41 @@ if (typeof core.taxScheduleForYear === 'function') {
 // Services Australia Age Pension deeming page, checked 2026-08-06, page last
 // updated 2026-07-01 (QC 29656): 1.25% on the first $66,800 single / $110,600
 // couple, 3.25% above.
+// Offset indexation is deliberately split (#32): income tax brackets and LITO
+// are frozen in nominal terms because Australian law does not index them, so
+// they bracket-creep; SAPTO and the Medicare low-income thresholds are applied
+// on real income because both are indexed annually in law. These lock that
+// intent in both views so the split cannot drift silently.
+console.log('\noffset indexation split');
+if (typeof core.householdTaxAssessment === 'function') {
+  const realTaxable = 35000;
+  const assess = factor => core.householdTaxAssessment({
+    status: 'single',
+    alive: [true, false],
+    ages: [67, 0],
+    taxableNominal: [realTaxable * factor, 0],
+    rebateNominal: [realTaxable * factor, 0],
+    frankingNominal: [0, 0],
+    inflationFactor: factor,
+    year: 2026
+  }).people[0];
+  const today = assess(1);
+  const doubled = assess(2);
+  check('LITO is applied on nominal income and so bracket-creeps',
+    today.litoNominal === core.litoOffset(realTaxable) &&
+      doubled.litoNominal === core.litoOffset(realTaxable * 2),
+    `today=${today.litoNominal} doubled=${doubled.litoNominal}`);
+  check('LITO erodes in real terms as nominal income rises',
+    doubled.litoNominal / 2 < today.litoNominal);
+  check('SAPTO is applied on real income and holds its real value',
+    Math.abs(doubled.saptoFinalNominal / 2 - today.saptoFinalNominal) < 1e-6,
+    `today=${today.saptoFinalNominal} doubledReal=${doubled.saptoFinalNominal / 2}`);
+  check('Medicare is applied on real income and holds its real value',
+    Math.abs(doubled.medicareFinalNominal / 2 - today.medicareFinalNominal) < 1e-6);
+  check('the split is a real divergence, not a rounding artefact',
+    today.litoNominal > 0 && doubled.litoNominal < today.litoNominal);
+}
+
 console.log('\ndeeming rates and thresholds');
 {
   const rules = core.SERVICES_AUSTRALIA_2026;
