@@ -377,6 +377,7 @@
           <ul id="limitationsList">
             <li>Annual projection rows; retirement and pension starts use whole ages.</li>
             <li>Age Pension estimate assumes homeowners and excludes the principal residence. An explicit Single household uses single-person income, asset, deeming and CSHC thresholds from the first year. Couple tests apply before first death; the configured survivor uses the single-person thresholds immediately from the transition year.</li>
+            <li>The Work Bonus offsets salary against the Age Pension income test from Age Pension age, at $300 a fortnight with a maximum $11,800 balance and a $4,000 starting credit, accruing in years without salary. It is approximated annually rather than fortnightly, is not applied to Other income, and its amounts are held in nominal terms because they are not indexed.</li>
             <li>Nominal share-price growth is applied before dividends and sales; cost base stays unchanged. Dividend yield excludes price growth and is prorated by months held.</li>
             <li>Dividends and optional franking credits follow ownership. Eligibility is a user assumption; integrity rules are not automated.</li>
             <li>Capital losses are tracked per person, applied before discounts and carried forward from a zero opening balance. CGT is funded from assets and never counts as retirement income.</li>
@@ -603,6 +604,50 @@
     cshcSingleThreshold: 101105
   });
 
+  // The Work Bonus offsets employment and self-employment income before the
+  // Age Pension income test, and accrues whether or not the person works.
+  // Unlike the pension free areas it carries no statutory indexation, so its
+  // amounts are held in nominal terms and deflated into the real-terms income
+  // test. That is the same treatment the unindexed tax brackets and LITO get,
+  // and it means the offset erodes in real terms over a long projection, which
+  // is what happens in the absence of a legislated increase.
+  const WORK_BONUS = Object.freeze({
+    sourceUrl: 'https://www.servicesaustralia.gov.au/how-work-bonus-works?context=22561',
+    eligibilityUrl: 'https://www.servicesaustralia.gov.au/who-can-get-work-bonus?context=22561',
+    checkedDate: '2026-08-06',
+    pageLastUpdated: '2025-07-29',
+    fortnightlyAccrual: 300,
+    fortnightsPerYear: 26,
+    maximumBalance: 11800,
+    startingCredit: 4000,
+    eligibleAge: 67
+  });
+
+  // Annual approximation of a fortnightly scheme. Services Australia credits
+  // $300 each fortnight and offsets eligible income as it is earned, so across
+  // a year a person can use the carried balance plus the whole year's accrual.
+  // The cap applies to what is carried into the next year, not to the amount
+  // usable within the year, which is why the accrual is added before the offset
+  // and the cap is applied after it. Uneven earnings within a year are not
+  // modelled: a person who earns everything in one fortnight is treated the
+  // same as one who earns evenly.
+  function applyWorkBonus({ balance = 0, salary = 0, eligible, newlyEligible }) {
+    if (!eligible) {
+      return { offset: 0, balance: 0, assessableSalary: Math.max(0, salary) };
+    }
+    const earned = Math.max(0, Number(salary) || 0);
+    const opening = Math.max(0, Number(balance) || 0) +
+      (newlyEligible ? WORK_BONUS.startingCredit : 0);
+    const available = opening +
+      WORK_BONUS.fortnightlyAccrual * WORK_BONUS.fortnightsPerYear;
+    const offset = Math.min(earned, available);
+    return {
+      offset,
+      balance: Math.min(available - offset, WORK_BONUS.maximumBalance),
+      assessableSalary: earned - offset
+    };
+  }
+
   // Every rate in this file is a frozen constant checked on a stated date. This
   // is a single-file tool that can be opened years after it was saved, so the
   // figures need to answer to the clock rather than be presented as timelessly
@@ -636,7 +681,8 @@
       {
         label: 'Services Australia deeming',
         checkedDate: services.deemingSource?.checkedDate
-      }
+      },
+      { label: 'Services Australia Work Bonus', checkedDate: WORK_BONUS.checkedDate }
     ].filter(entry => parseIsoDateUtc(entry.checkedDate) !== null);
   }
 
@@ -1942,6 +1988,10 @@
         ? 0
         : scenario.savings.amount * savingsFraction,
       capitalLossCarryForward: [0, 0],
+      // Nominal dollars, carried across years and seeded with the starting
+      // credit in the first year each person becomes eligible.
+      workBonusBalance: [0, 0],
+      workBonusStarted: [false, false],
       lifecycle: single
         ? {
             householdStatus: 'single',
@@ -2572,8 +2622,28 @@
     const deemableOtherAssetsReal = deemableOtherAssetsNominal / inflationFactor;
     const ruleStatus = householdRuleStatus(scenario, state.lifecycle);
     const singleIndex = solePersonIndex(scenario, state.lifecycle);
+    // Work Bonus: employment income is offset before the income test for a
+    // living person of Age Pension age, once the household is actually being
+    // assessed for the pension. The balance accrues in years without salary,
+    // so a later return to work draws on it.
+    const workBonus = [0, 1].map(index => {
+      const eligible = Boolean(state.lifecycle.alive[index]) &&
+        ages[index] >= WORK_BONUS.eligibleAge &&
+        scenario.household.includeAgePension !== false;
+      const result = applyWorkBonus({
+        balance: state.workBonusBalance[index],
+        salary: salaries[index],
+        eligible,
+        newlyEligible: eligible && !state.workBonusStarted[index]
+      });
+      if (eligible) state.workBonusStarted[index] = true;
+      state.workBonusBalance[index] = result.balance;
+      return result;
+    });
+    const assessableSalaryNominal = workBonus.reduce(
+      (sum, result) => sum + result.assessableSalary, 0);
     const agePensionIncomeReal =
-      salaries.reduce((sum, value) => sum + value, 0) / inflationFactor +
+      assessableSalaryNominal / inflationFactor +
       ukState.reduce((sum, value) => sum + value, 0) / inflationFactor +
       (otherTaxableNominal + otherNonTaxableNominal) / inflationFactor +
       deemedIncome(assessableAssetsReal + deemableOtherAssetsReal,
@@ -3276,6 +3346,8 @@
     SAPTO_RULES,
     MEDICARE_BASE,
     SERVICES_AUSTRALIA_2026,
+    WORK_BONUS,
+    applyWorkBonus,
     inflationRateForYear,
     incomeTaxResident,
     medicareIndividualLevy,
@@ -5004,7 +5076,8 @@
       ['Services Australia Age Pension assets test', services.assetsTestUrl, services.checkedDate],
       ['Services Australia Age Pension income test', services.incomeTestUrl, services.checkedDate],
       ['Services Australia deeming', services.deemingUrl, services.deemingSource?.checkedDate],
-      ['Services Australia CSHC income test', services.cshcUrl, services.checkedDate]
+      ['Services Australia CSHC income test', services.cshcUrl, services.checkedDate],
+      ['Services Australia Work Bonus', core.WORK_BONUS.sourceUrl, core.WORK_BONUS.checkedDate]
     ];
     $('#sourceList').innerHTML = sources.map(([label, url, checked]) =>
       `<li><a href="${escapeHtml(url)}" target="_blank" rel="noreferrer">${escapeHtml(label)}</a>` +

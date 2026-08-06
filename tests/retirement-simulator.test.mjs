@@ -1442,6 +1442,98 @@ if (typeof core.taxScheduleForYear === 'function') {
 // tool that can be opened years after it was saved (#33). Staleness is counted
 // in scheduled indexation rounds crossed, not elapsed months: Age Pension
 // re-indexes 20 March and 20 September, tax/Medicare/SAPTO change 1 July.
+// The Work Bonus offsets employment income before the Age Pension income test
+// and accrues whether or not the person works (#25). Services Australia, checked
+// 2026-08-06: $300 a fortnight, maximum balance $11,800, $4,000 starting credit
+// for new recipients, available from Age Pension age.
+console.log('\nWork Bonus');
+if (typeof core.applyWorkBonus === 'function') {
+  const wb = core.WORK_BONUS;
+  check('Work Bonus figures match the published scheme',
+    wb.fortnightlyAccrual === 300 && wb.fortnightsPerYear === 26 &&
+    wb.maximumBalance === 11800 && wb.startingCredit === 4000 &&
+    wb.eligibleAge === 67);
+  check('Work Bonus carries its own dated provenance',
+    wb.checkedDate === '2026-08-06' && typeof wb.sourceUrl === 'string');
+  const ineligible = core.applyWorkBonus({ balance: 5000, salary: 20000, eligible: false });
+  check('below Age Pension age nothing is offset',
+    ineligible.offset === 0 && ineligible.assessableSalary === 20000 &&
+      ineligible.balance === 0);
+  const firstYear = core.applyWorkBonus({
+    balance: 0, salary: 0, eligible: true, newlyEligible: true });
+  check('a new recipient accrues to the cap rather than past it',
+    firstYear.balance === 11800,
+    `${firstYear.balance}`);
+  const idle = core.applyWorkBonus({ balance: 11800, salary: 0, eligible: true });
+  check('the balance never exceeds the maximum while idle',
+    idle.balance === 11800);
+  const spendAll = core.applyWorkBonus({ balance: 11800, salary: 25000, eligible: true });
+  check('a full bank plus the year accrual offsets 19800 of salary',
+    spendAll.offset === 11800 + 300 * 26 &&
+      spendAll.assessableSalary === 25000 - (11800 + 300 * 26) &&
+      spendAll.balance === 0,
+    `offset=${spendAll.offset} assessable=${spendAll.assessableSalary}`);
+  const drained = core.applyWorkBonus({ balance: 0, salary: 25000, eligible: true });
+  check('an emptied bank still offsets that year accrual',
+    drained.offset === 7800 && drained.assessableSalary === 17200);
+  const partial = core.applyWorkBonus({ balance: 0, salary: 5000, eligible: true });
+  check('salary below the accrual is fully offset and the rest banked',
+    partial.offset === 5000 && partial.assessableSalary === 0 &&
+      partial.balance === 2800);
+  check('a negative or missing salary cannot create an offset',
+    core.applyWorkBonus({ balance: 1000, salary: -5, eligible: true }).offset === 0 &&
+    core.applyWorkBonus({ balance: 1000, eligible: true }).offset === 0);
+}
+{
+  // Isolate the Work Bonus end to end: the same gross amount delivered as
+  // salary (Work Bonus eligible) must leave more pension than delivered as
+  // taxable Other income (not eligible), for a person past Age Pension age.
+  const workingPensioner = asSalary => {
+    const s = core.makeSampleScenario();
+    Object.assign(s.assumptions, {
+      inflationMode: 'manual', manualInflationPct: 0, ukPensionsEnabled: false
+    });
+    s.household.type = 'single';
+    Object.assign(s.household, {
+      targetAfterTax: 50000, annualBudget: 45000, modelEndAge: 71,
+      includeAgePension: true, applyMinimumDrawdown: false,
+      firstDeath: { enabled: false }
+    });
+    s.cash = { amount: 0, interestPct: 0, owner: 'p0' };
+    s.savings = { amount: 50000, interestPct: 0, owner: 'p0' };
+    s.shareholdings = [];
+    s.otherAssets = [];
+    s.lumpSumWithdrawals = [];
+    s.otherIncomes = asSalary ? [] : [{
+      id: 'consulting', label: 'Consulting', currency: 'AUD', fxToAud: 1,
+      amount: 15000, taxable: true, owner: 'p0', survivorPct: 100
+    }];
+    s.people.forEach((person, index) => Object.assign(person, {
+      age: index === 0 ? 68 : 66,
+      retireAge: index === 0 ? 72 : 66,
+      superAccessAge: 60,
+      salary: asSalary && index === 0 ? 15000 : 0,
+      salaryGrowthPct: 0, sgPct: 0,
+      accumulationReturnPct: 0, retirementReturnPct: 0,
+      super: 150000, ukStateAnnualGbp: 0, ukStateSurvivorPct: 0
+    }));
+    return core.projectScenario(s).rows;
+  };
+  const viaSalary = workingPensioner(true);
+  const viaOtherIncome = workingPensioner(false);
+  check('employment income leaves more pension than equivalent other income',
+    viaSalary[0].components.agePensionNet >
+      viaOtherIncome[0].components.agePensionNet,
+    `salary=${viaSalary[0].components.agePensionNet.toFixed(0)} other=${viaOtherIncome[0].components.agePensionNet.toFixed(0)}`);
+  check('the Work Bonus advantage persists past the first year',
+    viaSalary[1].components.agePensionNet >
+      viaOtherIncome[1].components.agePensionNet);
+  check('a fully offset salary is worth more in year one than year two',
+    viaSalary[0].components.agePensionNet >
+      viaSalary[1].components.agePensionNet,
+    'the starting credit and opening bank are spent first');
+}
+
 console.log('\nrates staleness guard');
 if (typeof core.ratesStaleness === 'function') {
   check('the indexation calendar is the two pension rounds plus 1 July',
