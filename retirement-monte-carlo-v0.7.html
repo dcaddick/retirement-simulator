@@ -512,17 +512,35 @@
     return 0;
   }
 
-  function saptoOffset(rebateIncome) {
-    if (rebateIncome <= 30994) return 1602;
-    if (rebateIncome >= 43810) return 0;
-    return Math.max(0, 1602 - (rebateIncome - 30994) * 0.125);
+  // SAPTO base and cut-in depend on household status: a single pensioner gets
+  // the higher single base, a member of a couple gets the lower couple base.
+  // Applying the couple schedule to a survivor understates the offset and
+  // overstates tax. Matches the deterministic engine's SAPTO_RULES.
+  const SAPTO_SCHEDULE = Object.freeze({
+    checkedDate: '2026-07-21',
+    sourceUrl: 'https://www.ato.gov.au/myTax25OffsetsSAPTO',
+    taper: 0.125,
+    single: Object.freeze({ base: 2230, cutIn: 34919, cutOut: 52759 }),
+    couple: Object.freeze({ base: 1602, cutIn: 30994, cutOut: 43810 })
+  });
+
+  function saptoOffset(rebateIncome, status = 'couple') {
+    const schedule = status === 'single'
+      ? SAPTO_SCHEDULE.single
+      : SAPTO_SCHEDULE.couple;
+    if (rebateIncome <= schedule.cutIn) return schedule.base;
+    if (rebateIncome >= schedule.cutOut) return 0;
+    return Math.max(0,
+      schedule.base - (rebateIncome - schedule.cutIn) * SAPTO_SCHEDULE.taper);
   }
 
-  function netTax({ taxableIncome, rebateIncome, year, seniorEligible }) {
+  function netTax({
+    taxableIncome, rebateIncome, year, seniorEligible, saptoStatus = 'couple'
+  }) {
     const gross = incomeTaxResident(taxableIncome, year) +
       medicareLevy(taxableIncome, seniorEligible);
     const offsets = litoOffset(taxableIncome) +
-      (seniorEligible ? saptoOffset(rebateIncome) : 0);
+      (seniorEligible ? saptoOffset(rebateIncome, saptoStatus) : 0);
     return Math.max(0, gross - offsets);
   }
 
@@ -531,7 +549,8 @@
     rebateNominal,
     inflationFactor,
     year,
-    seniorEligible
+    seniorEligible,
+    saptoStatus = 'couple'
   }) {
     const factor = inflationFactor > 0 ? inflationFactor : 1;
     const taxableReal = taxableNominal / factor;
@@ -539,7 +558,7 @@
     const grossReal = incomeTaxResident(taxableNominal, year) / factor +
       medicareLevy(taxableReal, seniorEligible);
     const offsetsReal = litoOffset(taxableNominal) / factor +
-      (seniorEligible ? saptoOffset(rebateReal) : 0);
+      (seniorEligible ? saptoOffset(rebateReal, saptoStatus) : 0);
     return Math.max(0, grossReal - offsetsReal);
   }
 
@@ -1627,13 +1646,16 @@
       interestByPerson[index] +
       discountedGainByPerson[index]
     );
+    const saptoStatus =
+      state.lifecycle.householdStatus === 'survivor' ? 'single' : 'couple';
     const taxReal = taxableNominal.map((value, index) =>
       state.lifecycle.alive[index] ? projectionNetTax({
         taxableNominal: value,
         rebateNominal: value,
         inflationFactor,
         year,
-        seniorEligible: ages[index] >= 67
+        seniorEligible: ages[index] >= 67,
+        saptoStatus
       }) : 0
     );
     const totalTaxNominal =
@@ -1649,7 +1671,8 @@
           taxableNominal[index] - discountedGainByPerson[index],
         inflationFactor,
         year,
-        seniorEligible: ages[index] >= 67
+        seniorEligible: ages[index] >= 67,
+        saptoStatus
       });
       return sum + Math.max(0, withGain - withoutGain) * inflationFactor;
     }, 0);

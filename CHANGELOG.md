@@ -9,6 +9,7 @@ This changelog summarizes public, non-personal milestones. Early development use
 - Established Monte Carlo schema 5 and salary-growth parity as the first issue #1 import-support slice; the companion remains experimental and the other compatibility guards remain active ([#1](https://github.com/dcaddick/retirement-simulator/issues/1)).
 - Added Other-income parity as the second issue #1 Monte Carlo import-support slice, including currency conversion, CPI indexation, ownership, tax treatment and survivor continuation; four compatibility guards remain active ([#1](https://github.com/dcaddick/retirement-simulator/issues/1)).
 - Added Defined Benefit/UK Pension parity as the third issue #1 Monte Carlo slice, replacing obsolete private-pension controls and preserving legacy values through migration; three compatibility guards remain active ([#1](https://github.com/dcaddick/retirement-simulator/issues/1)).
+- Fixed the experimental Monte Carlo companion applying the couple SAPTO schedule (base $1,602, cut-in $30,994) to a single survivor instead of the single schedule (base $2,230, cut-in $34,919). The offset was understated and tax overstated from the year a survivor reached 67, which also reduced the reported net Age Pension. The deterministic simulator was already correct; the companion now selects the schedule from household status ([#37](https://github.com/dcaddick/retirement-simulator/issues/37)).
 
 ## 1.12 - 2026-08-01
 

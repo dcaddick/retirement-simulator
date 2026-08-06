@@ -1542,4 +1542,37 @@ assert.ok(
   'savings interest should rise under the inflation stress but remain explicit'
 );
 
+// SAPTO schedule selection (#37): a single survivor must not be given the
+// lower couple base, which understates the offset and overstates tax.
+assert.equal(
+  simulator.saptoOffset(20000, 'single'),
+  2230,
+  'a single survivor below the cut-in should receive the full single SAPTO base'
+);
+assert.equal(
+  simulator.saptoOffset(20000, 'couple'),
+  1602,
+  'a member of a couple below the cut-in should receive the couple SAPTO base'
+);
+assert.equal(
+  simulator.saptoOffset(20000),
+  1602,
+  'SAPTO should default to the couple schedule when no status is supplied'
+);
+assert.equal(
+  round6(simulator.saptoOffset(36919, 'single')),
+  1980,
+  'single SAPTO should taper at 12.5c above the single cut-in'
+);
+assert.equal(
+  simulator.saptoOffset(60000, 'single'),
+  0,
+  'single SAPTO should be exhausted above the single cut-out'
+);
+assert.equal(
+  simulator.saptoOffset(32000, 'single') > simulator.saptoOffset(32000, 'couple'),
+  true,
+  'the single schedule should never offset less than the couple schedule'
+);
+
 console.log('retirement-monte-carlo-v0.7 survivor-boundary, risk-mode, age-gap and stress override tests passed');
