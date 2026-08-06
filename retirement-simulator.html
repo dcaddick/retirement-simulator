@@ -573,7 +573,19 @@
     assetsTestUrl: 'https://www.servicesaustralia.gov.au/assets-test-for-age-pension?context=22526',
     incomeTestUrl: 'https://www.servicesaustralia.gov.au/income-test-for-age-pension?context=22526',
     cshcUrl: 'https://www.servicesaustralia.gov.au/income-test-for-commonwealth-seniors-health-card?context=21966',
-    deemingUrl: 'https://www.servicesaustralia.gov.au/deeming',
+    deemingUrl: 'https://www.servicesaustralia.gov.au/deeming?context=22526',
+    // Deeming carries its own line-item provenance because it is the highest
+    // sensitivity means-test input here and its values move by ministerial
+    // decision rather than routine indexation. Verified against the Age
+    // Pension deeming page, which stated 1.25% on the first $66,800 single /
+    // $110,600 couple and 3.25% above, and was itself last updated 1 July 2026.
+    deemingSource: Object.freeze({
+      url: 'https://www.servicesaustralia.gov.au/deeming?context=22526',
+      effectiveDate: '2026-07-01',
+      checkedDate: '2026-08-06',
+      pageLastUpdated: '2026-07-01',
+      quickCode: 'QC 29656'
+    }),
     agePensionMaxCoupleAnnual: 1810.40 * 26,
     agePensionMaxSingleAnnual: 1200.90 * 26,
     homeownerAssetFreeArea: 499000,

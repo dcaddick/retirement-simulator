@@ -1424,8 +1424,38 @@ if (typeof core.taxScheduleForYear === 'function') {
     `2025=${core.incomeTaxResident(45000, 2025)} 2026=${core.incomeTaxResident(45000, 2026)}`);
 }
 
-check('single deeming threshold is applied',
-  core.deemedIncome(66800, 'single') === 66800 * 0.0125);
+// Deeming is the highest-sensitivity means-test input and moves by ministerial
+// decision, so the rates and both thresholds are pinned to a dated source (#24).
+// Services Australia Age Pension deeming page, checked 2026-08-06, page last
+// updated 2026-07-01 (QC 29656): 1.25% on the first $66,800 single / $110,600
+// couple, 3.25% above.
+console.log('\ndeeming rates and thresholds');
+{
+  const rules = core.SERVICES_AUSTRALIA_2026;
+  const source = rules.deemingSource ?? {};
+  check('deeming carries its own dated provenance',
+    source.effectiveDate === '2026-07-01' &&
+    source.checkedDate === '2026-08-06' &&
+    typeof source.url === 'string' && source.url.includes('deeming'));
+  check('deeming lower rate is 1.25 per cent',
+    rules.deemingLowerRate === 0.0125);
+  check('deeming upper rate is 3.25 per cent',
+    rules.deemingUpperRate === 0.0325);
+  check('single deeming threshold is 66800',
+    rules.deemingThresholdSingle === 66800);
+  check('couple deeming threshold is 110600',
+    rules.deemingThresholdCouple === 110600);
+  check('single balance at the threshold is all lower-rate',
+    core.deemedIncome(66800, 'single') === 66800 * 0.0125);
+  check('couple balance at the threshold is all lower-rate',
+    core.deemedIncome(110600, 'couple') === 110600 * 0.0125);
+  check('single balance above the threshold splits across both bands',
+    core.deemedIncome(166800, 'single') === 66800 * 0.0125 + 100000 * 0.0325);
+  check('couple balance above the threshold splits across both bands',
+    core.deemedIncome(210600, 'couple') === 110600 * 0.0125 + 100000 * 0.0325);
+  check('a zero balance is deemed to earn nothing',
+    core.deemedIncome(0, 'single') === 0 && core.deemedIncome(0, 'couple') === 0);
+}
 check('single CSHC threshold is current',
   core.SERVICES_AUSTRALIA_2026.cshcSingleThreshold === 101105);
 check('couple CSHC threshold is current',
