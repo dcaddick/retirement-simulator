@@ -1387,6 +1387,42 @@ if (typeof core.agePensionForHousehold === 'function') {
   check('single income test tapers at 50 cents',
     singleIncomeTaper.household === 1200.90 * 26 - 500);
 }
+// Tax schedules are keyed by the calendar year the financial year begins in,
+// which is the same year projection rows carry (#31). FY2025-26 keeps the 16%
+// first bracket; the 15% and 14% steps are legislated from 1 July 2026 and
+// 1 July 2027 by the Treasury Laws Amendment (More Cost of Living Relief)
+// Act 2025. ATO resident rates checked 2026-08-06.
+console.log('\ntax year semantics');
+check('schedule key convention is documented on the source record',
+  /financial year begins/.test(core.TAX_SOURCE.scheduleKey ?? ''));
+check('FY2025-26 first bracket is represented at 16 per cent',
+  core.TAX_SCHEDULES[2025][1][1] === 0.16);
+check('FY2026-27 first bracket is 15 per cent',
+  core.TAX_SCHEDULES[2026][1][1] === 0.15);
+check('FY2027-28 first bracket is 14 per cent',
+  core.TAX_SCHEDULES[2027][1][1] === 0.14);
+check('every schedule shares the 18200 tax-free threshold',
+  [2025, 2026, 2027].every(year => core.TAX_SCHEDULES[year][0][0] === 18200 &&
+    core.TAX_SCHEDULES[year][0][1] === 0));
+if (typeof core.taxScheduleForYear === 'function') {
+  check('projection year 2025 selects the FY2025-26 schedule',
+    core.taxScheduleForYear(2025) === core.TAX_SCHEDULES[2025]);
+  check('projection year 2026 selects the FY2026-27 schedule',
+    core.taxScheduleForYear(2026) === core.TAX_SCHEDULES[2026]);
+  check('projection year 2027 selects the FY2027-28 schedule',
+    core.taxScheduleForYear(2027) === core.TAX_SCHEDULES[2027]);
+  check('years beyond the known range hold the latest schedule',
+    core.taxScheduleForYear(2045) === core.TAX_SCHEDULES[2027]);
+  check('years before the known range clamp to the earliest schedule',
+    core.taxScheduleForYear(2019) === core.TAX_SCHEDULES[2025]);
+  check('a non-finite year falls back to the earliest schedule',
+    core.taxScheduleForYear(Number.NaN) === core.TAX_SCHEDULES[2025]);
+  check('the 16 per cent bracket actually prices a FY2025-26 year',
+    core.incomeTaxResident(45000, 2025) === 4288 &&
+      core.incomeTaxResident(45000, 2026) === 4020,
+    `2025=${core.incomeTaxResident(45000, 2025)} 2026=${core.incomeTaxResident(45000, 2026)}`);
+}
+
 check('single deeming threshold is applied',
   core.deemedIncome(66800, 'single') === 66800 * 0.0125);
 check('single CSHC threshold is current',

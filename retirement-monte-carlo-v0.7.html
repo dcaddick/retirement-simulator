@@ -431,13 +431,23 @@
     }),
     longRunRate: 0.025
   });
+  // Keyed by the calendar year in which the Australian financial year begins,
+  // so 2025 is FY2025-26, 2026 is FY2026-27 and 2027 is FY2027-28. Projection
+  // rows carry that same calendar year, so the row labelled 2026 is taxed at
+  // FY2026-27 rates. FY2025-26 keeps the 16% first bracket; the 15% and 14%
+  // steps are the cuts legislated by the Treasury Laws Amendment (More Cost of
+  // Living Relief) Act 2025, effective 1 July 2026 and 1 July 2027.
   const TAX_SCHEDULES = Object.freeze({
+    2025: [[18200, 0], [45000, 0.16], [135000, 0.30], [190000, 0.37], [Infinity, 0.45]],
     2026: [[18200, 0], [45000, 0.15], [135000, 0.30], [190000, 0.37], [Infinity, 0.45]],
     2027: [[18200, 0], [45000, 0.14], [135000, 0.30], [190000, 0.37], [Infinity, 0.45]]
   });
+  const TAX_SCHEDULE_YEARS = Object.freeze({ earliest: 2025, latest: 2027 });
   const TAX_SOURCE = Object.freeze({
-    checkedDate: '2026-07-06',
-    url: 'https://www.ato.gov.au/tax-rates-and-codes/tax-rates-australian-residents'
+    checkedDate: '2026-08-06',
+    url: 'https://www.ato.gov.au/tax-rates-and-codes/tax-rates-australian-residents',
+    legislatedCutsUrl: 'https://www.ato.gov.au/about-ato/new-legislation/in-detail/individuals/personal-income-tax-new-tax-cuts-for-every-australian-taxpayer',
+    scheduleKey: 'calendar year in which the financial year begins (2025 = FY2025-26)'
   });
   const MEDICARE_BASE = Object.freeze({
     effectiveYear: 2025,
@@ -483,8 +493,15 @@
     return TREASURY_INFLATION.rates[year] ?? TREASURY_INFLATION.longRunRate;
   }
 
+  // Years outside the known range clamp to the nearest known schedule rather
+  // than silently falling through to a later, lower-rate one.
   function taxScheduleForYear(year) {
-    return year >= 2027 ? TAX_SCHEDULES[2027] : TAX_SCHEDULES[2026];
+    const startYear = Number.isFinite(year)
+      ? Math.trunc(year)
+      : TAX_SCHEDULE_YEARS.earliest;
+    const clamped = Math.min(TAX_SCHEDULE_YEARS.latest,
+      Math.max(TAX_SCHEDULE_YEARS.earliest, startYear));
+    return TAX_SCHEDULES[clamped];
   }
 
   function incomeTaxResident(taxableIncome, year) {
@@ -2058,6 +2075,8 @@
     pensionFlows,
     TREASURY_INFLATION,
     TAX_SCHEDULES,
+    TAX_SCHEDULE_YEARS,
+    taxScheduleForYear,
     TAX_SOURCE,
     MEDICARE_BASE,
     SERVICES_AUSTRALIA_2026,
