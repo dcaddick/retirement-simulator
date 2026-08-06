@@ -1165,6 +1165,43 @@
     return superFirst ? [superTier, potTier] : [potTier, superTier];
   }
 
+  // Super held by a partner below Age Pension age is exempt from the means
+  // test, while savings are always assessed. Because the top-up waterfall draws
+  // to Preferred and banks anything above Essential, drawing that exempt super
+  // converts an exempt asset into an assessed one. Splitting a super tier
+  // evenly by weight ignores that, so an age-gap couple loses Age Pension for
+  // no benefit: the same money is drawn and the same spending funded either way.
+  //
+  // Within a tier, defer super belonging to a partner under Age Pension age
+  // behind everything else in that tier, so already-assessed super is spent
+  // first and the exempt balance is preserved while it still shelters value.
+  // Tier order itself is the user's stated drawdown intent and is untouched.
+  // Only applied when the Age Pension is being estimated, since that is the
+  // only reason to prefer one balance over the other; scenarios that exclude
+  // it are unaffected.
+  function orderSuperTiersByMeansTest(tiers, ages, meansTested) {
+    if (!meansTested) return tiers;
+    const exemptSource = index => `p${index}Super`;
+    // Exactly the complement of the assessable rule in
+    // assessableFinancialAssets, so a null age in a Single household is
+    // classified the same way in both places.
+    const exempt = new Set([0, 1]
+      .filter(index => !(ages?.[index] >= 67))
+      .map(exemptSource));
+    if (!exempt.size) return tiers;
+    const ordered = [];
+    for (const tier of tiers) {
+      const deferred = tier.filter(entry => exempt.has(entry.source));
+      const rest = tier.filter(entry => !exempt.has(entry.source));
+      if (!deferred.length || !rest.length) {
+        ordered.push(tier);
+        continue;
+      }
+      ordered.push(rest, deferred);
+    }
+    return ordered;
+  }
+
   function defaultFirstDeath() {
     return {
       enabled: false,
@@ -2592,7 +2629,15 @@
     // act as the modelling lever while the essential budget reflects actual spending.
     const gap = Math.max(0, targetNominal - guaranteedNet - mandatoryTotal);
 
-    const waterfall = drawFromTiers(state, drawdownPriority, gap);
+    // Spend already-assessed super before means-test-exempt super, so filling
+    // to Preferred and banking the excess does not convert an exempt balance
+    // into assessed savings for nothing (#28).
+    const waterfall = drawFromTiers(
+      state,
+      orderSuperTiersByMeansTest(
+        drawdownPriority, ages, scenario.household.includeAgePension !== false),
+      gap
+    );
     const extraSuperDraws = [waterfall.drawsBySource.p0Super, waterfall.drawsBySource.p1Super];
     if (state.lifecycle.householdStatus === 'survivor') {
       const deceasedIndex = state.lifecycle.deceasedIndex;
@@ -3185,6 +3230,7 @@
     drawFromTiers,
     fundTaxExpense,
     defaultDrawdownPriority,
+    orderSuperTiersByMeansTest,
     effectiveDrawdownPriority,
     defaultFirstDeath,
     migrateScenario,

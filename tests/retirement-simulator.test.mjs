@@ -1434,6 +1434,94 @@ if (typeof core.taxScheduleForYear === 'function') {
 // they bracket-creep; SAPTO and the Medicare low-income thresholds are applied
 // on real income because both are indexed annually in law. These lock that
 // intent in both views so the split cannot drift silently.
+// Super below Age Pension age is exempt from the means test; savings are always
+// assessed. Filling to Preferred and banking the excess therefore converts
+// exempt super into assessed savings, costing Age Pension for no benefit (#28).
+// Already-assessed super is spent first within a tier.
+console.log('\ndrawdown preserves means-test-exempt super');
+if (typeof core.orderSuperTiersByMeansTest === 'function') {
+  const superTier = [
+    { source: 'p0Super', weight: 0.5 },
+    { source: 'p1Super', weight: 0.5 }
+  ];
+  const potTier = [
+    { source: 'savings', weight: 0.6 },
+    { source: 'cash', weight: 0.4 }
+  ];
+  const tiers = [superTier, potTier];
+  const gap = core.orderSuperTiersByMeansTest(tiers, [68, 62], true);
+  check('a mixed super tier defers the under-67 partner behind the assessed one',
+    gap.length === 3 &&
+    gap[0].length === 1 && gap[0][0].source === 'p0Super' &&
+    gap[1].length === 1 && gap[1][0].source === 'p1Super' &&
+    gap[2] === potTier,
+    JSON.stringify(gap.map(t => t.map(e => e.source))));
+  check('both partners at Age Pension age leaves the tier untouched',
+    core.orderSuperTiersByMeansTest(tiers, [68, 67], true)[0] === superTier);
+  check('both partners below Age Pension age leaves the tier untouched',
+    core.orderSuperTiersByMeansTest(tiers, [62, 60], true)[0] === superTier);
+  check('excluding the Age Pension leaves drawdown order untouched',
+    core.orderSuperTiersByMeansTest(tiers, [68, 62], false) === tiers);
+  // A tier holding only exempt super is an explicit instruction to spend it
+  // first, so tier order stays the user's decision.
+  check('a tier of only exempt super is left as the stated intent',
+    core.orderSuperTiersByMeansTest(
+      [[{ source: 'p1Super', weight: 1 }], potTier], [68, 62], true
+    ).length === 2);
+  check('a null Person 2 age is classed exactly as the means test classes it',
+    core.orderSuperTiersByMeansTest(tiers, [68, null], true)[0][0].source === 'p0Super');
+}
+{
+  // End to end: an age-gap couple drawing super to Preferred should preserve the
+  // younger partner's exempt balance and see its assessable base fall, not rise.
+  const gapScenario = core.makeSampleScenario();
+  Object.assign(gapScenario.assumptions, {
+    inflationMode: 'manual', manualInflationPct: 0, ukPensionsEnabled: false
+  });
+  gapScenario.household.type = 'couple';
+  Object.assign(gapScenario.household, {
+    targetAfterTax: 70000, annualBudget: 45000, modelEndAge: 74,
+    includeAgePension: true, applyMinimumDrawdown: false,
+    firstDeath: { enabled: false }
+  });
+  gapScenario.household.drawdownPriority = core.defaultDrawdownPriority(true);
+  gapScenario.cash = { amount: 0, interestPct: 0, owner: 'joint' };
+  gapScenario.savings = { amount: 40000, interestPct: 0, owner: 'joint' };
+  gapScenario.shareholdings = [];
+  gapScenario.otherIncomes = [];
+  gapScenario.otherAssets = [];
+  gapScenario.lumpSumWithdrawals = [];
+  gapScenario.people.forEach((person, index) => Object.assign(person, {
+    age: index === 0 ? 68 : 62,
+    retireAge: index === 0 ? 68 : 62,
+    superAccessAge: 60,
+    salary: 0, salaryGrowthPct: 0, sgPct: 0,
+    accumulationReturnPct: 0, retirementReturnPct: 0,
+    super: 400000,
+    ukStateAnnualGbp: 0, ukStateSurvivorPct: 0
+  }));
+  const gapRows = core.projectScenario(gapScenario).rows;
+  const underAgeRows = gapRows.filter(row => row.ages[1] < 67);
+  check('the exempt partner super is untouched while below Age Pension age',
+    underAgeRows.length > 1 &&
+      underAgeRows.every(row => row.superBalances[1] === 400000),
+    underAgeRows.map(row => row.superBalances[1].toFixed(0)).join(' '));
+  check('the assessed partner super funds the drawdown instead',
+    underAgeRows[underAgeRows.length - 1].superBalances[0] <
+      underAgeRows[0].superBalances[0]);
+  const assessableAt = row =>
+    (row.ages[0] >= 67 ? row.superBalances[0] : 0) +
+    (row.ages[1] >= 67 ? row.superBalances[1] : 0) +
+    row.savings + row.cash;
+  check('the assessable base falls while the household spends down',
+    assessableAt(underAgeRows[underAgeRows.length - 1]) <
+      assessableAt(underAgeRows[0]),
+    `${assessableAt(underAgeRows[0]).toFixed(0)} -> ${assessableAt(underAgeRows[underAgeRows.length - 1]).toFixed(0)}`);
+  check('the Age Pension does not fall while the household spends down',
+    (underAgeRows[underAgeRows.length - 1].components.agePensionNet ?? 0) >=
+      (underAgeRows[0].components.agePensionNet ?? 0));
+}
+
 console.log('\noffset indexation split');
 if (typeof core.householdTaxAssessment === 'function') {
   const realTaxable = 35000;
