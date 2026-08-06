@@ -45,8 +45,8 @@ const TESTING = fileURLToPath(
   new URL('../docs/TESTING.md', import.meta.url)
 );
 const CHANGELOG = fileURLToPath(new URL('../CHANGELOG.md', import.meta.url));
-const SCREENSHOT_111 = fileURLToPath(
-  new URL('../docs/assets/retirement-simulator-v1.11.png', import.meta.url)
+const SCREENSHOT_112 = fileURLToPath(
+  new URL('../docs/assets/retirement-simulator-v1.12.png', import.meta.url)
 );
 const README = fileURLToPath(new URL('../README.md', import.meta.url));
 const PAGES_WORKFLOW = fileURLToPath(
@@ -381,8 +381,9 @@ check('methodology records prototype architecture rationale',
   methodology.includes('thousands of users'));
 check('README identifies deterministic v1.12 and its screenshot',
   readme.includes('v1.12') &&
-  readme.includes('docs/assets/retirement-simulator-v1.11.png') &&
-  existsSync(SCREENSHOT_111) &&
+  readme.includes('docs/assets/retirement-simulator-v1.12.png') &&
+  existsSync(SCREENSHOT_112) &&
+  !readme.includes('captured from v1.11') &&
   readme.includes('retirement-monte-carlo-v0.7.html') &&
   readme.includes('one partner') && readme.includes('franking') &&
   readme.includes('capital-loss') && readme.includes('docs/DEFERRED-REVIEW.md'));

@@ -19,9 +19,9 @@ Open the same deterministic simulator to explore its look and feel without downl
 
 Single HTML file · no installation · opens locally in a modern browser.
 
-![Retirement Income Simulator v1.11 showing a fictional single-person household](docs/assets/retirement-simulator-v1.11.png)
+![Retirement Income Simulator v1.12 showing a fictional two-person household, with Household type and the headline spending, horizon and rule settings grouped under Scenario at the top of the controls](docs/assets/retirement-simulator-v1.12.png)
 
-*Shown with fictional sample data in the default dark theme, captured from v1.11; v1.12 moves Household type and the headline spending, horizon and rule settings into the Scenario group at the top of the controls. The deterministic v1.12 simulator supports Couple and Single households, and the optional hosted version offers easier iPad access. Results are estimates, not financial advice.*
+*Shown with the built-in fictional sample household in the default dark theme, captured from v1.12. Household type leads the Scenario group, followed by the headline spending, horizon and rule settings, with People directly beneath. The deterministic simulator supports Couple and Single households, and the optional hosted version offers easier iPad access. Results are estimates, not financial advice.*
 
 The header carries a "Get the latest version" link to the GitHub releases page. It is an ordinary link: the file never contacts GitHub or checks for updates on its own.
 
