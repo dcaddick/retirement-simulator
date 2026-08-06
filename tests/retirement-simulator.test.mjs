@@ -1391,6 +1391,32 @@ check('single deeming threshold is applied',
   core.deemedIncome(66800, 'single') === 66800 * 0.0125);
 check('single CSHC threshold is current',
   core.SERVICES_AUSTRALIA_2026.cshcSingleThreshold === 101105);
+check('couple CSHC threshold is current',
+  core.SERVICES_AUSTRALIA_2026.cshcCoupleThreshold === 161768);
+// CSHC eligibility is a strict less-than test, not less-than-or-equal.
+// Services Australia: "your annual gross taxable income must be less than
+// $101,105.00 a year if you're single" (checked 2026-08-06), matching the
+// Social Security Act 1991 s1071 calculator. Raised and rejected as #29.
+if (typeof core.cshcEstimate === 'function') {
+  const singleLimit = core.SERVICES_AUSTRALIA_2026.cshcSingleThreshold;
+  const estimateAt = income => core.cshcEstimate({
+    adjustedTaxableIncome: income,
+    accountBasedPensionBalance: 0,
+    status: 'single'
+  });
+  const atThreshold = estimateAt(singleLimit);
+  const belowThreshold = estimateAt(singleLimit - 1);
+  const aboveThreshold = estimateAt(singleLimit + 1);
+  check('CSHC assessed income reaches the threshold it is compared against',
+    atThreshold.assessedIncome === singleLimit &&
+      atThreshold.threshold === singleLimit);
+  check('CSHC income exactly at the single threshold is not eligible',
+    atThreshold.eligible === false);
+  check('CSHC income one dollar below the single threshold is eligible',
+    belowThreshold.eligible === true);
+  check('CSHC income above the single threshold is not eligible',
+    aboveThreshold.eligible === false);
+}
 
 console.log('\nfirst-death lifecycle transition');
 check('first-death lifecycle helper is exported',
