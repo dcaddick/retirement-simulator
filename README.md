@@ -56,6 +56,12 @@ Scenario data stays in the browser's local storage unless you explicitly import 
 
 ## Retirement Simulator
 
+The settings panel starts in **Simple**, with three short sections: **About you**, **What you have**, and **Your retirement lifestyle**. Enter ages, retirement ages, super, cash and savings, and one household spending goal. Salary appears only while someone is still working. Spending can be entered per year, month or week (12 months or 52 weeks per year).
+
+Choose **Advanced** or **Explore more options** for the full editor, including names, ownership, planned spending, pensions, investments, returns, inflation and survivor settings. Both views use the same scenario and calculations; switching views preserves every value. The chosen view and spending period are remembered locally, separately from exported scenario data.
+
+Fresh starts and **New** use labelled fictional example amounts with no planned expenses and equal preferred-income and essential-budget targets. Editing that single spending goal updates both while they remain equal. Imported or saved scenarios with different targets keep their separate essential budget, with a link to review it in Advanced. **Reset sample** still restores the original, more detailed sample. Single-household joint balances retain the existing 50% inclusion rule, which Simple explains beside the affected account.
+
 The deterministic simulator models either a couple or a single-person household and includes:
 
 - salaries, retirement ages and superannuation contributions;
