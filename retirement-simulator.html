@@ -4,7 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src https://api.frankfurter.app https://stooq.com; base-uri 'none'; form-action 'none'" />
-<title>Family Retirement Income Simulator v1.12</title>
+<title>Family Retirement Income Simulator v1.1.0</title>
 <style>
   :root{
     --bg:#0f1720; --panel:#18232f; --panel2:#1e2c3a; --line:#2b3d4f;
@@ -36,6 +36,24 @@
   #splitter{cursor:col-resize;background:var(--line);opacity:.6;transition:opacity .15s;touch-action:none}
   #splitter:hover,#splitter.dragging{opacity:1;background:var(--accent, #0B81A2)}
   .controls{padding:14px 16px;border-right:1px solid var(--line);overflow-y:auto;min-height:0;height:100%;max-height:none}
+  .settings-switch{display:flex;gap:4px;padding:4px;background:var(--panel);border:1px solid var(--line);border-radius:10px;margin-bottom:16px;position:sticky;top:-14px;z-index:2}
+  .settings-switch button{flex:1;border-color:transparent;min-height:38px;background:transparent}
+  .settings-switch button[aria-pressed="true"]{background:var(--accent);color:#08131c;font-weight:650}
+  button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+  .simple-intro{margin-bottom:20px}
+  .simple-intro h2{font-size:20px;line-height:1.25;margin:0 0 8px}
+  .simple-intro p{margin:0;color:var(--muted);font-size:12.5px}
+  .simple-section{border:0;border-top:1px solid var(--line);padding:17px 0 4px;margin:0 0 12px;min-width:0}
+  .simple-section h3{font-size:15px;margin:0 0 12px;letter-spacing:0;color:var(--text)}
+  .simple-person{border:0;padding:0;margin:10px 0 15px;min-width:0}
+  #simpleSettings label{margin:9px 0;gap:10px}
+  #simpleSettings input,#simpleSettings select{min-height:36px;max-width:55%}
+  #simpleSettings .simple-spend{display:flex;gap:8px;align-items:center}
+  #simpleSettings .simple-spend input{width:100%;max-width:none;font-size:20px;min-width:0;text-align:left}
+  #simpleSettings .simple-spend select{width:125px;flex-shrink:0}
+  .simple-action{width:100%;min-height:42px;margin-top:12px;color:var(--accent)}
+  .simple-link{padding:0;border:0;background:none;color:var(--accent);text-decoration:underline;font-size:inherit}
+  .simple-notice{color:var(--muted);font-size:12px;margin:8px 0}
   .stage{padding:14px 18px;overflow-x:hidden;overflow-y:auto;min-height:0;height:100%}
   .group{margin-bottom:13px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
   .group h3{margin:0 0 8px;font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--accent)}
@@ -212,7 +230,7 @@
 <div class="disclaimer-banner top" role="note">Local, reproducible retirement-risk analysis. Estimate only; not financial or tax advice.</div>
 <header>
   <div class="header-row">
-  <h1>Family Retirement Income Simulator <span class="version">v1.12</span>
+  <h1>Family Retirement Income Simulator <span class="version">v1.1.0</span>
     <a class="version-link"
       href="https://github.com/dcaddick/retirement-simulator/releases/latest"
       target="_blank" rel="noreferrer"
@@ -234,6 +252,12 @@
 </header>
 <div class="wrap">
   <div class="controls" id="controls">
+    <div class="settings-switch" role="group" aria-label="Settings detail">
+      <button type="button" id="simpleMode" aria-pressed="true" aria-controls="simpleSettings">Simple</button>
+      <button type="button" id="advancedMode" aria-pressed="false" aria-controls="advancedSettings">Advanced</button>
+    </div>
+    <div id="simpleSettings"></div>
+    <div id="advancedSettings" hidden>
     <details class="group" id="scenarioSection" open>
       <summary class="group-toggle"><h3>Scenario</h3></summary>
       <label><span class="k">Scenario name</span>
@@ -328,6 +352,7 @@
       <summary class="group-toggle"><h3>Household</h3></summary>
       <div id="householdFields"></div>
     </details>
+    </div>
     <ul id="validationSummary" class="validation-summary" aria-live="polite"></ul>
   </div>
   <div id="splitter" role="separator" aria-orientation="vertical" aria-label="Resize panels"></div>
@@ -443,7 +468,7 @@
       </details>
     </div>
     <div class="note">
-      <b>v1.11.</b> Fictional Australian couple sample data is stored locally on this device and can be imported or exported as JSON. Calculations are transparent estimates and are not financial or tax advice. The Display toggle switches the whole dashboard &mdash; table, chart and headline figures &mdash; between today&rsquo;s dollars and nominal (future) dollars, except the CSHC estimate which stays in today&rsquo;s dollars against its fixed threshold. Numeric inputs recalculate live as you type without moving your modelling position; the &ldquo;Recalculated&rdquo; stamp above the table confirms each run.
+      <b>v1.1.0.</b> Fictional Australian couple sample data is stored locally on this device and can be imported or exported as JSON. Calculations are transparent estimates and are not financial or tax advice. The Display toggle switches the whole dashboard &mdash; table, chart and headline figures &mdash; between today&rsquo;s dollars and nominal (future) dollars, except the CSHC estimate which stays in today&rsquo;s dollars against its fixed threshold. Numeric inputs recalculate live as you type without moving your modelling position; the &ldquo;Recalculated&rdquo; stamp above the table confirms each run.
     </div>
   </div>
 </div>
@@ -3408,11 +3433,19 @@
   'use strict';
 
   const core = globalThis.RetirementSimulatorCore;
-  const STORAGE_KEY = 'family-retirement-simulator:v1.12:scenario';
+  const STORAGE_KEY = 'family-retirement-simulator:v1.1.0:scenario';
   const THEME_STORAGE_KEY = 'retirement-simulator-theme';
+  const SETTINGS_MODE_KEY = 'retirement-simulator:settings-mode';
+  const SPENDING_PERIOD_KEY = 'retirement-simulator:spending-period';
+  let settingsMode = window.__safeStorage.getItem(SETTINGS_MODE_KEY) === 'advanced' ? 'advanced' : 'simple';
+  let spendingPeriod = window.__safeStorage.getItem(SPENDING_PERIOD_KEY) || 'year';
+  const spendingPeriods = { year: 1, month: 12, week: 52 };
+  if (!Object.hasOwn(spendingPeriods, spendingPeriod)) spendingPeriod = 'year';
   // Read-only fallbacks so scenarios saved under earlier versions carry over
   // on first load (they migrate to the current schema automatically).
   const LEGACY_STORAGE_KEYS = [
+    'family-retirement-simulator:v1.13:scenario',
+    'family-retirement-simulator:v1.12:scenario',
     'family-retirement-simulator:v1.11:scenario',
     'family-retirement-simulator:v1.10:scenario',
     'family-retirement-simulator:v1.09:scenario',
@@ -3647,6 +3680,116 @@
         data-currency="${currency}" data-path="${path}"
         value="${core.formatMoney(value, currency)}">
     </label>`;
+  }
+
+  // Simple is a presentation of the same scenario, never a second model.
+  function makeStarterScenario() {
+    const scenario = core.makeSampleScenario();
+    scenario.scenarioName = 'Example starting point';
+    scenario.people[0].name = 'You';
+    scenario.people[1].name = 'Partner';
+    scenario.lumpSumWithdrawals = [];
+    scenario.savings.owner = 'joint';
+    scenario.household.annualBudget = scenario.household.targetAfterTax;
+    scenario.household.showSurvival = false;
+    return scenario;
+  }
+
+  function simpleField(label, path, value, money = false) {
+    const id = `simple-${path.replaceAll('.', '-')}`;
+    return `<label for="${id}"><span class="k">${escapeHtml(label)}</span>
+      <input id="${id}" type="number" inputmode="${money ? 'decimal' : 'numeric'}" min="0" step="${money ? 'any' : '1'}"
+        ${money ? '' : 'max="120"'} data-simple-path="${path}" value="${value}"></label>`;
+  }
+
+  function renderSimpleSettings(scenario) {
+    const people = activePeople(scenario);
+    const splitBudget = scenario.household.annualBudget !== scenario.household.targetAfterTax;
+    const hasExtras = scenario.lumpSumWithdrawals.some(item => item.enabled !== false) ||
+      scenario.shareholdings.length || (scenario.otherIncomes ?? []).length ||
+      (scenario.otherAssets ?? []).length || scenario.household.firstDeath.enabled ||
+      (scenario.assumptions.ukPensionsEnabled !== false && people.some(({ person }) => person.ukStateAnnualGbp > 0));
+    $('#simpleSettings').innerHTML = `
+      <div class="simple-intro"><h2>Start with the basics</h2>
+        <p>A few numbers to explore your retirement. Adjust them and see your projection update.</p>
+        ${scenario.scenarioName === 'Example starting point' || scenario.scenarioName === 'Sample household'
+          ? '<p class="simple-notice">Fictional example amounts — replace them with your own.</p>' : ''}
+      </div>
+      <section class="simple-section" aria-labelledby="simpleAboutHeading">
+        <h3 id="simpleAboutHeading">1. About you</h3>
+        <label for="simple-household-type"><span class="k">Planning for</span>
+          <select id="simple-household-type" data-simple-path="household.type">
+            <option value="single"${isSingleScenario(scenario) ? ' selected' : ''}>Just me</option>
+            <option value="couple"${!isSingleScenario(scenario) ? ' selected' : ''}>A couple</option>
+          </select></label>
+        ${people.map(({ person, index }) => `<fieldset class="simple-person">
+          <legend>${escapeHtml(person.name || (index ? 'Partner' : 'You'))}</legend>
+          ${simpleField('Age now', `people.${index}.age`, person.age)}
+          ${simpleField('Retirement age', `people.${index}.retireAge`, person.retireAge)}
+          ${person.age < person.retireAge ? simpleField('Yearly salary before tax ($)', `people.${index}.salary`, person.salary, true) : ''}
+        </fieldset>`).join('')}
+        ${isSingleScenario(scenario) ? '<p class="simple-notice">Only Person 1 is modelled. Partner details are kept for switching back.</p>' : ''}
+      </section>
+      <section class="simple-section" aria-labelledby="simpleAssetsHeading">
+        <h3 id="simpleAssetsHeading">2. What you have</h3>
+        ${people.map(({ person, index }) => simpleField(`${person.name === 'You' || !person.name ? 'Your' : `${person.name}'s`} super ($)`, `people.${index}.super`, person.super, true)).join('')}
+        ${['cash', 'savings'].map(key => {
+          const account = scenario[key];
+          const label = key === 'cash' ? 'Cash' : 'Savings';
+          if (isSingleScenario(scenario) && account.owner === 'p1') return `<p class="simple-notice">${label} belongs to Person 2 and is excluded. <button type="button" class="simple-link" data-open-advanced="cashSavingsSection">Review ownership</button></p>`;
+          return simpleField(`${label} ($)`, `${key}.amount`, account.amount, true) +
+            (isSingleScenario(scenario) && account.owner === 'joint' ? '<p class="simple-notice">Joint balance: only your 50% share is included. <button type="button" class="simple-link" data-open-advanced="cashSavingsSection">Review ownership</button></p>' : '');
+        }).join('')}
+      </section>
+      <section class="simple-section" aria-labelledby="simpleLifestyleHeading">
+        <h3 id="simpleLifestyleHeading">3. Your retirement lifestyle</h3>
+        <label for="simple-spending"><span class="k">${splitBudget ? 'Preferred retirement income ($)' : 'How much would you like to spend? ($)'}</span></label>
+        <div class="simple-spend">
+          <input id="simple-spending" type="number" inputmode="decimal" min="0" step="any" data-simple-path="household.targetAfterTax" data-link-budget="${String(!splitBudget)}"
+            value="${Number((scenario.household.targetAfterTax / spendingPeriods[spendingPeriod]).toFixed(2))}">
+          <select id="simpleSpendingPeriod" aria-label="Spending period">
+            ${[['year', 'per year'], ['month', 'per month'], ['week', 'per week']].map(([key, label]) => `<option value="${key}"${spendingPeriod === key ? ' selected' : ''}>${label}</option>`).join('')}
+          </select>
+        </div>
+        <p class="simple-notice">For your household, after tax, in today's dollars.</p>
+        ${splitBudget ? '<p class="simple-notice">Your separate essential budget is kept. <button type="button" class="simple-link" data-open-advanced="scenarioSection">Review in Advanced</button></p>' : ''}
+      </section>
+      ${hasExtras ? '<p class="simple-notice">Additional settings are active. <button type="button" class="simple-link" data-open-advanced="">View Advanced</button></p>' : ''}
+      <p class="simple-notice">Projection assumptions can be reviewed in Advanced.</p>
+      <button type="button" class="simple-action" data-open-advanced="">Explore more options &rarr;</button>`;
+    applySettingsMode();
+  }
+
+  function applySettingsMode() {
+    $('#simpleSettings').hidden = settingsMode !== 'simple';
+    $('#advancedSettings').hidden = settingsMode !== 'advanced';
+    $('#simpleMode').setAttribute('aria-pressed', String(settingsMode === 'simple'));
+    $('#advancedMode').setAttribute('aria-pressed', String(settingsMode === 'advanced'));
+  }
+
+  function setSettingsMode(mode, sectionId = '') {
+    // Flush a pending edit before replacing either editor.
+    clearTimeout(simpleEditTimer);
+    if (pendingSimpleControl?.isConnected && !commitSimpleControl(pendingSimpleControl)) {
+      const raw = pendingSimpleControl.value.trim();
+      if (!raw || !Number.isFinite(Number(raw)) || Number(raw) < 0) return;
+    }
+    pendingSimpleControl = null;
+    settingsMode = mode;
+    window.__safeStorage.setItem(SETTINGS_MODE_KEY, mode);
+    renderScenario(currentScenario);
+    pendingUiContext = null;
+    requestAnimationFrame(() => {
+      const section = sectionId ? document.getElementById(sectionId) : null;
+      if (section) {
+        section.open = true;
+        section.scrollIntoView({ block: 'nearest' });
+        section.querySelector('summary')?.focus();
+      } else {
+        $('#controls').scrollTop = 0;
+        $(mode === 'simple' ? '#simpleMode' : '#advancedMode').focus({ preventScroll: true });
+      }
+    });
   }
 
   function numberField(label, path, value, attributes = '') {
@@ -4210,11 +4353,11 @@
     document.querySelectorAll('[aria-invalid="true"]').forEach(element =>
       element.removeAttribute('aria-invalid'));
     $('#validationSummary').innerHTML = errors
-      .map(error => `<li>${escapeHtml(error.path)}: ${escapeHtml(error.message)}</li>`)
+      .map(error => `<li>${escapeHtml(error.path)}: ${escapeHtml(error.message)} <button type="button" class="simple-link" data-validation-path="${escapeHtml(error.path)}">Review</button></li>`)
       .join('');
     errors.forEach(error => {
-      const control = document.querySelector(`[data-path="${CSS.escape(error.path)}"]`);
-      if (control) control.setAttribute('aria-invalid', 'true');
+      document.querySelectorAll(`[data-path="${CSS.escape(error.path)}"], [data-simple-path="${CSS.escape(error.path)}"]`)
+        .forEach(control => control.setAttribute('aria-invalid', 'true'));
     });
   }
 
@@ -4241,7 +4384,7 @@
   function loadScenario() {
     const text = window.__safeStorage.getItem(STORAGE_KEY) ||
       LEGACY_STORAGE_KEYS.map(key => window.__safeStorage.getItem(key)).find(Boolean);
-    if (!text) return core.makeSampleScenario();
+    if (!text) return makeStarterScenario();
     try {
       return core.importScenario(text);
     } catch {
@@ -4974,6 +5117,13 @@
 
   function recalculateAndRender() {
     const errors = core.validateScenario(currentScenario);
+    if (pendingSimpleControl?.isConnected && pendingSimpleControl.dataset.dirty === 'true' &&
+        pendingSimpleControl.dataset.simplePath !== 'household.type') {
+      const raw = pendingSimpleControl.value.trim();
+      if (!raw || !Number.isFinite(Number(raw)) || Number(raw) < 0) {
+        errors.push({ path: pendingSimpleControl.dataset.simplePath, message: 'Enter a number of zero or greater.' });
+      }
+    }
     showValidation(errors);
     if (errors.length) {
       showProjectionError('Correct the highlighted inputs to update the projection.');
@@ -5099,6 +5249,7 @@
     renderUkPensions(currentScenario);
     renderOtherItems(currentScenario);
     renderHousehold(currentScenario);
+    renderSimpleSettings(currentScenario);
     bindMoneyInputs();
     recalculateAndRender();
   }
@@ -5283,6 +5434,93 @@
     const errors = core.validateScenario(currentScenario);
     showValidation(errors);
     if (!errors.length) scheduleSave(currentScenario);
+  });
+
+  let simpleEditTimer = null;
+  let pendingSimpleControl = null;
+
+  function commitSimpleControl(control) {
+    if (!control.isConnected) return true;
+    if (control.dataset.dirty !== 'true') return true;
+    const path = control.dataset.simplePath;
+    const raw = control.value.trim();
+    const value = path === 'household.type' ? raw : Number(raw);
+    const annualValue = path === 'household.targetAfterTax' ? value * spendingPeriods[spendingPeriod] : value;
+    const budgetIsLinked = path === 'household.targetAfterTax' &&
+      (currentScenario.household.annualBudget === currentScenario.household.targetAfterTax ||
+        control.dataset.linkBudget === 'true');
+    let next = setPathImmutable(currentScenario, path, annualValue);
+    // One spending goal for a starter; never overwrite a separately chosen budget.
+    if (budgetIsLinked) {
+      next = setPathImmutable(next, 'household.annualBudget', annualValue);
+    }
+    // Keep invalid drafts in the scenario so edits to another field, a theme
+    // change, or a view switch cannot silently restore an older value. The
+    // engine's validation prevents saving or projecting until the user fixes it.
+    currentScenario = next;
+    const errors = core.validateScenario(currentScenario);
+    showValidation(errors);
+    if (errors.length) {
+      showValidationBlock(errors);
+      return false;
+    }
+    currentScenario = next;
+    control.dataset.dirty = 'false';
+    scheduleSave(currentScenario);
+    recalculateAndRender();
+    return true;
+  }
+
+  $('#simpleMode').addEventListener('click', () => setSettingsMode('simple'));
+  $('#advancedMode').addEventListener('click', () => setSettingsMode('advanced'));
+  $('#simpleSettings').addEventListener('click', event => {
+    const button = event.target.closest('[data-open-advanced]');
+    if (button) setSettingsMode('advanced', button.dataset.openAdvanced);
+  });
+  $('#validationSummary').addEventListener('click', event => {
+    const path = event.target.dataset.validationPath;
+    if (!path) return;
+    const simple = document.querySelector(`[data-simple-path="${CSS.escape(path)}"]`);
+    if (settingsMode === 'simple' && simple) {
+      simple.focus();
+      return;
+    }
+    const advanced = document.querySelector(`[data-path="${CSS.escape(path)}"]`);
+    if (!advanced) return;
+    const section = advanced.closest('details.group');
+    setSettingsMode('advanced', section?.id);
+    requestAnimationFrame(() => {
+      const target = document.querySelector(`[data-path="${CSS.escape(path)}"]`);
+      for (let parent = target?.parentElement; parent; parent = parent.parentElement) {
+        if (parent.tagName === 'DETAILS') parent.open = true;
+      }
+      target?.focus();
+    });
+  });
+  $('#simpleSettings').addEventListener('input', event => {
+    const control = event.target;
+    if (!control.dataset.simplePath) return;
+    control.dataset.dirty = 'true';
+    pendingSimpleControl = control;
+    clearTimeout(simpleEditTimer);
+    simpleEditTimer = setTimeout(() => commitSimpleControl(control), 300);
+  });
+  $('#simpleSettings').addEventListener('change', event => {
+    clearTimeout(simpleEditTimer);
+    if (event.target.id === 'simpleSpendingPeriod') {
+      if (pendingSimpleControl?.isConnected && !commitSimpleControl(pendingSimpleControl)) {
+        event.target.value = spendingPeriod;
+        return;
+      }
+      spendingPeriod = event.target.value;
+      window.__safeStorage.setItem(SPENDING_PERIOD_KEY, spendingPeriod);
+    } else if (event.target.dataset.simplePath) {
+      // Select changes also work in browsers that do not dispatch input.
+      if (event.target.tagName === 'SELECT') event.target.dataset.dirty = 'true';
+      if (!commitSimpleControl(event.target)) return;
+    } else return;
+    pendingSimpleControl = null;
+    renderScenario(currentScenario);
   });
 
   // v0.98b: live recalculation for numeric fields (ages, rates, percentages).
@@ -5612,11 +5850,9 @@
       'Start a new scenario and replace the locally saved scenario?',
       { confirmLabel: 'Start new' }
     ))) return;
-    const scenario = core.makeSampleScenario();
-    scenario.scenarioName = 'Untitled household';
-    scenario.people[0].name = 'Person 1';
-    scenario.people[1].name = 'Person 2';
-    scenario.shareholdings = [];
+    const scenario = makeStarterScenario();
+    settingsMode = 'simple';
+    window.__safeStorage.setItem(SETTINGS_MODE_KEY, settingsMode);
     renderScenario(scenario);
     saveScenario(scenario);
   });

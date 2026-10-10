@@ -33,6 +33,14 @@ For the lump-sum regression, use fictional demo values, disable **Include Aged P
 
 ## Browser verification
 
+The focused Simple/Advanced checks can be run with Playwright installed or available on `NODE_PATH`:
+
+```powershell
+node tests/simple-settings.browser.cjs
+```
+
+This uses a fresh isolated Chrome context, fictional data and the local HTML file. Set `BROWSER_CHANNEL=msedge` to use Edge instead. Screenshots are written under the ignored `output/simple-settings/` directory. Coverage includes the default three-section view, live editing, conditional salary, Single/Couple restoration, period conversion without round-trip drift, mode/projection parity, preservation of separate budgets and hidden settings, validation recovery, import/export, reload persistence and mobile overflow. It is an optional local browser check, not currently wired into CI.
+
 Automated tests do not replace a real-browser pass. For user-interface changes, verify at least:
 
 - initial load with fictional sample data;

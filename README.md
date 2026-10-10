@@ -1,27 +1,14 @@
 # Retirement Simulator
 
-A transparent, local-first retirement-income modelling tool built primarily for personal use and shared openly in case others find it useful.
+### [Download the simulator](https://github.com/dcaddick/retirement-simulator/releases/latest/download/retirement-simulator.html) · [Open it in your browser](https://dcaddick.github.io/retirement-simulator/)
 
-The repository contains two self-contained browser tools:
+![Retirement Income Simulator v1.1.0 showing the Simple starting view and projection beside it](docs/assets/retirement-simulator-v1.1.0.png)
 
-- **Retirement Simulator** — the primary deterministic annual projection.
-- **Retirement Monte Carlo Report** — an experimental companion for exploring sequence-of-returns sensitivity.
+*The simulator opens with a simple starting view. Advanced settings are available when you want them. Results are estimates, not financial advice.*
 
-> **Estimate only. Not financial, tax, legal or investment advice.** The models are simplified, assumptions become stale, and results are not predictions.
+The hosted version keeps scenario data in that browser's local storage. Scenarios created from a locally opened file do not automatically appear there, but you can move them with JSON export/import.
 
-## Download
-
-[**Download Retirement Simulator**](https://github.com/dcaddick/retirement-simulator/releases/latest/download/retirement-simulator.html)
-
-[**Using an iPad? Try the simulator in your browser**](https://dcaddick.github.io/retirement-simulator/)
-
-Open the same deterministic simulator to explore its look and feel without downloading the HTML file. Scenario data stays in that browser's local storage. Scenarios created from a locally opened file do not automatically appear on the hosted site, but you can move them with JSON export/import.
-
-Single HTML file · no installation · opens locally in a modern browser.
-
-![Retirement Income Simulator v1.12 showing a fictional two-person household, with Household type and the headline spending, horizon and rule settings grouped under Scenario at the top of the controls](docs/assets/retirement-simulator-v1.12.png)
-
-*Shown with the built-in fictional sample household in the default dark theme, captured from v1.12. Household type leads the Scenario group, followed by the headline spending, horizon and rule settings, with People directly beneath. The deterministic simulator supports Couple and Single households, and the optional hosted version offers easier iPad access. Results are estimates, not financial advice.*
+A local-first retirement-income modelling tool for Australian households. Estimates are simplified, assumptions can become stale, and results are not predictions.
 
 The header carries a "Get the latest version" link to the GitHub releases page. It is an ordinary link: the file never contacts GitHub or checks for updates on its own.
 
@@ -55,6 +42,12 @@ The stable live filename is always `retirement-simulator.html`. Exact sanitized 
 Scenario data stays in the browser's local storage unless you explicitly import or export a file. Both pages include a locally remembered light/dark theme control.
 
 ## Retirement Simulator
+
+The settings panel starts in **Simple**, with three short sections: **About you**, **What you have**, and **Your retirement lifestyle**. Enter ages, retirement ages, super, cash and savings, and one household spending goal. Salary appears only while someone is still working. Spending can be entered per year, month or week (12 months or 52 weeks per year).
+
+Choose **Advanced** or **Explore more options** for the full editor, including names, ownership, planned spending, pensions, investments, returns, inflation and survivor settings. Both views use the same scenario and calculations; switching views preserves every value. The chosen view and spending period are remembered locally, separately from exported scenario data.
+
+Fresh starts and **New** use labelled fictional example amounts with no planned expenses and equal preferred-income and essential-budget targets. Editing that single spending goal updates both while they remain equal. Imported or saved scenarios with different targets keep their separate essential budget, with a link to review it in Advanced. **Reset sample** still restores the original, more detailed sample. Single-household joint balances retain the existing 50% inclusion rule, which Simple explains beside the affected account.
 
 The deterministic simulator models either a couple or a single-person household and includes:
 
