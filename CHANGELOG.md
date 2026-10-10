@@ -2,6 +2,14 @@
 
 This changelog summarizes public, non-personal milestones. Early development used many private prototype snapshots; those files are intentionally not reproduced in the public repository.
 
+## 1.13 - 2026-10-10
+
+- Added a Simple starting view with three sections: About you, What you have, and Your retirement lifestyle. It starts with clearly labelled fictional example amounts and offers annual, monthly, or weekly spending entry ([#42](https://github.com/dcaddick/retirement-simulator/issues/42)).
+- Preserved the full editor in Advanced. Both views use the same scenario and projection; saved scenarios and hidden settings remain intact when switching.
+- New scenarios start with fewer pre-filled details and equal headline and essential spending targets. Existing separate targets and all imported scenario values are preserved.
+- Remembered the selected settings view and spending period locally, separate from exported scenario data.
+- Archived the exact outgoing deterministic v1.12 executable and its public sample screenshot.
+
 ## Unreleased
 
 - Published [Independent Review Materials](docs/independent-review/README.md) so anyone can have the model examined by their own accountant, tax agent or adviser without requesting anything: release identity and hash, a rule-by-rule map from documented methodology to code, the external source and evidence registers, fictional reference scenarios with an independent-calculation protocol, the test evidence and its limits, and the project's own open-defect list. Every page states that no independent review has been performed.

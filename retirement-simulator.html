@@ -4,7 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src https://api.frankfurter.app https://stooq.com; base-uri 'none'; form-action 'none'" />
-<title>Family Retirement Income Simulator v1.12</title>
+<title>Family Retirement Income Simulator v1.13</title>
 <style>
   :root{
     --bg:#0f1720; --panel:#18232f; --panel2:#1e2c3a; --line:#2b3d4f;
@@ -230,7 +230,7 @@
 <div class="disclaimer-banner top" role="note">Local, reproducible retirement-risk analysis. Estimate only; not financial or tax advice.</div>
 <header>
   <div class="header-row">
-  <h1>Family Retirement Income Simulator <span class="version">v1.12</span>
+  <h1>Family Retirement Income Simulator <span class="version">v1.13</span>
     <a class="version-link"
       href="https://github.com/dcaddick/retirement-simulator/releases/latest"
       target="_blank" rel="noreferrer"
@@ -468,7 +468,7 @@
       </details>
     </div>
     <div class="note">
-      <b>v1.11.</b> Fictional Australian couple sample data is stored locally on this device and can be imported or exported as JSON. Calculations are transparent estimates and are not financial or tax advice. The Display toggle switches the whole dashboard &mdash; table, chart and headline figures &mdash; between today&rsquo;s dollars and nominal (future) dollars, except the CSHC estimate which stays in today&rsquo;s dollars against its fixed threshold. Numeric inputs recalculate live as you type without moving your modelling position; the &ldquo;Recalculated&rdquo; stamp above the table confirms each run.
+      <b>v1.13.</b> Fictional Australian couple sample data is stored locally on this device and can be imported or exported as JSON. Calculations are transparent estimates and are not financial or tax advice. The Display toggle switches the whole dashboard &mdash; table, chart and headline figures &mdash; between today&rsquo;s dollars and nominal (future) dollars, except the CSHC estimate which stays in today&rsquo;s dollars against its fixed threshold. Numeric inputs recalculate live as you type without moving your modelling position; the &ldquo;Recalculated&rdquo; stamp above the table confirms each run.
     </div>
   </div>
 </div>
@@ -3433,7 +3433,7 @@
   'use strict';
 
   const core = globalThis.RetirementSimulatorCore;
-  const STORAGE_KEY = 'family-retirement-simulator:v1.12:scenario';
+  const STORAGE_KEY = 'family-retirement-simulator:v1.13:scenario';
   const THEME_STORAGE_KEY = 'retirement-simulator-theme';
   const SETTINGS_MODE_KEY = 'retirement-simulator:settings-mode';
   const SPENDING_PERIOD_KEY = 'retirement-simulator:spending-period';
@@ -3444,6 +3444,7 @@
   // Read-only fallbacks so scenarios saved under earlier versions carry over
   // on first load (they migrate to the current schema automatically).
   const LEGACY_STORAGE_KEYS = [
+    'family-retirement-simulator:v1.12:scenario',
     'family-retirement-simulator:v1.11:scenario',
     'family-retirement-simulator:v1.10:scenario',
     'family-retirement-simulator:v1.09:scenario',
@@ -3743,7 +3744,7 @@
         <h3 id="simpleLifestyleHeading">3. Your retirement lifestyle</h3>
         <label for="simple-spending"><span class="k">${splitBudget ? 'Preferred retirement income ($)' : 'How much would you like to spend? ($)'}</span></label>
         <div class="simple-spend">
-          <input id="simple-spending" type="number" inputmode="decimal" min="0" step="any" data-simple-path="household.targetAfterTax"
+          <input id="simple-spending" type="number" inputmode="decimal" min="0" step="any" data-simple-path="household.targetAfterTax" data-link-budget="${String(!splitBudget)}"
             value="${Number((scenario.household.targetAfterTax / spendingPeriods[spendingPeriod]).toFixed(2))}">
           <select id="simpleSpendingPeriod" aria-label="Spending period">
             ${[['year', 'per year'], ['month', 'per month'], ['week', 'per week']].map(([key, label]) => `<option value="${key}"${spendingPeriod === key ? ' selected' : ''}>${label}</option>`).join('')}
@@ -5443,23 +5444,20 @@
     const path = control.dataset.simplePath;
     const raw = control.value.trim();
     const value = path === 'household.type' ? raw : Number(raw);
-    let errors = [];
-    if (raw === '' || (typeof value === 'number' && (!Number.isFinite(value) || value < 0))) {
-      errors = [{ path, message: 'Enter a number of zero or greater.' }];
+    const annualValue = path === 'household.targetAfterTax' ? value * spendingPeriods[spendingPeriod] : value;
+    const budgetIsLinked = path === 'household.targetAfterTax' &&
+      (currentScenario.household.annualBudget === currentScenario.household.targetAfterTax ||
+        control.dataset.linkBudget === 'true');
+    let next = setPathImmutable(currentScenario, path, annualValue);
+    // One spending goal for a starter; never overwrite a separately chosen budget.
+    if (budgetIsLinked) {
+      next = setPathImmutable(next, 'household.annualBudget', annualValue);
     }
-    let next = currentScenario;
-    if (!errors.length) {
-      const annualValue = path === 'household.targetAfterTax' ? value * spendingPeriods[spendingPeriod] : value;
-      next = setPathImmutable(currentScenario, path, annualValue);
-      // One spending goal for a starter; never overwrite a separately chosen budget.
-      if (path === 'household.targetAfterTax' && currentScenario.household.annualBudget === currentScenario.household.targetAfterTax) {
-        next = setPathImmutable(next, 'household.annualBudget', annualValue);
-      }
-      errors = core.validateScenario(next);
-      // Retain valid numeric drafts even when a related field needs correcting
-      // (for example, current age has overtaken the entered retirement age).
-      currentScenario = next;
-    }
+    // Keep invalid drafts in the scenario so edits to another field, a theme
+    // change, or a view switch cannot silently restore an older value. The
+    // engine's validation prevents saving or projecting until the user fixes it.
+    currentScenario = next;
+    const errors = core.validateScenario(currentScenario);
     showValidation(errors);
     if (errors.length) {
       showValidationBlock(errors);
