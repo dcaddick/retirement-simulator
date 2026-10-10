@@ -1,27 +1,14 @@
 # Retirement Simulator
 
-A transparent, local-first retirement-income modelling tool built primarily for personal use and shared openly in case others find it useful.
+### [Download the simulator](https://github.com/dcaddick/retirement-simulator/releases/latest/download/retirement-simulator.html) · [Open it in your browser](https://dcaddick.github.io/retirement-simulator/)
 
-The repository contains two self-contained browser tools:
+![Retirement Income Simulator v1.1.0 showing the Simple starting view and projection beside it](docs/assets/retirement-simulator-v1.1.0.png)
 
-- **Retirement Simulator** — the primary deterministic annual projection.
-- **Retirement Monte Carlo Report** — an experimental companion for exploring sequence-of-returns sensitivity.
+*The simulator opens with a simple starting view. Advanced settings are available when you want them. Results are estimates, not financial advice.*
 
-> **Estimate only. Not financial, tax, legal or investment advice.** The models are simplified, assumptions become stale, and results are not predictions.
+The hosted version keeps scenario data in that browser's local storage. Scenarios created from a locally opened file do not automatically appear there, but you can move them with JSON export/import.
 
-## Download
-
-[**Download Retirement Simulator**](https://github.com/dcaddick/retirement-simulator/releases/latest/download/retirement-simulator.html)
-
-[**Using an iPad? Try the simulator in your browser**](https://dcaddick.github.io/retirement-simulator/)
-
-Open the same deterministic simulator to explore its look and feel without downloading the HTML file. Scenario data stays in that browser's local storage. Scenarios created from a locally opened file do not automatically appear on the hosted site, but you can move them with JSON export/import.
-
-Single HTML file · no installation · opens locally in a modern browser.
-
-![Retirement Income Simulator v1.13 showing the Simple starting view and projection beside it](docs/assets/retirement-simulator-v1.13.png)
-
-*Shown with fictional example values in Simple mode in the default dark theme, captured from v1.13. The Advanced view retains the full simulator settings. The deterministic simulator supports Couple and Single households; the optional hosted version offers easier iPad access. Results are estimates, not financial advice.*
+A local-first retirement-income modelling tool for Australian households. Estimates are simplified, assumptions can become stale, and results are not predictions.
 
 The header carries a "Get the latest version" link to the GitHub releases page. It is an ordinary link: the file never contacts GitHub or checks for updates on its own.
 

@@ -2,13 +2,15 @@
 
 This changelog summarizes public, non-personal milestones. Early development used many private prototype snapshots; those files are intentionally not reproduced in the public repository.
 
-## 1.13 - 2026-10-10
+## 1.1.0 - 2026-10-10
 
 - Added a Simple starting view with three sections: About you, What you have, and Your retirement lifestyle. It starts with clearly labelled fictional example amounts and offers annual, monthly, or weekly spending entry ([#42](https://github.com/dcaddick/retirement-simulator/issues/42)).
+- Reworked the README opening so download links lead directly to the product screenshot.
 - Preserved the full editor in Advanced. Both views use the same scenario and projection; saved scenarios and hidden settings remain intact when switching.
 - New scenarios start with fewer pre-filled details and equal headline and essential spending targets. Existing separate targets and all imported scenario values are preserved.
 - Remembered the selected settings view and spending period locally, separate from exported scenario data.
 - Archived the exact outgoing deterministic v1.12 executable and its public sample screenshot.
+- Preserved scenarios saved by v1.13 under the new v1.1.0 storage key.
 
 ## Unreleased
 

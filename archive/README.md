@@ -15,7 +15,7 @@ These executable snapshots are exact, sanitized public releases retained for reg
 | `retirement-simulator-v1.0.9.html` | `v1.0.9:retirement-simulator.html` | `1fbb3a5c086f49ea33e66d106468a85812908eeb` | — |
 | `retirement-simulator-v1.0.10.html` | `v1.0.10:retirement-simulator.html` | `87d456f500a6f48f2289e91afb553d267faa8ff9` | `6F9401E74709A67BDD539DD353ED9E4C78A71ACA4B78D8D2A8206811BAE9C394` |
 | `retirement-simulator-v1.0.11.html` | `v1.0.11:retirement-simulator.html` | `582dab6b6597d1d7facbf2b0daec33869b97f289` | `58380381311A4D8402CADCE5DF93A65A85CBD2558AE23EA59454A4EAD3EE8039` |
-| `retirement-simulator-v1.0.12.html` | `v1.0.12:retirement-simulator.html` | `d80a91ded1100ddcdd0f5341c7ae9d6abbdf7a6b` | `D74465554EDF1090F4A20E45D7A8EE1690A22E8493415E3FA68A9605593258F9` |
+| `retirement-simulator-v1.0.12.html` | `b5f94f8:retirement-simulator.html` | `d80a91ded1100ddcdd0f5341c7ae9d6abbdf7a6b` | `D74465554EDF1090F4A20E45D7A8EE1690A22E8493415E3FA68A9605593258F9` |
 
 The outgoing v1.12 public sample screenshot is also retained as [`retirement-simulator-v1.12.png`](retirement-simulator-v1.12.png), SHA-256 `6221AA53C80E61AFF68803137C2D03CFA89D73144BB7541E86B62564EC289BE4`.
 

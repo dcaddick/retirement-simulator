@@ -48,8 +48,8 @@ const TESTING = fileURLToPath(
   new URL('../docs/TESTING.md', import.meta.url)
 );
 const CHANGELOG = fileURLToPath(new URL('../CHANGELOG.md', import.meta.url));
-const SCREENSHOT_113 = fileURLToPath(
-  new URL('../docs/assets/retirement-simulator-v1.13.png', import.meta.url)
+const SCREENSHOT_110 = fileURLToPath(
+  new URL('../docs/assets/retirement-simulator-v1.1.0.png', import.meta.url)
 );
 const README = fileURLToPath(new URL('../README.md', import.meta.url));
 const PAGES_WORKFLOW = fileURLToPath(
@@ -242,10 +242,11 @@ check('return assumptions are explained below the table',
 check('assumptions and methodology moved out of the controls panel',
   html.indexOf('<summary>Model assumptions and sources</summary>') > html.indexOf('<div class="tblwrap">') &&
   html.indexOf('id="methodologySection"') > html.indexOf('<div class="tblwrap">'));
-check('v1.13 document version is consistent',
-  html.includes('<title>Family Retirement Income Simulator v1.13</title>') &&
-  html.includes('<span class="version">v1.13</span>') &&
-  html.includes("const STORAGE_KEY = 'family-retirement-simulator:v1.13:scenario'") &&
+check('v1.1.0 document version is consistent',
+  html.includes('<title>Family Retirement Income Simulator v1.1.0</title>') &&
+  html.includes('<span class="version">v1.1.0</span>') &&
+  html.includes("const STORAGE_KEY = 'family-retirement-simulator:v1.1.0:scenario'") &&
+  html.includes("'family-retirement-simulator:v1.13:scenario'") &&
   html.includes("'family-retirement-simulator:v1.12:scenario'") &&
   html.includes("'family-retirement-simulator:v1.11:scenario'") &&
   html.includes("'family-retirement-simulator:v1.10:scenario'"));
@@ -303,10 +304,10 @@ check('CI verifies the archived v1.0.11 tag blob',
   testWorkflow.includes('v1.0.11:retirement-simulator.html'));
 check('outgoing v1.0.12 executable is archived', existsSync(ARCHIVE_112));
 check('v1.0.12 archive provenance is recorded',
-  archiveReadme.includes('v1.0.12:retirement-simulator.html'));
+  archiveReadme.includes('b5f94f8:retirement-simulator.html'));
 check('CI verifies the archived v1.0.12 tag blob',
   testWorkflow.includes('Verify archived v1.0.12 source') &&
-  testWorkflow.includes('v1.0.12:retirement-simulator.html'));
+  testWorkflow.includes('b5f94f8:retirement-simulator.html'));
 check('v1.0.10 archive provenance is recorded',
   archiveReadme.includes('v1.0.10:retirement-simulator.html') &&
   archiveReadme.includes('87d456f500a6f48f2289e91afb553d267faa8ff9') &&
@@ -395,10 +396,13 @@ check('methodology discloses childless Medicare family scope',
 check('methodology records prototype architecture rationale',
   methodology.includes('personal prototype') &&
   methodology.includes('thousands of users'));
-check('README identifies deterministic v1.13 and its screenshot',
-  readme.includes('v1.13') &&
-  readme.includes('docs/assets/retirement-simulator-v1.13.png') &&
-  existsSync(SCREENSHOT_113) &&
+check('README places download links directly above the v1.1.0 screenshot',
+  readme.indexOf('[Download the simulator]') < readme.indexOf('docs/assets/retirement-simulator-v1.1.0.png') &&
+  readme.indexOf('[Open it in your browser]') < readme.indexOf('docs/assets/retirement-simulator-v1.1.0.png') &&
+  readme.indexOf('docs/assets/retirement-simulator-v1.1.0.png') < readme.indexOf('A local-first retirement-income modelling tool') &&
+  readme.includes('v1.1.0') &&
+  readme.includes('docs/assets/retirement-simulator-v1.1.0.png') &&
+  existsSync(SCREENSHOT_110) &&
   !readme.includes('captured from v1.12') &&
   readme.includes('retirement-monte-carlo-v0.7.html') &&
   readme.includes('one partner') && readme.includes('franking') &&
@@ -2820,7 +2824,7 @@ const hostedLinkIndex = readme.indexOf(pagesUrl);
 check('README offers the hosted simulator beneath the download',
   downloadLinkIndex >= 0 &&
   hostedLinkIndex > downloadLinkIndex &&
-  readme.includes('Using an iPad? Try the simulator in your browser'));
+  readme.includes('Open it in your browser'));
 check('README explains hosted storage and transfer boundaries',
   readme.includes("that browser's local storage") &&
   readme.includes('do not automatically appear') &&
