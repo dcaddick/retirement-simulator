@@ -529,6 +529,9 @@ check('table actions place Export CSV after Display',
   /class="table-actions"[\s\S]*id="displayMode"[\s\S]*id="exportProjectionCsv"/.test(html));
 check('Export CSV is the final table action',
   /id="exportProjectionCsv"[^>]*>Export CSV<\/button>\s*<\/div>/.test(html));
+check('projection table Event column is left aligned',
+  html.includes('td.event-cell,th.event-cell{text-align:left}') &&
+  html.includes(`heading === 'Event' ? ' class="event-cell"'`));
 check('return readouts are left aligned and use concise labels',
   html.includes('.return-readout{') &&
   html.includes('text-align:left') &&
