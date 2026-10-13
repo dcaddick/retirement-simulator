@@ -29,7 +29,7 @@ archive/retirement-simulator-v1.0.6.html
 archive/retirement-simulator-v1.0.9.html
 ```
 
-For the lump-sum regression, use fictional demo values, disable **Include Aged Pension estimate**, add a withdrawal and confirm no script-error banner appears. CI verifies the explicitly listed archived baselines against their recorded Git blobs. The v1.1.0-labelled archive is the outgoing checkout including the later layout fix; its recorded checkout hash is verified locally, while release-tag comparison remains pending.
+For the lump-sum regression, use fictional demo values, disable **Include Aged Pension estimate**, add a withdrawal and confirm no script-error banner appears. CI verifies the explicitly listed archived baselines against their recorded Git blobs. The v1.1.0-labelled archive is the outgoing checkout including the later layout fix; CI verifies it against its recorded checkout (`dee57d7`), and it differs from the `v1.1.0` tag only by that fix.
 
 ## Browser verification
 
@@ -133,4 +133,4 @@ With Playwright available, run `node tests/v1.1.1.browser.cjs` for migration, no
 
 The older `node tests/simple-settings.browser.cjs` attempts a real browser download. Its download step reports `download.path: canceled` in this host session, reproduced on both the untouched outgoing archive and current source; do not count that suite as passing. A real iPad Safari pass was not performed. GitHub Pages deploys when the release is merged to `main`.
 
-Local deterministic verification on 13 October 2026: 469 regression checks passed and the focused v1.1.1 invariant suite passed. `node --check tests/v1.1.1.browser.cjs` and `git diff --check` passed. The Node 20 GitHub Actions workflow has not yet run for this release branch.
+Local deterministic verification on 13 October 2026: 469 regression checks passed and the focused v1.1.1 invariant suite passed. `node --check tests/v1.1.1.browser.cjs` and `git diff --check` passed. The first CI run on `main` failed in the Monte Carlo suite (schema-16 validation against its schema-14 fixtures); the follow-up baseline change restores it, and all three suites pass locally on 14 October 2026.

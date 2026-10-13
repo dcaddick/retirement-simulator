@@ -34,6 +34,8 @@ jobs:
         run: test "$(git hash-object archive/retirement-simulator-v1.0.11.html)" = "$(git rev-parse v1.0.11:retirement-simulator.html)"
       - name: Verify archived v1.0.12 source
         run: test "$(git hash-object archive/retirement-simulator-v1.0.12.html)" = "$(git rev-parse b5f94f8:retirement-simulator.html)"
+      - name: Verify archived v1.1.0 source
+        run: test "$(git hash-object archive/retirement-simulator-v1.1.0.html)" = "$(git rev-parse dee57d7:retirement-simulator.html)"
       - run: node tests/retirement-simulator.test.mjs
       - run: node tests/v1.1.1.test.mjs
       - run: node tests/retirement-monte-carlo.test.mjs

@@ -2,6 +2,13 @@
 
 This changelog summarizes public, non-personal milestones. Early development used many private prototype snapshots; those files are intentionally not reproduced in the public repository.
 
+## Unreleased
+
+- Refreshed the experimental Monte Carlo companion's Age Pension, CSHC and deeming inputs to the same official values the deterministic v1.1.1 release uses (checked 12 October 2026). Monte Carlo spending and buffer behavior is otherwise unchanged and stays on its schema-14 contract.
+- Fixed the Monte Carlo regression suite, which failed in CI after v1.1.1 because it compared against the schema-16 deterministic file; it now compares against the archived v1.1.0 baseline with only the shared rate refresh applied.
+- CI now verifies the v1.1.0 archive against its recorded checkout. Compared with the `v1.1.0` release tag, the archive differs only by the #48 Event-column alignment fix.
+- Added a pull request template with a date-sensitive source review checklist, plus the v1.1.1 design, plan and September repair-plan documents.
+
 ## 1.1.1 - 2026-10-13
 
 - Preferred now means normal spending; Essential is the bad-year floor. The ordinary deterministic projection follows Preferred and does not generate bad years. Schema-14 imports map both budgets to the former Essential amount and show a review notice; schema-16 migration removes the retired buffer setting.

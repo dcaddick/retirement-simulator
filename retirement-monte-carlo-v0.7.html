@@ -457,26 +457,28 @@
     sapto: { lower: 44268, upper: 55335 }
   });
   const SERVICES_AUSTRALIA_2026 = Object.freeze({
-    effectiveDate: '2026-07-01',
-    checkedDate: '2026-07-06',
+    effectiveDate: '2026-09-20',
+    thresholdsEffectiveDate: '2026-07-01',
+    checkedDate: '2026-10-12',
+    pageLastUpdated: '2026-09-20',
     assetsTestUrl: 'https://www.servicesaustralia.gov.au/assets-test-for-age-pension?context=22526',
     incomeTestUrl: 'https://www.servicesaustralia.gov.au/income-test-for-age-pension?context=22526',
     cshcUrl: 'https://www.servicesaustralia.gov.au/income-test-for-commonwealth-seniors-health-card?context=21966',
     deemingUrl: 'https://www.servicesaustralia.gov.au/deeming',
-    agePensionMaxCoupleAnnual: 1810.40 * 26,
+    agePensionMaxCoupleAnnual: 1866 * 26,
     homeownerAssetFreeArea: 499000,
     assetTaperAnnualPerThousand: 78,
     incomeFreeAreaCoupleAnnual: 396 * 26,
     incomeTaperCouple: 0.50,
-    agePensionMaxSingleAnnual: 1200.90 * 26,
+    agePensionMaxSingleAnnual: 1237.70 * 26,
     homeownerAssetFreeAreaSingle: 333000,
     incomeFreeAreaSingleAnnual: 226 * 26,
     deemingThresholdSingle: 66800,
     deemingThresholdCouple: 110600,
-    deemingLowerRate: 0.0125,
-    deemingUpperRate: 0.0325,
-    cshcCoupleThreshold: 161768,
-    cshcSingleThreshold: 101105
+    deemingLowerRate: 0.0175,
+    deemingUpperRate: 0.0375,
+    cshcCoupleThreshold: 168076,
+    cshcSingleThreshold: 105048
   });
 
   function inflationRateForYear(year, assumptions) {
