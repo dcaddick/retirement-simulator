@@ -414,8 +414,9 @@ check('v1.09 documents lump-sum affordability warnings',
   readme.includes('unfunded lump-sum') &&
   methodology.includes('requested, funded and unfunded') &&
   testingGuide.includes('partially and completely unfunded'));
-check('Monte Carlo remains unreleased and experimental',
-  readme.includes('Unreleased v0.8 work') &&
+check('Monte Carlo is documented as permanently parked',
+  readme.includes('**Development is permanently parked.**') &&
+  readme.includes('not tested in CI') &&
   readme.includes('retirement-monte-carlo-v0.7.html'));
 check('release docs define the fixed first-death boundary',
   methodology.includes('start of the selected projection year') &&
@@ -424,9 +425,9 @@ check('release docs define the fixed first-death boundary',
 check('deferred register resolves the survivor-state item',
   deferredReview.includes('AIPR-003-MORTALITY') &&
   deferredReview.includes('Resolved in v1.0.8/v0.7'));
-check('Monte Carlo scope issue remains linked as open work',
+check('Monte Carlo scope issue is linked as closed, not planned',
   readme.includes('issues/1') &&
-  readme.includes('still tracked'));
+  readme.includes('closed as not planned'));
 check('browser checklist covers survivor state in both tools',
   testingGuide.includes('fixed first-death') &&
   testingGuide.includes('every Monte Carlo path'));

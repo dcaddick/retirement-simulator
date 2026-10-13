@@ -19,7 +19,7 @@ These executable snapshots are exact, sanitized public releases retained for reg
 
 The outgoing v1.12 public sample screenshot is also retained as [`retirement-simulator-v1.12.png`](retirement-simulator-v1.12.png), SHA-256 `6221AA53C80E61AFF68803137C2D03CFA89D73144BB7541E86B62564EC289BE4`.
 
-The outgoing v1.1.0-labelled checkout, including the subsequent #48 Event-column alignment fix, is retained as `retirement-simulator-v1.1.0.html`. Verified source: `dee57d7261f64630c34842d20cc518bec7a34ba4:retirement-simulator.html`; Git blob `4511fe1d3e2c3a78e0663d2a40b4cd08f34451e6`; SHA-256 `7AE5E8E252059DFA593CA49892F07B406EE358A42064DF67BB43C11C7C70F4CD`. This is a verified checkout snapshot; release-tag/asset comparison remains pending because no local v1.1.0 tag is available and GitHub network access failed during this maintenance pass.
+The outgoing v1.1.0-labelled checkout, including the subsequent #48 Event-column alignment fix, is retained as `retirement-simulator-v1.1.0.html`. Verified source: `dee57d7261f64630c34842d20cc518bec7a34ba4:retirement-simulator.html`; Git blob `4511fe1d3e2c3a78e0663d2a40b4cd08f34451e6`; SHA-256 `7AE5E8E252059DFA593CA49892F07B406EE358A42064DF67BB43C11C7C70F4CD`. This is a verified checkout snapshot, checked in CI. Compared with the `v1.1.0` release tag (`b75e4f5`), it differs only by the two-line #48 Event-column alignment fix (checked 14 October 2026).
 
 Only public fictional sample data may be stored here. Never archive personal scenarios, balances, names, screenshots, exports or private development artifacts.
 

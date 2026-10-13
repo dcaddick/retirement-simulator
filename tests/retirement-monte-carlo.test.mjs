@@ -6,8 +6,10 @@ const html = await readFile(
   new URL('../retirement-monte-carlo-v0.7.html', import.meta.url),
   'utf8'
 );
+// Monte Carlo is permanently parked: pin it to the frozen v1.1.0 deterministic
+// baseline it was last maintained against. Not run in CI.
 const deterministicHtml = await readFile(
-  new URL('../retirement-simulator.html', import.meta.url),
+  new URL('../archive/retirement-simulator-v1.1.0.html', import.meta.url),
   'utf8'
 );
 const readme = await readFile(new URL('../README.md', import.meta.url), 'utf8');

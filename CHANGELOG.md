@@ -2,6 +2,12 @@
 
 This changelog summarizes public, non-personal milestones. Early development used many private prototype snapshots; those files are intentionally not reproduced in the public repository.
 
+## Unreleased
+
+- Monte Carlo companion is permanently parked: it is kept as a frozen reference with no further feature, parity or rate updates. Its suite is pinned to the archived v1.1.0 deterministic baseline and removed from CI, which fixes the CI failure on `main` after v1.1.1 (#49). Issue #1 is closed as not planned.
+- CI now verifies the v1.1.0 archive against its recorded checkout. Compared with the `v1.1.0` release tag, the archive differs only by the #48 Event-column alignment fix.
+- Added a pull request template with a date-sensitive source review checklist, plus the v1.1.1 design, plan and September repair-plan documents.
+
 ## 1.1.1 - 2026-10-13
 
 - Preferred now means normal spending; Essential is the bad-year floor. The ordinary deterministic projection follows Preferred and does not generate bad years. Schema-14 imports map both budgets to the former Essential amount and show a review notice; schema-16 migration removes the retired buffer setting.
