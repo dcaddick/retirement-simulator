@@ -2,6 +2,16 @@
 
 This changelog summarizes public, non-personal milestones. Early development used many private prototype snapshots; those files are intentionally not reproduced in the public repository.
 
+## 1.1.1 - 2026-10-13
+
+- Preferred now means normal spending; Essential is the bad-year floor. The ordinary deterministic projection follows Preferred and does not generate bad years. Schema-14 imports map both budgets to the former Essential amount and show a review notice; schema-16 migration removes the retired buffer setting.
+- Added the suggested two-year Cash + Savings review strategy as guidance only. It does not calculate a buffer target or affect projection calculations, table values or charts; issue #45 remains open for any future modeled strategy.
+- Lump-sum details show requested, funded and unfunded amounts, actual funding sources and fallback in the selected display basis.
+- Added broad super risk profiles that set editable suggested returns, plus contextual return ranges and linked source evidence. Warnings do not change assumptions or projections.
+- Refreshed deterministic Age Pension, CSHC and deeming inputs against official sources checked 12 October 2026, and added per-source currency review schedules.
+- Added optional calculation logs for capital-loss carry-forward details, dismissible status notices and adjustable projection-table column widths.
+- Archived the outgoing v1.1.0-labelled checkout including its later layout correction; it is identified as a verified checkout snapshot, not as a verified release-tag copy.
+
 ## 1.1.0 - 2026-10-10
 
 - Added a Simple starting view with three sections: About you, What you have, and Your retirement lifestyle. It starts with clearly labelled fictional example amounts and offers annual, monthly, or weekly spending entry ([#42](https://github.com/dcaddick/retirement-simulator/issues/42)).

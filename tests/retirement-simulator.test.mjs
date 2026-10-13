@@ -94,8 +94,11 @@ vm.runInContext(extract('simulator-core'), context, { filename: 'simulator-core.
 const core = context.RetirementSimulatorCore;
 
 console.log('\nschema + sample');
-check('schema version is 14', core.SCHEMA_VERSION === 14);
+check('schema version is 16', core.SCHEMA_VERSION === 16);
 const sample = core.makeSampleScenario();
+// The cash-buffer value is planning metadata only; funding regressions cover
+// the unchanged pre-buffer projection behavior.
+sample.household.cashBufferYears = 0;
 check('sample validates', core.validateScenario(sample).length === 0,
   JSON.stringify(core.validateScenario(sample)[0] ?? null));
 check('sample defaults to a couple household',
@@ -113,7 +116,7 @@ schema12.otherAssets = [{
 }];
 const migrated13 = core.migrateScenario(schema12);
 check('schema 12 Other Assets migrate outside Age Pension deeming',
-  migrated13.schemaVersion === 14 &&
+  migrated13.schemaVersion === 16 &&
   migrated13.otherAssets[0].agePensionDeemed === false &&
   migrated13.otherAssets[0].owner === 'joint');
 
@@ -128,7 +131,7 @@ schema13Household.otherAssets = [{
 delete schema13Household.otherAssets[0].owner;
 const migrated14 = core.migrateScenario(schema13Household);
 check('schema 13 migrates to an explicit couple household',
-  migrated14.schemaVersion === 14 &&
+  migrated14.schemaVersion === 16 &&
   migrated14.household.type === 'couple' &&
   migrated14.otherAssets[0].owner === 'joint' &&
   core.validateScenario(migrated14).length === 0);
@@ -242,10 +245,10 @@ check('return assumptions are explained below the table',
 check('assumptions and methodology moved out of the controls panel',
   html.indexOf('<summary>Model assumptions and sources</summary>') > html.indexOf('<div class="tblwrap">') &&
   html.indexOf('id="methodologySection"') > html.indexOf('<div class="tblwrap">'));
-check('v1.1.0 document version is consistent',
-  html.includes('<title>Family Retirement Income Simulator v1.1.0</title>') &&
-  html.includes('<span class="version">v1.1.0</span>') &&
-  html.includes("const STORAGE_KEY = 'family-retirement-simulator:v1.1.0:scenario'") &&
+check('v1.1.1 document version is consistent',
+  html.includes('<title>Family Retirement Income Simulator v1.1.1</title>') &&
+  html.includes('<span class="version">v1.1.1</span>') &&
+  html.includes("const STORAGE_KEY = 'family-retirement-simulator:v1.1.1:scenario'") &&
   html.includes("'family-retirement-simulator:v1.13:scenario'") &&
   html.includes("'family-retirement-simulator:v1.12:scenario'") &&
   html.includes("'family-retirement-simulator:v1.11:scenario'") &&
@@ -332,7 +335,7 @@ delete schema10.shareholdings[0].companyTaxRatePct;
 delete schema10.shareholdings[0].frankingEligible;
 const migrated11 = core.migrateScenario(schema10);
 check('schema 10 migrates inert v1.06 tax and share defaults',
-  migrated11.schemaVersion === 14 &&
+  migrated11.schemaVersion === 16 &&
   migrated11.otherIncomes[0].owner === 'joint' &&
   migrated11.otherIncomes[0].survivorPct === 0 &&
   migrated11.household.firstDeath.enabled === false &&
@@ -353,7 +356,7 @@ schema11.otherIncomes = [{
 delete schema11.otherIncomes[0].survivorPct;
 const migrated12 = core.migrateScenario(schema11);
 check('schema 11 migrates inert first-death defaults',
-  migrated12.schemaVersion === 14 &&
+  migrated12.schemaVersion === 16 &&
   migrated12.household.firstDeath.enabled === false &&
   migrated12.household.firstDeath.survivorPreferredPct === 70 &&
   migrated12.household.firstDeath.survivorEssentialPct === 70 &&
@@ -518,8 +521,8 @@ check('lump reason truncates before key values',
   html.includes('.lump-summary-reason{') && html.includes('text-overflow:ellipsis'));
 check('lump controls retain iPad touch targets',
   html.includes('.lump-chevron,.lump-summary-enabled{min-width:44px;min-height:44px'));
-check('lump editor displays latest intended year first',
-  html.includes('.sort((a, b) => b.item.year - a.item.year || a.index - b.index)'));
+check('lump editor displays earliest intended date first',
+  html.includes('.sort((a, b) => a.item.year - b.item.year || a.item.month - b.item.month || a.index - b.index)'));
 check('compact lump-sum formatter uses the exported core formatter',
   /function compactMoney\([^)]+\)\s*\{[\s\S]*?return core\.formatMoney\(amount\);[\s\S]*?\}/.test(html));
 check('table height splitter is accessible and persistent',
@@ -531,7 +534,7 @@ check('Export CSV is the final table action',
   /id="exportProjectionCsv"[^>]*>Export CSV<\/button>\s*<\/div>/.test(html));
 check('projection table Event column is left aligned',
   html.includes('td.event-cell,th.event-cell{text-align:left}') &&
-  html.includes(`heading === 'Event' ? ' class="event-cell"'`));
+  html.includes("['Event', 'Calculation log'].includes(heading)"));
 check('return readouts are left aligned and use concise labels',
   html.includes('.return-readout{') &&
   html.includes('text-align:left') &&
@@ -553,6 +556,51 @@ check('survival ribbon uses Safari-safe rounded path', html.includes('function r
 console.log('\nreal-return readouts');
 check('real return uses nominal less inflation', core.realReturnPct(7, 2.5) === 4.5);
 check('real return preserves a negative spread', core.realReturnPct(3, 5) === -2);
+check('broad super profiles map to sourced real midpoints',
+  core.SUPER_RETURN_PROFILES.conservative.midpoint === 1.5 &&
+  core.SUPER_RETURN_PROFILES.balanced.midpoint === 2.5 &&
+  core.SUPER_RETURN_PROFILES.growth.midpoint === 3.5 &&
+  core.SUPER_RETURN_PROFILES['all-growth'].midpoint === 4.25);
+check('profile midpoint is converted to editable nominal return using average model inflation',
+  core.returnProfileNominalMidpoint(sample, 0) === Math.round((core.averageInflationPct(sample, 0) + 3.5) * 10) / 10);
+const customProfileScenario = structuredClone(sample);
+customProfileScenario.people[0].superReturnProfile = 'custom';
+check('Custom profile leaves current nominal assumption unchanged',
+  core.returnProfileNominalMidpoint(customProfileScenario, 0) === null);
+const guidanceScenario = structuredClone(sample);
+guidanceScenario.people[0].superReturnProfile = 'balanced';
+const balancedGuidance = core.returnGuidance(9, guidanceScenario, 'super', 'balanced');
+const savingsGuidance = core.returnGuidance(9, guidanceScenario, 'savings');
+const cashGuidance = core.returnGuidance(1, guidanceScenario, 'cash');
+check('balanced profile guidance uses its band and midpoint action',
+  balancedGuidance.lower === 1.5 && balancedGuidance.upper === 3.5 && balancedGuidance.midpoint != null && balancedGuidance.outside);
+check('Savings has a distinct historical reference; Cash has no out-of-band warning',
+  savingsGuidance.lower === 0 && savingsGuidance.upper === 2 && cashGuidance.lower == null && !cashGuidance.outside);
+check('return warnings are compact and link to issue 46',
+  html.includes('OUT OF BAND') && html.includes('https://github.com/dcaddick/retirement-simulator/issues/46') &&
+  !html.includes('Cash/Savings reference') && html.includes('data-return-midpoint'));
+check('return evidence sources are listed under the table assumptions',
+  html.includes('id="returnEvidenceHeading"') &&
+  ['Chant West', 'APRA', 'SuperRatings', 'Morningstar Australia', 'RBA deposit-rate data']
+    .every(source => html.includes(`<strong>${source}</strong>`)) &&
+  html.includes('id="sourceList"'));
+check('(i) return warning link opens issue 46',
+  html.includes('class="return-info" href="https://github.com/dcaddick/retirement-simulator/issues/46"'));
+check('dark-theme official source and model source links use the profile-link accent',
+  html.includes('.inflation-summary a,.assumptions a{color:var(--accent)') &&
+  html.includes('.return-profile-label a{color:var(--accent)}'));
+check('dashboard status cards expose dismiss controls and retain dismissal state',
+  html.includes('class="flag-dismiss" data-dismiss-status=') &&
+  html.includes('dismissedStatusCards.has(dismissalKey)') &&
+  html.includes("dismiss.closest('.flag')?.remove()"));
+check('profile change updates both editable nominal return fields',
+  html.includes("event.target.matches('.return-profile')") &&
+  html.includes('people.${index}.accumulationReturnPct') &&
+  html.includes('people.${index}.retirementReturnPct'));
+check('calculation logs are opt-in and appended after the primary columns',
+  html.includes('id="showCalculationLogs" type="checkbox"') &&
+  html.includes("showCalculationLogs ? `<td class=\"event-cell calculation-log\"") &&
+  html.includes("['Event', 'Calculation log'].includes(heading)"));
 check('Treasury 2026 accumulation spread is calculated',
   core.realReturnPct(5.5, core.TREASURY_INFLATION.rates[2026] * 100) === 0.5);
 check('Treasury long-run retirement spread is calculated',
@@ -1401,15 +1449,15 @@ if (typeof core.agePensionForHousehold === 'function') {
     assets: 0, assessableIncome: 226 * 26 + 1000, included: true
   });
   check('single maximum Age Pension uses one survivor rate',
-    singleFull.household === 1200.90 * 26);
+    singleFull.household === 1237.70 * 26);
   check('single pension is allocated only to the survivor',
     singleFull.byPerson[0] === singleFull.household &&
     singleFull.byPerson[1] === 0);
   check('survivor below age 67 receives zero', singleTooYoung.household === 0);
   check('single assets test tapers by 78 dollars annually per thousand',
-    singleAssetTaper.household === 1200.90 * 26 - 78);
+    singleAssetTaper.household === 1237.70 * 26 - 78);
   check('single income test tapers at 50 cents',
-    singleIncomeTaper.household === 1200.90 * 26 - 500);
+    singleIncomeTaper.household === 1237.70 * 26 - 500);
 }
 // Tax schedules are keyed by the calendar year the financial year begins in,
 // which is the same year projection rows carry (#31). FY2025-26 keeps the 16%
@@ -1585,8 +1633,8 @@ if (typeof core.ratesStaleness === 'function') {
     between('2027-01-01', '2026-01-01').length === 0);
   // The oldest checked date governs, so the advisory is only as current as the
   // least recently verified input. That is 2026-07-06 today.
-  const freshRun = core.ratesStaleness('2026-07-10');
-  const oneRound = core.ratesStaleness('2026-09-21');
+  const freshRun = core.ratesStaleness('2026-10-12');
+  const oneRound = core.ratesStaleness('2027-03-20');
   const manyRounds = core.ratesStaleness('2028-08-01');
   check('a run before any indexation reports current rates',
     freshRun.state === 'ok' && freshRun.roundsPassed === 0,
@@ -1606,6 +1654,27 @@ if (typeof core.ratesStaleness === 'function') {
       freshRun.nextIndexation.time > Date.parse('2026-07-10T00:00:00Z'));
   check('an unparseable clock degrades to unknown rather than a false all-clear',
     core.ratesStaleness('not-a-date').state === 'unknown');
+  check('invalid calendar dates do not silently roll into the following month',
+    core.ratesStaleness('2026-02-30').state === 'unknown');
+  const sources = core.datedRateSources();
+  const march = core.ratesStaleness('2027-03-20');
+  check('March only marks Age Pension groups due',
+    march.crossed.length === 2 && march.crossed.every(e => e.label.includes('Age Pension')));
+  check('missing source dates cannot produce a false all-clear',
+    core.ratesStaleness('2026-10-12', [...sources, { label: 'Missing', schedule: [] }]).state === 'unknown');
+  const cshc = sources.filter(e => e.label.includes('CSHC'));
+  check('CSHC crosses September only, on the exact boundary',
+    core.ratesStaleness('2027-09-19', cshc).state === 'ok' &&
+    core.ratesStaleness('2027-09-20', cshc).roundsPassed === 1);
+  const thresholds = sources.filter(e => e.label.includes('deeming thresholds'));
+  check('deeming thresholds cross July only, on the exact boundary',
+    core.ratesStaleness('2027-06-30', thresholds).state === 'ok' &&
+    core.ratesStaleness('2027-07-01', thresholds).roundsPassed === 1);
+  check('unscheduled groups never inherit another group’s scheduled rounds',
+    core.ratesStaleness('2030-10-12', sources.filter(e => !e.schedule.length)).crossed.length === 0);
+  check('September pension maxima annualise the verified fortnightly amounts',
+    core.SERVICES_AUSTRALIA_2026.agePensionMaxCoupleAnnual === 1866 * 26 &&
+    core.SERVICES_AUSTRALIA_2026.agePensionMaxSingleAnnual === 1237.70 * 26);
 }
 
 console.log('\ndrawdown preserves means-test-exempt super');
@@ -1727,32 +1796,32 @@ console.log('\ndeeming rates and thresholds');
   const rules = core.SERVICES_AUSTRALIA_2026;
   const source = rules.deemingSource ?? {};
   check('deeming carries its own dated provenance',
-    source.effectiveDate === '2026-07-01' &&
-    source.checkedDate === '2026-08-06' &&
+    source.effectiveDate === '2026-09-20' &&
+    source.checkedDate === '2026-10-12' &&
     typeof source.url === 'string' && source.url.includes('deeming'));
-  check('deeming lower rate is 1.25 per cent',
-    rules.deemingLowerRate === 0.0125);
-  check('deeming upper rate is 3.25 per cent',
-    rules.deemingUpperRate === 0.0325);
+  check('deeming lower rate is 1.75 per cent',
+    rules.deemingLowerRate === 0.0175);
+  check('deeming upper rate is 3.75 per cent',
+    rules.deemingUpperRate === 0.0375);
   check('single deeming threshold is 66800',
     rules.deemingThresholdSingle === 66800);
   check('couple deeming threshold is 110600',
     rules.deemingThresholdCouple === 110600);
   check('single balance at the threshold is all lower-rate',
-    core.deemedIncome(66800, 'single') === 66800 * 0.0125);
+    core.deemedIncome(66800, 'single') === 66800 * 0.0175);
   check('couple balance at the threshold is all lower-rate',
-    core.deemedIncome(110600, 'couple') === 110600 * 0.0125);
+    core.deemedIncome(110600, 'couple') === 110600 * 0.0175);
   check('single balance above the threshold splits across both bands',
-    core.deemedIncome(166800, 'single') === 66800 * 0.0125 + 100000 * 0.0325);
+    core.deemedIncome(166800, 'single') === 66800 * 0.0175 + 100000 * 0.0375);
   check('couple balance above the threshold splits across both bands',
-    core.deemedIncome(210600, 'couple') === 110600 * 0.0125 + 100000 * 0.0325);
+    core.deemedIncome(210600, 'couple') === 110600 * 0.0175 + 100000 * 0.0375);
   check('a zero balance is deemed to earn nothing',
     core.deemedIncome(0, 'single') === 0 && core.deemedIncome(0, 'couple') === 0);
 }
 check('single CSHC threshold is current',
-  core.SERVICES_AUSTRALIA_2026.cshcSingleThreshold === 101105);
+  core.SERVICES_AUSTRALIA_2026.cshcSingleThreshold === 105048);
 check('couple CSHC threshold is current',
-  core.SERVICES_AUSTRALIA_2026.cshcCoupleThreshold === 161768);
+  core.SERVICES_AUSTRALIA_2026.cshcCoupleThreshold === 168076);
 // CSHC eligibility is a strict less-than test, not less-than-or-equal.
 // Services Australia: "your annual gross taxable income must be less than
 // $101,105.00 a year if you're single" (checked 2026-08-06), matching the
@@ -1907,7 +1976,7 @@ const singleLifecycleRows =
   core.projectScenario(singleLifecycleScenario).rows;
 check('single household keeps entered targets at 100 percent',
   singleLifecycleRows.every(row =>
-    row.target === 80000 && row.budget === 70000));
+    row.target === 80000 && row.budget === 80000 && row.essential === 70000));
 check('single household never emits a first-death event',
   singleLifecycleRows.every(row =>
     !row.events.some(event => event.type === 'first-death')));
@@ -2093,7 +2162,7 @@ check('deceased continuation income is paid to the survivor',
   survivorFirstRow.otherIncomeByPerson[0] === 0 &&
   survivorFirstRow.otherIncomeByPerson[1] === 3000);
 check('survivor preferred and essential targets step down immediately',
-  survivorFirstRow.target === 56000 && survivorFirstRow.budget === 49000);
+  survivorFirstRow.target === 56000 && survivorFirstRow.budget === 56000 && survivorFirstRow.essential === 49000);
 check('deceased super is exposed as inherited survivor super',
   survivorFirstRow.superBalances[0] === 0 &&
   survivorFirstRow.inheritedSuper.ownerIndex === 1 &&
@@ -2151,7 +2220,7 @@ survivorPensionScenario.lumpSumWithdrawals = [];
 const survivorPensionRow = core.projectScenario(survivorPensionScenario).rows[1];
 check('transition-year projection uses the single Age Pension rules',
   survivorPensionRow.agePensionStatus === 'single' &&
-  survivorPensionRow.components.agePensionNet === 1200.90 * 26);
+  survivorPensionRow.components.agePensionNet === 1237.70 * 26);
 const unflaggedSurvivorDeemingScenario = structuredClone(survivorPensionScenario);
 unflaggedSurvivorDeemingScenario.otherAssets = [{
   id: 'survivor-loan', label: 'Survivor private loan',
@@ -2294,8 +2363,8 @@ check('income reduces drawdown once the baseline draws from assets',
   firstDrawIndex < 0
     ? 'baseline never draws from assets'
     : `year ${base.rows[firstDrawIndex].year}: ${drawTotal(projIncome.rows[firstDrawIndex])} vs ${drawTotal(base.rows[firstDrawIndex])}`);
-check('income raises end-of-model assets vs baseline',
-  projIncome.rows.at(-1).totalAssets > base.rows.at(-1).totalAssets,
+check('income reduces cumulative unmet spending over the projection',
+  projIncome.rows.reduce((sum, row) => sum + row.shortfall, 0) < base.rows.reduce((sum, row) => sum + row.shortfall, 0),
   `${projIncome.rows.at(-1).totalAssets} vs ${base.rows.at(-1).totalAssets}`);
 // CPI indexing: real (today's-dollars) value of otherIncomeNet should be roughly
 // stable in later years, not eroding like a frozen pension.
@@ -2520,6 +2589,7 @@ check('lump-sum warning state is independent of annual-budget shortfall',
   }));
 const combinedShortfalls = structuredClone(partialLump);
 combinedShortfalls.household.annualBudget = 100000;
+combinedShortfalls.household.targetAfterTax = 100000;
 const combinedResult = core.projectScenario(combinedShortfalls);
 check('annual-budget and lump-sum warnings can appear together',
   combinedResult.firstShortfall !== null &&
@@ -2564,14 +2634,14 @@ const lumpTooltip = core.chartTooltipLines(
   { key: 'lumpSum', value: 25000, label: 'Lump sum withdrawal', displayFactor: 1 }, lumpRow, withLump);
 check('lump tooltip contains only context and essential funding sentence',
   lumpTooltip.length === 2 &&
-  lumpTooltip[1] === 'New car - requested $25,000; $25,000 funded from Cash + Savings');
+  lumpTooltip[1].includes('New car - requested $25,000; $25,000 funded from Cash $') && lumpTooltip[1].includes('Savings $') && lumpTooltip[1].includes('selected source: Cash'));
 const partialTooltip = core.chartTooltipLines(
   { key: 'lumpSum', value: 15000, label: 'Lump sum withdrawal', displayFactor: 1 },
   partialRow,
   partialLump);
 check('partial lump tooltip discloses requested funded and unfunded amounts',
   partialTooltip.length === 2 &&
-  partialTooltip[1] === 'European holiday - requested $25,000; $15,000 funded from Cash + Savings; $10,000 unfunded',
+  partialTooltip[1] === 'European holiday - requested $25,000; $15,000 funded from Cash $10,000 + Savings $5,000; $10,000 unfunded; selected source: Cash; fallback: Savings',
   JSON.stringify(partialTooltip));
 const normalTooltip = core.chartTooltipLines(
   { key: 'person1Super', value: 17475, label: 'Jane super drawdown', displayFactor: 1 },
@@ -2717,7 +2787,7 @@ v5.people[1].ukPrivateAmountGbp = 20000;
 v5.people[1].ukPrivateTakeAge = 66;
 v5.people[1].ukPrivateType = 'lump';
 const migrated = core.migrateScenario(structuredClone(v5));
-check('migrates to v14', migrated.schemaVersion === 14);
+check('migrates to v16', migrated.schemaVersion === 16);
 check('annuity becomes other income', migrated.otherIncomes.length === 1 &&
   migrated.otherIncomes[0].amount === 5000 && migrated.otherIncomes[0].currency === 'GBP');
 check('lump becomes other asset with disposal year',
@@ -2737,14 +2807,14 @@ schema7.schemaVersion = 7;
 schema7.lumpSumWithdrawals.forEach(item => delete item.enabled);
 const migrated8 = core.migrateScenario(schema7);
 check('schema 7 lump sums migrate enabled',
-  migrated8.schemaVersion === 14 && migrated8.lumpSumWithdrawals.every(item => item.enabled === true));
+  migrated8.schemaVersion === 16 && migrated8.lumpSumWithdrawals.every(item => item.enabled === true));
 
 const schema8 = structuredClone(sample);
 schema8.schemaVersion = 8;
 schema8.lumpSumWithdrawals.forEach(item => delete item.month);
 const migrated9 = core.migrateScenario(schema8);
 check('schema 8 lump sums migrate to January and salary growth defaults to zero',
-  migrated9.schemaVersion === 14 &&
+  migrated9.schemaVersion === 16 &&
   migrated9.lumpSumWithdrawals.every(item => item.month === 1) &&
   migrated9.people.every(person => person.salaryGrowthPct === 0));
 
@@ -2753,7 +2823,7 @@ schema9.schemaVersion = 9;
 schema9.people.forEach(person => delete person.salaryGrowthPct);
 const migrated10 = core.migrateScenario(schema9);
 check('schema 9 migrates salary growth to zero',
-  migrated10.schemaVersion === 14 && migrated10.people.every(person => person.salaryGrowthPct === 0));
+  migrated10.schemaVersion === 16 && migrated10.people.every(person => person.salaryGrowthPct === 0));
 
 const invalidMonth = structuredClone(sample);
 invalidMonth.lumpSumWithdrawals[0].month = 13;
@@ -2851,7 +2921,7 @@ delete v1.household.annualBudget;
 v1.people = v1.people.map(({ superAccessAge, superAccessPct, ukStateIndexation, ...rest }) => rest);
 delete v1.assumptions.ukPensionsEnabled;
 const chained = core.migrateScenario(structuredClone(v1));
-check('v1 chains to v14', chained.schemaVersion === 14);
+check('v1 chains to v16', chained.schemaVersion === 16);
 check('migration adds empty lump sums', Array.isArray(chained.lumpSumWithdrawals) && chained.lumpSumWithdrawals.length === 0);
 check('chained validates', core.validateScenario(chained).length === 0,
   JSON.stringify(core.validateScenario(chained)[0] ?? null));

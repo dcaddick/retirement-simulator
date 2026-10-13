@@ -8,23 +8,35 @@ It is not a regulated calculator and does not produce financial, tax, legal or i
 
 ## Annual calculation sequence
 
-Each projection row represents one year. At a high level the simulator:
+Each row is an annual approximation. Transactions occur in this order:
 
-1. Applies any scheduled transition from accumulation super to retirement/drawdown phase.
-2. Adds employment income and after-contributions-tax superannuation contributions for people still working.
-3. Applies the user-entered estimated net nominal super returns and annual nominal share-price growth.
-4. Records scheduled or named share sales, dividends and capital results using the holding-period exposure for that year.
-5. Applies account-based pension minimum drawdowns when enabled.
-6. Adds pensions and other configured income.
-7. Nets capital losses per person before discounts, then estimates income tax, franking offsets and CGT.
-8. Funds CGT as an asset expense, then uses the configured drawdown priorities to fill any remaining income target.
-9. Banks income above the Essential Annual Budget into savings.
-10. Flags a shortfall when available income and configured drawdown sources cannot cover the Essential Annual Budget.
-11. Converts nominal results to today's dollars when that display mode is selected.
+1. Apply the fixed first-death transition, if enabled, and capture opening Cash and Savings balances.
+2. Grow shares and process scheduled share sales; retain the existing sale-month interest approximation.
+3. Transition accessible super, apply annual super growth and salary/SG contributions, and grow or dispose of Other Assets.
+4. Fund due lump sums. Explicit sources go first, followed by the configured fallback tiers; automatic withdrawals use the configured drawdown order.
+5. Add dividends, other income and interest. Savings interest follows the opening balance and existing sale-year approximation. Cash retains its existing annual timing.
+6. Assess Age Pension using the balances at this checkpoint. Compute household taxes and fund CGT using the existing rules.
+7. Apply required ABP minimum draws after pension assessment, then fund normal Preferred spending, or the Essential floor for a supported stressed caller.
+8. Bank income above actual planned spending and report any shortfall. Record closing balances. The suggested Cash + Savings strategy is not modeled.
+9. Return engine output in today's dollars. Charts, event labels, table and CSV apply the selected display factor at presentation time.
+
+### Spending and schema 16
+
+Preferred means normal spending. Essential is a bad-year floor, constrained not to exceed Preferred. The ordinary deterministic projection always follows Preferred and never generates a bad year. Schema-14 migration maps both budgets to the previous Essential amount and retains the previous values in a review notice until dismissed. Schema-15 scenarios migrate to schema 16 with their entered returns unchanged, a broad return profile added for reference, and the retired `cashBufferYears` setting removed. Migration is idempotent; unrelated inputs remain saved.
+
+An engine-only stress caller can supply bad-year status to use the Essential floor and defer marked lump sums. The ordinary deterministic user interface has no bad-year generator or threshold control.
+
+### Suggested Cash + Savings strategy
+
+The Advanced panel suggests reviewing spending for the next two years and anticipated lump sums every six or twelve months, then topping up the Savings Pot from super to hold as a term deposit or cash. This is guidance only: the simulator does not calculate a target, schedule or transfer, and it does not affect projection calculations, table values or charts. Cash and Savings remain separate user-entered accounts and retain their existing balance, interest and funding behavior. The explicit modeled bucket proposed in issue #45 is not part of this release.
 
 ### Lump-sum withdrawals
 
-Lump-sum withdrawals are one-off spending for items such as a car, holiday or family assistance. Enabled items reduce the selected assets in the nominated year, do not count as retirement income and do not satisfy the annual income target. An explicit liquid source is used first; any remainder follows the household drawdown order. The projection retains requested, funded and unfunded amounts for each enabled planned withdrawal. Only the funded amount reduces assets or appears on the chart. An unfunded remainder produces a separate planning warning and does not change the annual-budget shortfall calculation. The Event column records the reason, amount and sources actually used. Disabled items remain saved in the scenario but are excluded from validation, calculations, charts and Event entries.
+Lump sums are separate from annual spending. Requested, funded, unfunded and per-source engine amounts are all in today's dollars; labels multiply by the display factor once. The selected source remains visible beside actual source amounts and any shortfall. Amber markers identify event years, including events with zero funding. CSV uses the displayed table. Disabled items remain saved but are excluded.
+
+### Return-reference context
+
+Warnings never change assumptions or calculation results. They use the existing nominal-minus-inflation real-return convention. The Growth super reference is 2.5–4.5% real: Chant West's 18 December 2025 publication describes a typical CPI+3.5% Growth objective; the +/-1 percentage-point band is this project's choice. Cash/Savings uses the project-selected 0–2% real band from issue #46. These are context, not universal suitability or regulatory limits. Treasury mode evaluates horizon-average inflation and separately flags years more than two percentage points outside the band. Sources were checked 12 October 2026.
 
 ### Illustrative survival ribbon
 
@@ -47,6 +59,10 @@ Cash, savings, shares and Other assets transfer immediately to the survivor whil
 Preferred Retirement Income and Essential Annual Budget step to their configured survivor percentages in the transition year. Single Age Pension rules apply immediately from that year, as do single-person CSHC thresholds and survivor-only tax allocation. The projection horizon follows the survivor's age. The model does not represent probate timing, binding nominations, estate disputes, tax on death benefits or detailed super death-benefit law.
 
 ## Main modelling areas
+
+### Capital losses
+
+When a share disposal's tax cost base (including allowable sale costs) exceeds its proceeds, the realised loss is recorded for its owner. It is carried forward and applied against that person's eligible capital gains under the model's existing discount-gain ordering. Unused amounts remain in the tax ledger; the main projection event column reports only a loss realized or applied in that year. Enable **Show calculation logs** below the table to inspect opening, current-year realized, applied and closing carry-forward amounts. Opening losses that predate the projection are not currently an input.
 
 ### Superannuation
 
@@ -84,13 +100,15 @@ This bounded, auditable household context is proportionate for a personal protot
 
 The normal Couple Age Pension estimate applies the combined homeowner-couple income and assets tests. If one partner has reached Age Pension age, the household receives half of the means-tested combined couple rate and the taxable payment is allocated to that eligible person; once both partners are 67, the household receives the full combined rate. Superannuation held by a partner under Age Pension age remains excluded while it stays in the modelled super environment. The income test uses a 50-cent combined couple reduction for each dollar above the couple free area. An explicit Single household applies the single-person rate, assets test, income test and deeming threshold to Person 1 from the first year.
 
-Every rate in the file is a frozen constant checked on a stated date, and the tool can be opened years after it was saved, so the figures are checked against the clock at run time. Staleness is measured in scheduled indexation rounds crossed rather than elapsed months, because crossing one of those dates is what actually supersedes a figure: Age Pension rates and thresholds re-index on 20 March and 20 September, and tax, Medicare and SAPTO parameters change on 1 July. The oldest checked date across all dated sources governs, since a result is only as current as its least recently verified input. No rounds crossed shows a plain currency note naming the next scheduled indexation; one round warns; two or more states that the figures are likely superseded. Each source link carries its own checked date so an individual figure can be aged separately. Nothing is recalculated or fetched — the advisory only reports how old the built-in constants are.
+Currency is assessed separately for each dated source group. Age Pension rates use 20 March and 20 September; threshold reviews also include 1 July. CSHC uses 20 September; tax, SAPTO, Medicare and deeming thresholds use 1 July. Deeming rates and Work Bonus have no fixed review schedule. A passed date means a review is due, not proof that a value changed. Missing or invalid source dates produce an unknown status. The advisory identifies an overdue group and date, or the next scheduled review. Unscheduled policy changes remain possible; the app does not fetch or update rates automatically.
 
-Superannuation held by a partner below Age Pension age is exempt from the means test, while savings are always assessed. Because the top-up waterfall draws to Preferred Retirement Income and banks anything above the Essential Annual Budget, drawing that exempt super would move value into assessed savings. Within a drawdown tier the simulator therefore spends already-assessed super before means-test-exempt super, so the same money funds the same spending while the exempt balance is preserved for as long as it still shelters value. Tier order itself is the user's stated drawdown intent and is never rearranged: a tier containing only the younger partner's super is treated as an explicit instruction to spend it first. The preference applies only when the Age Pension estimate is included, since that is the only reason to prefer one balance over the other.
+On 12 October 2026, Services Australia and the DSS deeming history confirmed the September inputs: standard maximum pension $1,237.70 single / $1,866 couple combined per fortnight, CSHC limits $105,048 / $168,076, and deeming rates 1.75% / 3.75%. Pension free areas and deeming thresholds retain their July values. The annual model multiplies fortnightly pension rates and income free areas by 26. See the source register for dates, links and limitations.
+
+Superannuation held by a partner below Age Pension age is exempt from the means test, while savings are always assessed. Tier order is the user's stated drawdown intent and is never rearranged: a tier containing only the younger partner's super is treated as an explicit instruction to spend it first. The suggested Cash + Savings strategy is text only; it does not move balances or alter the means test.
 
 The Work Bonus offsets employment income before the Age Pension income test for a living person of Age Pension age, once the household is being assessed for the pension. It credits $300 a fortnight, carries a maximum balance of $11,800, and gives a $4,000 starting credit in the first year a person becomes eligible. The balance accrues in years without salary, so a later return to work draws on it. Three simplifications apply. The scheme is approximated annually rather than fortnightly: the carried balance plus the whole year's accrual is available against that year's salary, and the cap is applied to what carries forward, so uneven earnings within a year are not distinguished. Only salary is treated as eligible income; Other income is never offset, so self-employment income entered there is not covered. The amounts are held in nominal terms and deflated into the real-terms income test, because the Work Bonus carries no statutory indexation, which means the offset erodes in real terms over a long projection unless Parliament legislates an increase.
 
-Deeming applies 1.25% to the first $66,800 of financial assets for a single person, or the first $110,600 combined for a couple, and 3.25% above that. These four values carry their own dated provenance in the code rather than sitting under a general page-checked date, because deeming is the highest-sensitivity means-test input in the model and its values move by ministerial decision rather than routine indexation. They were verified against the Services Australia Age Pension deeming page on 6 August 2026, which was itself last updated on 1 July 2026. The model always uses the pensioner-couple threshold for a couple; Services Australia applies a separate $55,300 per-person threshold where neither member of a couple receives a pension, and that case is not modelled.
+Deeming applies 1.75% to the first $66,800 of financial assets for a single person, or the first $110,600 combined for a couple, and 3.75% above that. These four values carry their own dated provenance in the code rather than sitting under a general page-checked date, because deeming is the highest-sensitivity means-test input in the model and its values move by ministerial decision rather than routine indexation. They were verified against the Services Australia Age Pension deeming page on 12 October 2026, with rates effective 20 September 2026 and thresholds effective 1 July 2026. The model always uses the pensioner-couple threshold for a couple; Services Australia applies a separate $55,300 per-person threshold where neither member of a couple receives a pension, and that case is not modelled.
 
 Taxable Other income follows its selected owner (`Person 1`, `Person 2` or `Joint 50/50`). Non-taxable Other income remains a household cash flow. Share dividends and franking credits follow the holding owner on the same basis. Franking eligibility is an explicit user assumption: the simulator does not automate holding-period, related-payment or other integrity rules. Refundable franking offsets can therefore produce an estimated tax refund in a low-tax year.
 
@@ -142,3 +160,5 @@ The maintained [Deferred Review Register](DEFERRED-REVIEW.md) records known limi
 - personalised product fees, insurance and adviser recommendations.
 
 Inspect the assumptions shown by the application and obtain qualified advice before making real decisions.
+
+Lump-sum audits retain requested, funded and unfunded amounts separately; an unfunded event is never charted as money received.

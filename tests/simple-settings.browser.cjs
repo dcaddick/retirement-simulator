@@ -15,7 +15,7 @@ const { pathToFileURL } = require('node:url');
   page.on('pageerror', error => errors.push(error.message));
   const output = path.resolve('output/simple-settings');
   await fs.mkdir(output, { recursive: true });
-  const key = 'family-retirement-simulator:v1.1.0:scenario';
+  const key = 'family-retirement-simulator:v1.1.1:scenario';
   const url = pathToFileURL(path.resolve('retirement-simulator.html')).href;
   const settle = () => page.waitForTimeout(650);
   const saved = () => page.evaluate(key => JSON.parse(localStorage.getItem(key)), key);

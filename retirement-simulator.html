@@ -4,7 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src https://api.frankfurter.app https://stooq.com; base-uri 'none'; form-action 'none'" />
-<title>Family Retirement Income Simulator v1.1.0</title>
+<title>Family Retirement Income Simulator v1.1.1</title>
 <style>
   :root{
     --bg:#0f1720; --panel:#18232f; --panel2:#1e2c3a; --line:#2b3d4f;
@@ -129,10 +129,12 @@
   .kpi .lab{color:var(--muted);font-size:10.5px;text-transform:uppercase;letter-spacing:.05em}
   .kpi .num{font-size:20px;font-weight:600;margin-top:3px;font-variant-numeric:tabular-nums}
   .kpi.good .num{color:var(--accent2)} .kpi.warn .num{color:var(--warn)} .kpi.bad .num{color:var(--bad)}
-  .flag{border-radius:8px;padding:7px 10px;font-size:12px;margin-bottom:7px;border:1px solid}
+  .flag{position:relative;border-radius:8px;padding:7px 36px 7px 10px;font-size:12px;margin-bottom:7px;border:1px solid}
   .flag.ok{background:rgba(139,212,80,.08);border-color:rgba(139,212,80,.4)}
   .flag.warn{background:rgba(255,180,84,.08);border-color:rgba(255,180,84,.4)}
   .flag.bad{background:rgba(255,107,107,.08);border-color:rgba(255,107,107,.4)}
+  .flag-dismiss{position:absolute;top:3px;right:4px;width:26px;height:26px;padding:0;border:0;background:transparent;color:var(--muted);font-size:18px;line-height:1}
+  .flag-dismiss:hover,.flag-dismiss:focus-visible{color:var(--text);border-color:transparent}
   .chart-shell{position:relative}
   canvas{width:100%;height:var(--chart-h,396px);background:var(--panel);border:1px solid var(--line);border-radius:10px;margin-top:4px}
   .chart-tooltip{position:absolute;z-index:5;display:grid;gap:2px;max-width:250px;padding:9px 11px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--text);box-shadow:0 8px 24px rgba(0,0,0,.28);pointer-events:none;font-size:12px}
@@ -149,6 +151,27 @@
   th{position:sticky;top:0;background:var(--panel2);color:var(--muted);font-weight:500;z-index:1}
   td:first-child,th:first-child{text-align:left}
   td.event-cell,th.event-cell{text-align:left}
+  td.calculation-log{white-space:normal;line-height:1.45;text-align:left!important}
+  .projection-log-toggle{display:flex;align-items:center;justify-content:space-between;gap:14px;margin:8px 2px 0;color:var(--muted);font-size:11.5px}
+  .projection-log-note{flex:1;color:var(--muted);font-size:10.5px;line-height:1.4}
+  .projection-log-control{display:inline-flex;align-items:center;justify-content:center;gap:7px;flex:0 0 auto;margin:0;padding:5px 9px;border:1px solid var(--line);border-radius:7px;background:var(--panel2);color:var(--text);cursor:pointer;white-space:nowrap}
+  .projection-log-control:hover{border-color:var(--accent)}
+  .projection-log-control input{width:15px;height:15px;margin:0;accent-color:var(--accent)}
+  .calculation-log{white-space:normal;line-height:1.45;text-align:left!important}
+  .column-resize-handle{position:absolute;z-index:2;top:0;right:0;bottom:0;width:12px;cursor:col-resize;touch-action:none;user-select:none}
+  .column-resize-handle::after{content:"";position:absolute;top:25%;bottom:25%;left:5px;border-left:1px solid var(--line)}
+  .column-resize-handle:hover::after,.column-resize-handle:focus-visible::after,.column-resize-handle.dragging::after{border-color:var(--accent);border-left-width:2px}
+  .column-resize-handle:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+  .return-profile-label{display:block;margin-bottom:10px}
+  .return-profile-label select{width:100%;margin-top:4px}
+  .return-profile-label .sub{margin-top:4px}
+  .return-profile-label a{color:var(--accent)}
+  .inflation-summary a,.assumptions a{color:var(--accent);text-underline-offset:2px}
+  .inflation-summary a:hover,.assumptions a:hover{color:var(--text)}
+  .return-context{display:flex;align-items:center;gap:7px;margin:3px 0 9px 2px;font-size:10.5px}
+  .return-warning{padding:2px 6px;border:1px solid color-mix(in srgb,var(--warn) 58%,transparent);border-radius:999px;background:color-mix(in srgb,var(--warn) 10%,transparent);color:var(--warn);font-size:9px;font-weight:700;letter-spacing:.035em}
+  .return-info{display:inline-grid;place-items:center;width:16px;height:16px;border:1px solid var(--line);border-radius:50%;color:var(--muted);text-decoration:none;font-size:10px;font-weight:700}
+  .return-reset{padding:2px 6px;border:1px solid var(--line);border-radius:4px;background:transparent;color:var(--accent);font-size:10px;cursor:pointer}
   tr.retire td{background:rgba(79,195,247,.06)} tr.event td{background:rgba(255,209,102,.08)}
   tr.short td{color:var(--bad)}
   .note{color:var(--muted);font-size:11.5px;margin-top:12px;border-top:1px solid var(--line);padding-top:9px}
@@ -159,6 +182,18 @@
   .table-actions{flex:0 0 auto}
   .table-tools label{margin:0;font-size:12px;color:var(--muted)}
   .assumptions h4{margin:10px 0 4px;font-size:12px;color:var(--text)}
+  .return-evidence{margin-top:14px;padding-top:12px;border-top:1px solid var(--line)}
+  .return-evidence-heading{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .return-evidence-heading h4{margin:0;font-size:14px}
+  .issue-source-tag{display:inline-block;padding:3px 7px;border:1px solid var(--line);border-radius:5px;color:var(--accent);font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase}
+  .return-evidence-intro{margin:5px 0 10px;max-width:820px;line-height:1.45}
+  .return-source-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+  .return-source-card{display:block;min-height:50px;padding:9px 10px;border:1px solid var(--line);border-radius:7px;background:var(--panel2);color:var(--text);text-decoration:none;transition:border-color .15s ease,background-color .15s ease}
+  .return-source-card:hover{border-color:var(--accent);background:color-mix(in srgb,var(--panel2) 88%,var(--accent) 12%)}
+  .return-source-card:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  .return-source-card strong{display:block;font-size:11.5px}
+  .return-source-card span{display:block;margin-top:3px;color:var(--muted);font-size:10px;line-height:1.35}
+  .return-evidence-caveat{margin:8px 0 0;font-size:10.5px;line-height:1.45}
   .assumptions ol{padding-left:18px}
   .assumptions ol li{margin-bottom:5px}
   .note b{color:var(--warn)}
@@ -175,6 +210,7 @@
     .controls,.stage{padding:12px}
   }
   @media (max-width:800px){
+    .return-source-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
     body{display:block;min-height:100vh}
     .wrap{display:block}
     #splitter{display:none}
@@ -190,6 +226,9 @@
     .chart-table-splitter,.table-height-splitter{display:none}
   }
   @media (max-width:480px){
+    .return-source-grid{grid-template-columns:1fr}
+    .projection-log-toggle{align-items:flex-start;flex-direction:column}
+    .projection-log-control{align-self:flex-end}
     .kpis{grid-template-columns:1fr}
     header{padding:14px}
     .group{border-radius:8px}
@@ -231,7 +270,7 @@
 <div class="disclaimer-banner top" role="note">Local, reproducible retirement-risk analysis. Estimate only; not financial or tax advice.</div>
 <header>
   <div class="header-row">
-  <h1>Family Retirement Income Simulator <span class="version">v1.1.0</span>
+  <h1>Family Retirement Income Simulator <span class="version">v1.1.1</span>
     <a class="version-link"
       href="https://github.com/dcaddick/retirement-simulator/releases/latest"
       target="_blank" rel="noreferrer"
@@ -248,6 +287,7 @@
   <div class="sub">A transparent single- or two-person household projection. Working estimate, not financial advice.</div>
   <div class="header-meta">
     <p id="scenarioMessage" class="scenario-message" aria-live="polite"></p>
+    <div id="spendingReview" class="scenario-message" role="status" hidden></div>
     <p class="privacy-note">Scenario data is saved locally and not uploaded. Optional US quote/FX fetches contact Stooq and Frankfurter.</p>
   </div>
 </header>
@@ -390,6 +430,10 @@
     </div>
     <div class="tblwrap"><table id="tbl"></table></div>
     <div id="tableHeightSplitter" class="table-height-splitter" role="separator" aria-label="Resize projection table" aria-orientation="horizontal" aria-valuemin="180" aria-valuemax="700" tabindex="0"></div>
+    <div class="projection-log-toggle">
+      <span class="projection-log-note">Capital-loss tax carry-forward details appear in the last table column. Drag a header divider to adjust widths.</span>
+      <label class="projection-log-control"><input id="showCalculationLogs" type="checkbox"> <span>Show calculation logs</span></label>
+    </div>
     <div class="supporting-notes">
       <p class="note"><b>Return assumptions.</b> Accumulation and retirement-phase returns are estimated net returns after fees and tax. A higher retirement-phase return may represent the tax advantage of pension-phase earnings; it does not imply a different underlying investment portfolio.</p>
       <details class="assumptions">
@@ -400,6 +444,31 @@
           <ul id="keyRatesList"></ul>
           <h4>Sources</h4>
           <ul id="sourceList"></ul>
+          <section class="return-evidence" aria-labelledby="returnEvidenceHeading">
+            <div class="return-evidence-heading">
+              <span class="issue-source-tag">Issue #46 · Sources</span>
+              <h4 id="returnEvidenceHeading">Evidence behind the broad ranges</h4>
+            </div>
+            <p class="return-evidence-intro">See <a href="https://github.com/dcaddick/retirement-simulator/issues/46" target="_blank" rel="noreferrer">issue #46</a> for the profile ranges and decision notes; the links below open the source material. Historical outcomes are context, not forecasts.</p>
+            <div class="return-source-grid" aria-label="Historical return and deposit-rate sources">
+              <a class="return-source-card" href="https://www.chantwest.com.au/media/lyvfjyzw/chant-west-media-release-17-july-2025-final.pdf" target="_blank" rel="noreferrer">
+                <strong>Chant West</strong><span>10-year super category returns and CPI-linked objectives · June 2025</span>
+              </a>
+              <a class="return-source-card" href="https://www.apra.gov.au/cppp-product-performance" target="_blank" rel="noreferrer">
+                <strong>APRA</strong><span>Product returns, fees, methodology and asset allocation</span>
+              </a>
+              <a class="return-source-card" href="https://www.superratings.com.au/2026/06/10/media-release-super-delivers-strong-may-return/" target="_blank" rel="noreferrer">
+                <strong>SuperRatings</strong><span>Peer-category accumulation return series · May 2026</span>
+              </a>
+              <a class="return-source-card" href="https://www.morningstar.com.au/retirement/why-super-returns-may-be-heading-lower" target="_blank" rel="noreferrer">
+                <strong>Morningstar Australia</strong><span>Long-run balanced super returns context · October 2025</span>
+              </a>
+              <a class="return-source-card" href="https://www.rba.gov.au/statistics/tables/" target="_blank" rel="noreferrer">
+                <strong>RBA deposit-rate data</strong><span>Monthly paid deposit rates (F4.1) for Savings context</span>
+              </a>
+            </div>
+            <p class="return-evidence-caveat">Category definitions, periods and fee treatment differ across sources. The 0–2% real Savings reference is contextual guidance, not a forecast for every cash or term-deposit product.</p>
+          </section>
           <ul id="limitationsList">
             <li>Annual projection rows; retirement and pension starts use whole ages.</li>
             <li>Age Pension estimate assumes homeowners and excludes the principal residence. An explicit Single household uses single-person income, asset, deeming and CSHC thresholds from the first year. Couple tests apply before first death; the configured survivor uses the single-person thresholds immediately from the transition year.</li>
@@ -419,42 +488,24 @@
         <summary>How each projected year is funded, in order</summary>
         <ul>
           <li><strong>Guaranteed income first:</strong> salary, defined-benefit or UK pensions, and the Aust. Age Pension are counted before anything is drawn.</li>
-          <li><strong>ABP minimum drawdown:</strong> when enabled, the legislated minimum comes out of each account-based pension regardless of need.</li>
-          <li><strong>Configured drawdown tiers:</strong> any remaining gap up to the <em>Preferred Retirement Income</em> is filled tier by tier until the target is met or every tier is exhausted.</li>
-          <li><strong>Surplus is banked:</strong> income above the <em>Essential Annual Budget</em> moves to savings and earns taxable interest in later years.</li>
-          <li><strong>Shortfall:</strong> flagged only when every tier is exhausted and income remains below the Essential Annual Budget.</li>
+          <li><strong>ABP minimum drawdown:</strong> when enabled, the legislated minimum comes out of each account-based pension regardless of need. With the buffer enabled it moves to Savings, followed by any discretionary super top-up toward the buffer target. Neither transfer counts as new income.</li>
+          <li><strong>Funding the spending gap:</strong> normal spending follows Preferred. With the buffer enabled, Cash then Savings fund the gap before the remaining tiers; otherwise the configured tiers apply. An explicitly stressed engine caller can use Essential instead.</li>
+          <li><strong>Surplus is banked:</strong> income above the active spending target (normally Preferred) moves to savings and earns taxable interest in later years.</li>
+          <li><strong>Shortfall:</strong> flagged only when every tier is exhausted and income remains below the active spending target.</li>
           <li>A two-source tier uses the chosen split while both sources remain available.</li>
         </ul>
       </details>
       <details class="assumptions" id="methodologySection">
         <summary>How each year is calculated (step by step)</summary>
         <div>
-          <p>Every projection year runs this exact sequence, in nominal (future) dollars.
-          The table and chart then divide by the cumulative inflation factor to show
-          today&rsquo;s dollars, unless the table display is switched to Nominal.</p>
+          <p>Each year uses annual timing approximations in nominal dollars, then converts output to the selected display basis.</p>
           <ol id="methodologySteps">
-            <li><b>Super access.</b> If a person reaches their super access age this year,
-              the selected percentage of their whole balance moves to the ABP
-              (retirement/drawdown) phase. This happens before growth.</li>
-            <li><b>Salary.</b> If still working: salary &times; inflation factor &times;
-              optional compounded growth above inflation (0% by default), plus SG
-              contributions (salary &times; SG% &times; 0.85 after contributions tax)
-              into accumulation super.</li>
-            <li><b>Investment growth.</b> The full year&rsquo;s estimated net return after fees and tax is applied:
-              accumulation balance &times; (1 + accumulation return), ABP balance
-              &times; (1 + retirement return). A 6% nominal return with 2.5% inflation
-              is about a 3.4% real return, which is why balances shown in today&rsquo;s
-              dollars grow more slowly than the headline rate.</li>
-            <li><b>ABP minimum drawdown.</b> If enabled, the legislated minimum is taken
-              from the post-growth ABP balance: 4% under 65, 5% at 65&ndash;74, 6% at
-              75&ndash;79, 7% at 80&ndash;84, 9% at 85&ndash;89, 11% at 90&ndash;94,
-              14% at 95+.</li>
-            <li><b>Top-up draws.</b> If guaranteed income (work, UK/DB pensions,
-              other income, Age Pension) plus the ABP minimums fall short of the Preferred
-              Retirement Income, the gap is drawn from the drawdown priority tiers. Spending is
-              capped at the Essential Annual Budget; income above it is banked to savings.</li>
-            <li><b>Display conversion.</b> Each row divides nominal values by the
-              cumulative inflation factor for that year (today&rsquo;s dollars).</li>
+            <li><b>Opening boundary.</b> Apply any fixed first death; record opening Cash, Savings and ownership. Grow shares and process scheduled sales.</li>
+            <li><b>Super and other assets.</b> Move the selected accessible super to retirement phase, apply returns and salary/SG contributions, then grow or dispose of Other Assets.</li>
+            <li><b>Buffer strategy and lumps.</b> The saved Cash + Savings buffer value is a strategy note only and does not change the projection. Fund due lumps from the selected source first, then follow the existing drawdown order.</li>
+            <li><b>Income and assessment.</b> Add dividends and interest, assess Age Pension, calculate tax and fund CGT. ABP minimums are taken after pension assessment.</li>
+            <li><b>Spending.</b> Fund the remaining Preferred spending gap; Essential applies only to a bad year supplied by a stress caller. Bank income above that target and report any shortfall.</li>
+            <li><b>Display conversion.</b> Divide by cumulative inflation for today's dollars; nominal display restores that factor once.</li>
           </ol>
           <p><b>Table columns.</b> Super balance columns are end-of-year balances after
           growth and draws. &ldquo;UK State Pension (gross)&rdquo; is the gross pension
@@ -464,12 +515,12 @@
           reach the Preferred Retirement Income. &ldquo;Tax&rdquo; is total household income tax
           including Medicare, LITO/SAPTO and the UPP deduction on UK pensions.
           &ldquo;After tax&rdquo; is total household after-tax income;
-          &ldquo;Banked&rdquo; is the part of it above the Essential Annual Budget, added to savings.</p>
+          &ldquo;Banked&rdquo; is the part above the active spending target, added to savings.</p>
         </div>
       </details>
     </div>
     <div class="note">
-      <b>v1.1.0.</b> Fictional Australian couple sample data is stored locally on this device and can be imported or exported as JSON. Calculations are transparent estimates and are not financial or tax advice. The Display toggle switches the whole dashboard &mdash; table, chart and headline figures &mdash; between today&rsquo;s dollars and nominal (future) dollars, except the CSHC estimate which stays in today&rsquo;s dollars against its fixed threshold. Numeric inputs recalculate live as you type without moving your modelling position; the &ldquo;Recalculated&rdquo; stamp above the table confirms each run.
+      <b>v1.1.1.</b> Fictional Australian couple sample data is stored locally on this device and can be imported or exported as JSON. Calculations are transparent estimates and are not financial or tax advice. The Display toggle switches the whole dashboard &mdash; table, chart and headline figures &mdash; between today&rsquo;s dollars and nominal (future) dollars, except the CSHC estimate which stays in today&rsquo;s dollars against its fixed threshold. Numeric inputs recalculate live as you type without moving your modelling position; the &ldquo;Recalculated&rdquo; stamp above the table confirms each run.
     </div>
   </div>
 </div>
@@ -524,7 +575,15 @@
 <script id="simulator-core">
 (function () {
   'use strict';
-  const SCHEMA_VERSION = 14;
+  const SCHEMA_VERSION = 16;
+  const SUPER_RETURN_PROFILES = Object.freeze({
+    conservative: Object.freeze({ label: 'Conservative', midpoint: 1.5, lower: 0.5, upper: 2.5 }),
+    balanced: Object.freeze({ label: 'Balanced', midpoint: 2.5, lower: 1.5, upper: 3.5 }),
+    growth: Object.freeze({ label: 'Growth', midpoint: 3.5, lower: 2.5, upper: 4.5 }),
+    'all-growth': Object.freeze({ label: 'All Growth', midpoint: 4.25, lower: 3.25, upper: 5.25 }),
+    custom: Object.freeze({ label: 'Custom', midpoint: null, lower: null, upper: null })
+  });
+  const SAVINGS_RETURN_REFERENCE = Object.freeze({ midpoint: 1, lower: 0, upper: 2 });
   const VALID_OWNERS = new Set(['p0', 'p1', 'joint']);
   const DRAWDOWN_SOURCES = new Set(['p0Super', 'p1Super', 'cash', 'savings']);
   const OTHER_CURRENCIES = new Set(['AUD', 'GBP', 'USD']);
@@ -595,8 +654,11 @@
     return status === 'couple' ? SAPTO_RULES.couple : SAPTO_RULES.single;
   }
   const SERVICES_AUSTRALIA_2026 = Object.freeze({
-    effectiveDate: '2026-07-01',
-    checkedDate: '2026-07-06',
+    effectiveDate: '2026-09-20',
+    thresholdsEffectiveDate: '2026-07-01',
+    checkedDate: '2026-10-12',
+    pageLastUpdated: '2026-09-20',
+    pensionRatesUrl: 'https://www.servicesaustralia.gov.au/how-much-age-pension-you-can-get?context=22526',
     assetsTestUrl: 'https://www.servicesaustralia.gov.au/assets-test-for-age-pension?context=22526',
     incomeTestUrl: 'https://www.servicesaustralia.gov.au/income-test-for-age-pension?context=22526',
     cshcUrl: 'https://www.servicesaustralia.gov.au/income-test-for-commonwealth-seniors-health-card?context=21966',
@@ -604,17 +666,19 @@
     // Deeming carries its own line-item provenance because it is the highest
     // sensitivity means-test input here and its values move by ministerial
     // decision rather than routine indexation. Verified against the Age
-    // Pension deeming page, which stated 1.25% on the first $66,800 single /
-    // $110,600 couple and 3.25% above, and was itself last updated 1 July 2026.
+    // Pension deeming page: 1.75% on the first $66,800 single / $110,600
+    // couple and 3.75% above, effective 20 September 2026. Thresholds retain
+    // their 1 July 2026 effective date.
     deemingSource: Object.freeze({
       url: 'https://www.servicesaustralia.gov.au/deeming?context=22526',
-      effectiveDate: '2026-07-01',
-      checkedDate: '2026-08-06',
-      pageLastUpdated: '2026-07-01',
+      effectiveDate: '2026-09-20',
+      thresholdEffectiveDate: '2026-07-01',
+      checkedDate: '2026-10-12',
+      pageLastUpdated: '2026-09-20',
       quickCode: 'QC 29656'
     }),
-    agePensionMaxCoupleAnnual: 1810.40 * 26,
-    agePensionMaxSingleAnnual: 1200.90 * 26,
+    agePensionMaxCoupleAnnual: 1866 * 26,
+    agePensionMaxSingleAnnual: 1237.70 * 26,
     homeownerAssetFreeArea: 499000,
     homeownerAssetFreeAreaSingle: 333000,
     assetTaperAnnualPerThousand: 78,
@@ -624,10 +688,10 @@
     incomeTaperSingle: 0.50,
     deemingThresholdCouple: 110600,
     deemingThresholdSingle: 66800,
-    deemingLowerRate: 0.0125,
-    deemingUpperRate: 0.0325,
-    cshcCoupleThreshold: 161768,
-    cshcSingleThreshold: 101105
+    deemingLowerRate: 0.0175,
+    deemingUpperRate: 0.0375,
+    cshcCoupleThreshold: 168076,
+    cshcSingleThreshold: 105048
   });
 
   // The Work Bonus offsets employment and self-employment income before the
@@ -674,13 +738,9 @@
     };
   }
 
-  // Every rate in this file is a frozen constant checked on a stated date. This
-  // is a single-file tool that can be opened years after it was saved, so the
-  // figures need to answer to the clock rather than be presented as timelessly
-  // current. Staleness is measured in scheduled indexation rounds crossed, not
-  // in elapsed months: Age Pension rates and thresholds re-index on 20 March
-  // and 20 September, and tax, Medicare and SAPTO parameters change on 1 July.
-  // Crossing one of those dates is what actually supersedes a figure.
+  // Frozen inputs need source-specific review dates. Crossing a scheduled date
+  // means review is due; it does not establish that a particular value changed.
+  // Each source below selects its own rounds; unscheduled policies have none.
   const INDEXATION_SCHEDULE = Object.freeze([
     Object.freeze({ month: 3, day: 20, label: 'Age Pension indexation' }),
     Object.freeze({ month: 7, day: 1, label: 'tax and Medicare parameters' }),
@@ -691,36 +751,39 @@
     const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value ?? ''));
     if (!match) return null;
     const time = Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
-    return Number.isFinite(time) ? time : null;
+    return Number.isFinite(time) && new Date(time).toISOString().slice(0, 10) === value ? time : null;
   }
 
   function datedRateSources() {
     const services = SERVICES_AUSTRALIA_2026;
     return [
-      { label: 'ATO resident tax rates', checkedDate: TAX_SOURCE.checkedDate },
-      { label: 'ATO SAPTO', checkedDate: SAPTO_RULES.checkedDate },
-      { label: 'ATO Medicare levy thresholds', checkedDate: MEDICARE_BASE.checkedDate },
+      { label: 'ATO resident tax rates', checkedDate: TAX_SOURCE.checkedDate, schedule: [INDEXATION_SCHEDULE[1]], url: TAX_SOURCE.url },
+      { label: 'ATO SAPTO', checkedDate: SAPTO_RULES.checkedDate, schedule: [INDEXATION_SCHEDULE[1]], url: SAPTO_RULES.sourceUrl },
+      { label: 'ATO Medicare levy thresholds', checkedDate: MEDICARE_BASE.checkedDate, schedule: [INDEXATION_SCHEDULE[1]], url: MEDICARE_BASE.sourceUrl },
       {
-        label: 'Services Australia Age Pension and CSHC',
-        checkedDate: services.checkedDate
+        label: 'Services Australia Age Pension rates',
+        checkedDate: services.checkedDate, schedule: [INDEXATION_SCHEDULE[0], INDEXATION_SCHEDULE[2]], url: services.pensionRatesUrl
       },
       {
-        label: 'Services Australia deeming',
-        checkedDate: services.deemingSource?.checkedDate
+        label: 'Services Australia Age Pension thresholds',
+        checkedDate: services.checkedDate, schedule: INDEXATION_SCHEDULE, url: services.assetsTestUrl
       },
-      { label: 'Services Australia Work Bonus', checkedDate: WORK_BONUS.checkedDate }
-    ].filter(entry => parseIsoDateUtc(entry.checkedDate) !== null);
+      { label: 'Services Australia CSHC', checkedDate: services.checkedDate, schedule: [INDEXATION_SCHEDULE[2]], url: services.cshcUrl },
+      { label: 'Services Australia deeming thresholds', checkedDate: services.deemingSource?.checkedDate, schedule: [INDEXATION_SCHEDULE[1]], url: services.deemingUrl },
+      { label: 'Services Australia deeming rates', checkedDate: services.deemingSource?.checkedDate, schedule: [], url: services.deemingUrl },
+      { label: 'Services Australia Work Bonus', checkedDate: WORK_BONUS.checkedDate, schedule: [], url: WORK_BONUS.sourceUrl }
+    ];
   }
 
   // Counts the scheduled indexation dates strictly after `fromTime` and at or
   // before `toTime`, so a run on an indexation day counts that day as passed.
-  function indexationRoundsBetween(fromTime, toTime) {
+  function indexationRoundsBetween(fromTime, toTime, schedule = INDEXATION_SCHEDULE) {
     if (!(toTime > fromTime)) return [];
     const crossed = [];
     const startYear = new Date(fromTime).getUTCFullYear();
     const endYear = new Date(toTime).getUTCFullYear();
     for (let year = startYear; year <= endYear; year += 1) {
-      for (const event of INDEXATION_SCHEDULE) {
+      for (const event of schedule) {
         const time = Date.UTC(year, event.month - 1, event.day);
         if (time > fromTime && time <= toTime) {
           crossed.push({ time, year, label: event.label });
@@ -731,23 +794,23 @@
   }
 
   // `today` is injectable so the advisory is testable without touching the clock.
-  function ratesStaleness(today = Date.now()) {
+  function ratesStaleness(today = Date.now(), sources = datedRateSources()) {
     const todayTime = typeof today === 'number'
       ? today
-      : (parseIsoDateUtc(today) ?? Date.parse(today));
-    const sources = datedRateSources();
-    if (!sources.length || !Number.isFinite(todayTime)) {
+      : parseIsoDateUtc(today);
+    if (!sources.length || !Number.isFinite(todayTime) || sources.some(entry =>
+      parseIsoDateUtc(entry.checkedDate) === null ||
+      !Array.isArray(entry.schedule))) {
       return { state: 'unknown', roundsPassed: 0, crossed: [], sources: [] };
     }
-    const withTimes = sources.map(entry => ({
-      ...entry, time: parseIsoDateUtc(entry.checkedDate)
-    }));
-    // The oldest checked date governs: the household is only as current as the
-    // least recently verified input feeding its result.
+    const withTimes = sources.map(entry => {
+      const time = parseIsoDateUtc(entry.checkedDate);
+      return { ...entry, time, crossed: indexationRoundsBetween(time, todayTime, entry.schedule) };
+    });
     const oldest = withTimes.reduce((worst, entry) =>
       entry.time < worst.time ? entry : worst, withTimes[0]);
-    const crossed = indexationRoundsBetween(oldest.time, todayTime);
-    const roundsPassed = crossed.length;
+    const crossed = withTimes.flatMap(entry => entry.crossed.map(event => ({ ...event, label: entry.label }))).sort((a, b) => a.time - b.time);
+    const roundsPassed = new Set(crossed.map(event => event.time)).size;
     const state = roundsPassed === 0 ? 'ok' : (roundsPassed === 1 ? 'warn' : 'bad');
     return {
       state,
@@ -756,8 +819,9 @@
       sources: withTimes,
       oldestLabel: oldest.label,
       oldestCheckedDate: oldest.checkedDate,
-      nextIndexation: indexationRoundsBetween(
-        todayTime, Date.UTC(new Date(todayTime).getUTCFullYear() + 2, 0, 1))[0] ?? null
+      nextIndexation: withTimes.flatMap(entry => indexationRoundsBetween(
+        Math.max(todayTime, entry.time), Date.UTC(new Date(todayTime).getUTCFullYear() + 2, 0, 1), entry.schedule
+      ).map(event => ({ ...event, label: entry.label }))).sort((a, b) => a.time - b.time)[0] ?? null
     };
   }
 
@@ -770,6 +834,45 @@
 
   function realReturnPct(nominalPct, inflationPct) {
     return Math.round((nominalPct - inflationPct) * 10) / 10;
+  }
+
+  function averageInflationPct(scenario, index = 0) {
+    const person = scenario.people[index] ?? scenario.people[0];
+    const count = Math.min(121, Math.max(1,
+      scenario.household.modelEndAge - person.age + 1));
+    return Array.from({ length: count }, (_, i) =>
+      inflationRateForYear(scenario.startYear + i, scenario.assumptions) * 100
+    ).reduce((sum, value) => sum + value, 0) / count;
+  }
+
+  function returnProfileNominalMidpoint(scenario, index = 0, kind = 'super') {
+    const midpoint = kind === 'super'
+      ? SUPER_RETURN_PROFILES[scenario.people[index]?.superReturnProfile ?? 'growth']?.midpoint
+      : kind === 'savings' ? SAVINGS_RETURN_REFERENCE.midpoint : null;
+    return midpoint == null ? null : Math.round((averageInflationPct(scenario, index) + midpoint) * 10) / 10;
+  }
+
+  function returnGuidance(nominalPct, scenario, kind = 'super', profileKey = null, personIndex = null) {
+    const index = Number.isInteger(personIndex) ? personIndex : isSingleHousehold(scenario) ? 0 : scenario.household.firstDeath.enabled
+      ? 1 - (scenario.household.firstDeath.deceasedPerson === 'p1' ? 1 : 0) : 0;
+    const person = scenario.people[index];
+    const count = Math.min(121, Math.max(1, scenario.household.modelEndAge - person.age + 1));
+    const inflation = Array.from({ length: count }, (_, i) => inflationRateForYear(scenario.startYear + i, scenario.assumptions) * 100);
+    const profile = SUPER_RETURN_PROFILES[profileKey ?? person.superReturnProfile ?? 'growth'];
+    const reference = kind === 'super' ? profile
+      : kind === 'savings' ? SAVINGS_RETURN_REFERENCE : null;
+    if (!reference || reference.midpoint == null) {
+      return { real: realReturnPct(nominalPct, inflation.reduce((sum, value) => sum + value, 0) / count), lower: null, upper: null, midpoint: null, outside: false, years: [], profile: profileKey ?? person.superReturnProfile ?? 'custom' };
+    }
+    const { lower, upper, midpoint } = reference;
+    const average = inflation.reduce((sum, value) => sum + value, 0) / count;
+    const real = realReturnPct(nominalPct, average);
+    const years = scenario.assumptions.inflationMode === 'treasury'
+      ? inflation.flatMap((value, i) => {
+        const annualReal = realReturnPct(nominalPct, value);
+        return annualReal < lower - 2 || annualReal > upper + 2 ? [scenario.startYear + i] : [];
+      }) : [];
+    return { real, lower, upper, midpoint, outside: real < lower || real > upper, years, profile: kind === 'super' ? (profileKey ?? person.superReturnProfile ?? 'growth') : 'savings' };
   }
 
   // Years outside the known range clamp to the nearest known schedule rather
@@ -1325,7 +1428,7 @@
 
   // Super held by a partner below Age Pension age is exempt from the means
   // test, while savings are always assessed. Because the top-up waterfall draws
-  // to Preferred and banks anything above Essential, drawing that exempt super
+  // to the spending target or liquid buffer, drawing that exempt super
   // converts an exempt asset into an assessed one. Splitting a super tier
   // evenly by weight ignores that, so an age-gap couple loses Age Pension for
   // no benefit: the same money is drawn and the same spending funded either way.
@@ -1388,6 +1491,7 @@
           salary: 85000,
           salaryGrowthPct: 0,
           sgPct: 12,
+          superReturnProfile: 'growth',
           accumulationReturnPct: 5.5,
           retirementReturnPct: 6.5,
           ukStateAnnualGbp: 0,
@@ -1406,6 +1510,7 @@
           salary: 45000,
           salaryGrowthPct: 0,
           sgPct: 12,
+          superReturnProfile: 'growth',
           accumulationReturnPct: 5.5,
           retirementReturnPct: 6.5,
           ukStateAnnualGbp: 0,
@@ -1418,8 +1523,8 @@
       savings: { amount: 60000, interestPct: 4.5, owner: 'p1' },
       shareholdings: [],
       lumpSumWithdrawals: [
-        { id: 'sample-lump-car', amount: 20000, reason: 'New car', month: 3, year: startYear + 3, source: 'automatic', enabled: true },
-        { id: 'sample-lump-holiday', amount: 50000, reason: 'European holiday', month: 6, year: startYear + 5, source: 'automatic', enabled: true }
+        { id: 'sample-lump-car', amount: 20000, reason: 'New car', month: 3, year: startYear + 3, source: 'automatic', enabled: true, deferrable: true },
+        { id: 'sample-lump-holiday', amount: 50000, reason: 'European holiday', month: 6, year: startYear + 5, source: 'automatic', enabled: true, deferrable: true }
       ],
       otherIncomes: [],
       otherAssets: [],
@@ -1427,6 +1532,8 @@
         type: 'couple',
         targetAfterTax: 80000,
         annualBudget: 70000,
+        badYearThresholdPct: 10,
+        badYearTopUp: 'skip',
         modelEndAge: 95,
         drawdownPriority: [
           [
@@ -1708,6 +1815,33 @@
       migrated.otherAssets = (migrated.otherAssets ?? []).map(asset => ({
         ...asset,
         owner: asset.owner ?? 'joint'
+      }));
+      current = migrated;
+    }
+    if (current.schemaVersion === 14) {
+      const migrated = structuredClone(current);
+      migrated.schemaVersion = 15;
+      migrated.spendingReview = {
+        previousPreferred: migrated.household.targetAfterTax,
+        previousEssential: migrated.household.annualBudget
+      };
+      migrated.household.targetAfterTax = migrated.household.annualBudget;
+      migrated.household.badYearThresholdPct = 10;
+      migrated.household.badYearTopUp = 'skip';
+      migrated.lumpSumWithdrawals = (migrated.lumpSumWithdrawals ?? []).map(item => ({ ...item, deferrable: item.deferrable ?? true }));
+      current = migrated;
+    }
+    if (current.schemaVersion === 15) {
+      const migrated = structuredClone(current);
+      migrated.schemaVersion = 16;
+      migrated.household = { ...migrated.household };
+      delete migrated.household.cashBufferYears;
+      migrated.people = (migrated.people ?? []).map(person => ({
+        ...person,
+        // Preserve existing nominal return assumptions; Growth supplies the
+        // initial comparison profile until the user selects another profile.
+        superReturnProfile: SUPER_RETURN_PROFILES[person.superReturnProfile]
+          ? person.superReturnProfile : 'growth'
       }));
       current = migrated;
     }
@@ -2153,6 +2287,10 @@
     throw new Error(`Invalid drawdown source: ${source}`);
   }
 
+  function creditSavings(state, amount) {
+    state.savings += amount;
+  }
+
   function setSourceBalance(state, source, value) {
     if (source === 'p0Super') {
       if (state.lifecycle?.deceasedIndex === 0) state.inheritedSuper.retire = value;
@@ -2165,7 +2303,10 @@
       return;
     }
     if (source === 'cash') { state.cash = value; return; }
-    if (source === 'savings') { state.savings = value; return; }
+    if (source === 'savings') {
+      state.savings = value;
+      return;
+    }
     throw new Error(`Invalid drawdown source: ${source}`);
   }
 
@@ -2201,7 +2342,7 @@
     const requested = Math.max(0, amount);
     const drawsBySource = { p0Super: 0, p1Super: 0, cash: 0, savings: 0 };
     const savingsDraw = Math.min(state.savings, requested);
-    state.savings -= savingsDraw;
+    setSourceBalance(state, 'savings', state.savings - savingsDraw);
     drawsBySource.savings = savingsDraw;
     const remaining = requested - savingsDraw;
     if (!(remaining > 0)) return { drawsBySource, funded: requested, unfunded: 0 };
@@ -2238,16 +2379,21 @@
       .map(([source]) => lumpSourceLabel(source, people)).join(' + ') || 'Unfunded';
   }
 
-  function lumpSumEventLabel(event, people) {
+  function lumpSumEventLabel(event, people, displayFactor = 1) {
+    const money = value => formatMoney(value * displayFactor);
     const funding = event.funded > 0.005
-      ? `${formatMoney(event.funded)} funded from ` +
-        sourceSummary(event.drawsBySource, people)
-      : `${formatMoney(0)} funded`;
+      ? `${money(event.funded)} funded from ` +
+        Object.entries(event.drawsBySource).filter(([, amount]) => amount > 0.005)
+          .map(([source, amount]) => `${lumpSourceLabel(source, people)} ${money(amount)}`).join(' + ')
+      : `${money(0)} funded`;
     const shortfall = event.unfunded > 0.005
-      ? `; ${formatMoney(event.unfunded)} unfunded`
+      ? `; ${money(event.unfunded)} unfunded`
       : '';
-    return `${event.reason} - requested ${formatMoney(event.requested)}; ` +
-      `${funding}${shortfall}`;
+    const requested = event.requestedSource ? `; selected source: ${event.requestedSourceLabel || lumpSourceLabel(event.requestedSource, people)}` : '';
+    const fallbackSources = event.requestedSource && event.requestedSource !== 'automatic'
+      ? Object.entries(event.drawsBySource).filter(([source, amount]) => amount > 0.005 && source !== event.requestedSource && !source.startsWith('named:')).map(([source]) => lumpSourceLabel(source, people)) : [];
+    const fallback = fallbackSources.length ? `; fallback: ${fallbackSources.join(' + ')}` : '';
+    return `${event.reason} - requested ${money(event.requested)}; ${funding}${shortfall}${requested}${fallback}`;
   }
 
   function liquidateNamedSource(state, source, amount, inflationFactor, saleMonth = 12) {
@@ -2315,7 +2461,7 @@
         saleKind: 'scheduled'
       });
       saleRecords.push(saleRecord);
-      state.savings += proceeds;
+      creditSavings(state, proceeds);
       holding.quantity = 0;
       holding.costBaseAud = 0;
       holding.sold = true;
@@ -2340,6 +2486,14 @@
     if (age < 90) return 0.09;
     if (age < 95) return 0.11;
     return 0.14;
+  }
+
+  function badYearAssessment(actual, planned, thresholdPct = 10) {
+    if (![actual, planned, thresholdPct].every(Number.isFinite) || actual < 0 || planned < 0 || thresholdPct < 0 || thresholdPct > 100) {
+      throw new Error('Bad-year comparison requires nonnegative assets and a threshold from 0 to 100%.');
+    }
+    const deficitPct = planned > 0 ? Math.max(0, (planned - actual) / planned * 100) : 0;
+    return { badYear: actual < planned * (1 - thresholdPct / 100), deficitPct };
   }
 
   function projectScenario(scenario) {
@@ -2404,6 +2558,31 @@
     return { rows, firstShortfall, lumpSumFunding };
   }
 
+  function takeMinimumDraws(scenario, state, ages) {
+    const draws = [0, 0];
+    if (!scenario.household.applyMinimumDrawdown) return draws;
+    scenario.people.forEach((person, index) => {
+      if (!state.lifecycle.alive[index]) return;
+      draws[index] = state.superRetire[index] * minDrawRate(ages[index]);
+      state.superRetire[index] = Math.max(0, state.superRetire[index] - draws[index]);
+    });
+    if (state.inheritedSuper.retire > 0 && state.inheritedSuper.ownerIndex !== null) {
+      const owner = state.inheritedSuper.ownerIndex;
+      const inherited = state.inheritedSuper.retire * minDrawRate(ages[owner]);
+      state.inheritedSuper.retire -= inherited;
+      draws[owner] += inherited;
+    }
+    return draws;
+  }
+
+  // Engine-only hook for a caller that maintains a stressed state and a
+  // deterministic 1 July reference balance. The UI does not generate shocks.
+  function projectStressYear(args, plannedLiquidAssets) {
+    const comparison = badYearAssessment((args.state.cash + args.state.savings) / args.inflationFactor,
+      plannedLiquidAssets, args.scenario.household.badYearThresholdPct);
+    return projectYear({ ...args, badYear: comparison.badYear });
+  }
+
   function projectYear({
     scenario,
     state,
@@ -2414,11 +2593,14 @@
     openingSavings,
     saleYearInterest,
     events,
-    lifecycle
+    lifecycle,
+    badYear = false
   }) {
     const salaries = [0, 0];
     const ukState = [0, 0];
     const drawdownPriority = effectiveDrawdownPriority(scenario);
+    const orderedTiers = orderSuperTiersByMeansTest(drawdownPriority, ages, scenario.household.includeAgePension !== false);
+    let mandatoryDraws = [0, 0];
 
     scenario.people.forEach((person, index) => {
       if (!state.lifecycle.alive[index]) return;
@@ -2497,7 +2679,7 @@
       if (asset.sold) return;
       asset.value *= 1 + (asset.growthPct || 0) / 100;
       if (year >= asset.disposalYear) {
-        state.savings += asset.value;
+        creditSavings(state, asset.value);
         events.push({
           type: 'asset-disposal',
           label: `${asset.label || 'Asset'} disposed`,
@@ -2512,8 +2694,14 @@
     const lumpSumDrawsNominal = { p0Super: 0, p1Super: 0, cash: 0, savings: 0 };
     let lumpSumTotalNominal = 0;
     let lumpSumFundingShortfallNominal = 0;
-    (scenario.lumpSumWithdrawals ?? []).filter(item => item.enabled !== false && item.year === year)
+    state.deferredLumps ??= {};
+    (scenario.lumpSumWithdrawals ?? []).filter(item => item.enabled !== false && (state.deferredLumps[item.id] ?? item.year) === year)
       .forEach(withdrawal => {
+        if (badYear && withdrawal.deferrable !== false) {
+          state.deferredLumps[withdrawal.id] = year + 1;
+          events.push({ type: 'lump-deferred', label: `${withdrawal.reason} deferred to ${year + 1} in a bad year` });
+          return;
+        }
         const requestedNominal = withdrawal.amount * inflationFactor;
         const named = liquidateNamedSource(
           state, withdrawal.source, requestedNominal, inflationFactor, withdrawal.month);
@@ -2545,7 +2733,8 @@
           reason: withdrawal.reason,
           month: withdrawal.month,
           requestedSource: withdrawal.source,
-          drawsBySource: actualDraws,
+          requestedSourceLabel: /^(share|asset):/.test(withdrawal.source) ? named.label : undefined,
+          drawsBySource: Object.fromEntries(Object.entries(actualDraws).map(([source, amount]) => [source, amount / inflationFactor])),
           requested,
           funded,
           unfunded,
@@ -2583,7 +2772,7 @@
     const netCapitalGainByPerson = capitalLedger.people.map(
       person => person.netCapitalGainNominal);
     const dividendFlows = shareDividendFlows(state);
-    state.savings += dividendFlows.cashTotal;
+    creditSavings(state, dividendFlows.cashTotal);
 
     // Other income: annual amounts, CPI-indexed. Taxable items follow their
     // selected owner; non-taxable items are added to household income after tax.
@@ -2620,7 +2809,7 @@
       openingSavings * state.interestPct.savings / 100 +
       saleYearInterest;
     state.cash += cashInterest;
-    state.savings += savingsInterest;
+    creditSavings(state, savingsInterest);
     const interestByPerson = [0, 0];
     const cashWeights = ownerWeights(state.ownership.cash);
     const savingsWeights = ownerWeights(state.ownership.savings);
@@ -2687,27 +2876,7 @@
     const agePensionByPersonNominal = agePension.byPerson.map(
       value => value * inflationFactor);
 
-    const mandatoryDraws = [0, 0];
-    if (scenario.household.applyMinimumDrawdown) {
-      scenario.people.forEach((person, index) => {
-        if (!state.lifecycle.alive[index]) return;
-        if (!(state.superRetire[index] > 0)) return;
-        mandatoryDraws[index] =
-          state.superRetire[index] * minDrawRate(ages[index]);
-        state.superRetire[index] = Math.max(
-          0,
-          state.superRetire[index] - mandatoryDraws[index]
-        );
-      });
-      if (state.inheritedSuper.retire > 0 &&
-          state.inheritedSuper.ownerIndex !== null) {
-        const ownerIndex = state.inheritedSuper.ownerIndex;
-        const inheritedDraw = state.inheritedSuper.retire *
-          minDrawRate(ages[ownerIndex]);
-        state.inheritedSuper.retire -= inheritedDraw;
-        mandatoryDraws[ownerIndex] += inheritedDraw;
-      }
-    }
+    mandatoryDraws = takeMinimumDraws(scenario, state, ages);
 
     const uppRate = scenario.assumptions.uppPct / 100;
     const baseTaxableNominal = [0, 1].map(index =>
@@ -2799,16 +2968,15 @@
     }
     const mandatoryTotal =
       mandatoryDraws.reduce((sum, value) => sum + value, 0);
-    const targetNominal = scenario.household.targetAfterTax * inflationFactor *
+    const preferredNominal = scenario.household.targetAfterTax * inflationFactor *
       lifecycle.preferredTargetPct / 100;
-    const budgetNominal =
+    const essentialNominal =
       (scenario.household.annualBudget ?? scenario.household.targetAfterTax) *
       inflationFactor * lifecycle.essentialTargetPct / 100;
-    // v0.96: top-ups anchor to Preferred Retirement Income in both modes. With minimum
-    // drawdown enforced, mandatory minimums are Priority 1 and the tiers fill any
-    // remaining gap to Preferred Retirement Income; spending stays capped at the
-    // Essential Annual Budget and the excess is banked. This lets preferred income
-    // act as the modelling lever while the essential budget reflects actual spending.
+    const targetNominal = badYear ? Math.min(preferredNominal, essentialNominal) : preferredNominal;
+    const budgetNominal = targetNominal;
+    // Preferred is normal spending; an explicitly stressed caller can select
+    // the Essential floor. Ordinary deterministic projections never invent shocks.
     const gap = Math.max(0, targetNominal - guaranteedNet - mandatoryTotal);
 
     // Spend already-assessed super before means-test-exempt super, so filling
@@ -2816,8 +2984,7 @@
     // into assessed savings for nothing (#28).
     const waterfall = drawFromTiers(
       state,
-      orderSuperTiersByMeansTest(
-        drawdownPriority, ages, scenario.household.includeAgePension !== false),
+      orderedTiers,
       gap
     );
     const extraSuperDraws = [waterfall.drawsBySource.p0Super, waterfall.drawsBySource.p1Super];
@@ -2836,9 +3003,9 @@
       guaranteedNet +
       superIncome.reduce((sum, value) => sum + value, 0) +
       potDraw;
-    // v0.96: spending equals the Essential Annual Budget; income above it is banked to savings.
+    // Only income above actual planned spending is banked.
     const surplusBanked = Math.max(0, totalIncomeNominal - budgetNominal);
-    state.savings += surplusBanked;
+    creditSavings(state, surplusBanked);
     const shortfallNominal = Math.max(0, budgetNominal - totalIncomeNominal);
 
     const unsoldShares = state.holdings.reduce(
@@ -2874,6 +3041,7 @@
       lifecycle: { ...lifecycle, alive: [...lifecycle.alive] },
       inflationFactor,
       salaryByPerson: salaries.map(value => value / inflationFactor),
+      interestByPerson: interestByPerson.map(value => value / inflationFactor),
       ukStateByPerson: ukState.map(value => value / inflationFactor),
       otherIncomeByPerson: [0, 1].map(index =>
         (otherTaxableByPerson[index] + otherNonTaxableByPerson[index]) /
@@ -2918,6 +3086,9 @@
       agePensionStatus: agePension.status,
       totalIncome: totalIncomeNominal / inflationFactor,
       target: targetNominal / inflationFactor,
+      preferred: preferredNominal / inflationFactor,
+      essential: essentialNominal / inflationFactor,
+      badYear,
       budget: budgetNominal / inflationFactor,
       banked: surplusBanked / inflationFactor,
       shortfall: shortfallNominal / inflationFactor,
@@ -3022,6 +3193,9 @@
     } else {
       scenario.people.forEach((person, index) => {
         if (isSingleHousehold(scenario) && index === 1) return;
+        if (!SUPER_RETURN_PROFILES[person.superReturnProfile ?? 'growth']) {
+          add(`people.${index}.superReturnProfile`, 'Choose Conservative, Balanced, Growth, All Growth, or Custom.');
+        }
         validatePerson(person, index, add);
       });
     }
@@ -3177,6 +3351,15 @@
     if (!(scenario.household?.annualBudget >= 0)) {
       add('household.annualBudget', 'Essential Annual Budget must be zero or greater.');
     }
+    if (scenario.household?.annualBudget > scenario.household?.targetAfterTax) {
+      add('household.annualBudget', 'Essential spending cannot exceed Preferred spending.');
+    }
+    if (!Number.isFinite(scenario.household?.badYearThresholdPct) || scenario.household.badYearThresholdPct < 0 || scenario.household.badYearThresholdPct > 100) {
+      add('household.badYearThresholdPct', 'Bad-year threshold must be from 0 to 100%.');
+    }
+    if (!['skip', 'halve'].includes(scenario.household?.badYearTopUp)) {
+      add('household.badYearTopUp', 'Bad-year top-up must be skip or halve.');
+    }
     const firstDeath = scenario.household?.firstDeath;
     const horizonIndex = isSingleHousehold(scenario)
       ? 0
@@ -3274,6 +3457,7 @@
     } else scenario.lumpSumWithdrawals.forEach((item, index) => {
       const base = `lumpSumWithdrawals.${index}`;
       if (item.enabled === false) return;
+      if (item.deferrable != null && typeof item.deferrable !== 'boolean') add(`${base}.deferrable`, 'Choose whether this withdrawal may be deferred.');
       if (!(Number.isFinite(item.amount) && item.amount > 0)) add(`${base}.amount`, 'Enter an amount greater than zero.');
       if (!String(item.reason ?? '').trim()) add(`${base}.reason`, 'Enter a reason.');
       if (!Number.isInteger(item.month) || item.month < 1 || item.month > 12) add(`${base}.month`, 'Choose a valid intended month.');
@@ -3304,11 +3488,11 @@
     return `${row.year} · ${ages.length === 1 ? 'age' : 'ages'} ${ages.join(' and ')}`;
   }
 
-  function chartTooltipLines(segment, row, scenario) {
+  function chartTooltipLines(segment, row, scenario, displayFactor = 1) {
     const context = outputAgeContext(row, scenario);
     if (segment.key === 'lumpSum') {
       const detail = row.events.filter(event => event.type === 'lump-sum')
-        .map(event => lumpSumEventLabel(event, scenario.people))
+        .map(event => lumpSumEventLabel(event, scenario.people, displayFactor))
         .join(' · ');
       return [context, detail];
     }
@@ -3334,6 +3518,13 @@
     lumpSourceLabel,
     sourceSummary,
     lumpSumEventLabel,
+    badYearAssessment,
+    returnGuidance,
+    averageInflationPct,
+    returnProfileNominalMidpoint,
+    SUPER_RETURN_PROFILES,
+    projectStressYear,
+    projectYear,
     chartTooltipLines,
     outputAgeContext,
     validateScenario,
@@ -3434,7 +3625,8 @@
   'use strict';
 
   const core = globalThis.RetirementSimulatorCore;
-  const STORAGE_KEY = 'family-retirement-simulator:v1.1.0:scenario';
+  const STORAGE_KEY = 'family-retirement-simulator:v1.1.1:scenario';
+  const TABLE_COLUMN_WIDTHS_KEY = 'family-retirement-simulator:table-column-widths';
   const THEME_STORAGE_KEY = 'retirement-simulator-theme';
   const SETTINGS_MODE_KEY = 'retirement-simulator:settings-mode';
   const SPENDING_PERIOD_KEY = 'retirement-simulator:spending-period';
@@ -3445,6 +3637,7 @@
   // Read-only fallbacks so scenarios saved under earlier versions carry over
   // on first load (they migrate to the current schema automatically).
   const LEGACY_STORAGE_KEYS = [
+    'family-retirement-simulator:v1.1.0:scenario',
     'family-retirement-simulator:v1.13:scenario',
     'family-retirement-simulator:v1.12:scenario',
     'family-retirement-simulator:v1.11:scenario',
@@ -3463,6 +3656,17 @@
   ];
   let currentScenario = null;
   let currentProjection = null;
+  let showCalculationLogs = false;
+  const dismissedStatusCards = new Set();
+  let tableColumnWidths = {};
+  try {
+    const savedWidths = JSON.parse(window.__safeStorage.getItem(TABLE_COLUMN_WIDTHS_KEY) || '{}');
+    if (savedWidths && typeof savedWidths === 'object' && !Array.isArray(savedWidths)) {
+      tableColumnWidths = Object.fromEntries(Object.entries(savedWidths)
+        .filter(([, width]) => Number.isFinite(Number(width)) && Number(width) >= 48 && Number(width) <= 900)
+        .map(([key, width]) => [key, Math.round(Number(width))]));
+    }
+  } catch { /* Ignore malformed saved layout preferences. */ }
   let pendingUiContext = null;
   let saveTimer = null;
   let view = 'income';
@@ -3858,12 +4062,22 @@
 
   function returnFields(person, index, assumptions) {
     const path = `people.${index}`;
+    const selectedProfile = person.superReturnProfile ?? 'growth';
+    const profileOptions = Object.entries(core.SUPER_RETURN_PROFILES).map(([value, profile]) =>
+      `<option value="${value}"${selectedProfile === value ? ' selected' : ''}>${escapeHtml(profile.label)}</option>`
+    ).join('');
     return `<fieldset>
       <legend>${escapeHtml(person.name)}</legend>
-      ${numberField('Accumulation return %', `${path}.accumulationReturnPct`, person.accumulationReturnPct, 'min="-20" max="30" step="0.1"')}
+      <label class="return-profile-label"><span class="k">Super risk profile</span>
+        <select class="return-profile" data-path="${path}.superReturnProfile">${profileOptions}</select>
+        <span class="sub">Changing the profile sets both suggested nominal returns to its midpoint. You can edit either value afterwards. <a href="https://github.com/dcaddick/retirement-simulator/issues/46" target="_blank" rel="noreferrer" aria-label="Issue 46: return profile objectives, evidence, and methods">Profile details &amp; evidence ↗</a></span>
+      </label>
+      ${numberField('Accumulation expected nominal return %', `${path}.accumulationReturnPct`, person.accumulationReturnPct, 'min="-20" max="30" step="0.1"')}
       ${returnReadout(person, index, 'accumulationReturnPct', assumptions)}
-      ${numberField('Retirement return %', `${path}.retirementReturnPct`, person.retirementReturnPct, 'min="-20" max="30" step="0.1"')}
+      ${returnContext(person.accumulationReturnPct, currentScenario, 'super', `people.${index}.accumulationReturnPct`)}
+      ${numberField('Retirement expected nominal return %', `${path}.retirementReturnPct`, person.retirementReturnPct, 'min="-20" max="30" step="0.1"')}
       ${returnReadout(person, index, 'retirementReturnPct', assumptions)}
+      ${returnContext(person.retirementReturnPct, currentScenario, 'super', `people.${index}.retirementReturnPct`)}
     </fieldset>`;
   }
 
@@ -3888,6 +4102,34 @@
         existing.replaceWith(wrapper.firstElementChild);
       });
     });
+    document.querySelectorAll('[data-return-context]').forEach(element => {
+      const path = element.dataset.returnContext;
+      const value = path.split('.').reduce((object, key) => object?.[key], currentScenario);
+      const wrapper = document.createElement('div');
+      wrapper.innerHTML = returnContext(value, currentScenario,
+        path.startsWith('people.') ? 'super' : path.startsWith('savings.') ? 'savings' : 'cash', path);
+      element.replaceWith(wrapper.firstElementChild);
+    });
+  }
+
+  function returnContext(value, scenario, kind, path) {
+    if (kind === 'cash') return '';
+    const profileKey = kind === 'super'
+      ? scenario.people[Number(path.split('.')[1])]?.superReturnProfile ?? 'growth'
+      : null;
+    const guide = core.returnGuidance(value, scenario, kind, profileKey,
+      kind === 'super' ? Number(path.split('.')[1]) : null);
+    const active = guide.outside || guide.years.length > 0;
+    if (!active) return `<div class="return-context" data-return-context="${escapeHtml(path)}" aria-live="polite"></div>`;
+    const reference = kind === 'super' ? core.SUPER_RETURN_PROFILES[profileKey].label : 'Savings deposit';
+    const years = guide.years.length ? ` Treasury years outside the extended band: ${guide.years.join(', ')}.` : '';
+    const resetLabel = kind === 'super' ? 'Use profile midpoint' : 'Use savings midpoint';
+    const accessible = `${reference} assumption ${guide.real.toFixed(1)}% real is outside its ${guide.lower} to ${guide.upper}% real reference.${years} See issue 46 for objectives, history, and methodology.`;
+    return `<div class="return-context" data-return-context="${escapeHtml(path)}" aria-live="polite">
+      <span class="return-warning" role="status">${guide.real.toFixed(1)}% real · OUT OF BAND</span>
+      <a class="return-info" href="https://github.com/dcaddick/retirement-simulator/issues/46" target="_blank" rel="noreferrer" title="${escapeHtml(accessible)}" aria-label="${escapeHtml(accessible)}">i</a>
+      <button type="button" class="return-reset" data-return-midpoint="${escapeHtml(path)}">${resetLabel}</button>
+    </div>`;
   }
 
   function renderCashAndSavings(scenario) {
@@ -3903,6 +4145,7 @@
         <legend>Savings Pot (Term Deposits, etc..)</legend>
         ${moneyField('Amount', 'savings.amount', scenario.savings.amount)}
         ${numberField('Interest rate %', 'savings.interestPct', scenario.savings.interestPct, 'min="0" max="30" step="0.1"')}
+        ${returnContext(scenario.savings.interestPct, scenario, 'savings', 'savings.interestPct')}
         ${ownerField('Owner', 'savings.owner', scenario.savings.owner, scenario)}
       </fieldset>`;
     $('#cashSavingsFields').innerHTML = cash || savings
@@ -3958,10 +4201,10 @@
       ? 1 - (scenario.household.firstDeath.deceasedPerson === 'p1' ? 1 : 0) : 0;
     const horizonYear = scenario.startYear + scenario.household.modelEndAge -
       scenario.people[horizonIndex].age;
-    const latestFirst = (scenario.lumpSumWithdrawals ?? [])
+    const chronological = (scenario.lumpSumWithdrawals ?? [])
       .map((item, index) => ({ item, index }))
-      .sort((a, b) => b.item.year - a.item.year || a.index - b.index);
-    $('#lumpSumList').innerHTML = latestFirst.map(({ item, index }) => {
+      .sort((a, b) => a.item.year - b.item.year || a.item.month - b.item.month || a.index - b.index);
+    $('#lumpSumList').innerHTML = chronological.map(({ item, index }) => {
       const expanded = expandedLumpIds.has(item.id) || !lumpIsComplete(item);
       const editorId = `lump-editor-${item.id}`;
       const accessibleReason = item.reason || 'lump sum';
@@ -3982,6 +4225,7 @@
           <label><span class="k">Fund from</span><select data-path="lumpSumWithdrawals.${index}.source">${lumpSourceOptions(item.source, scenario)}</select></label>
           </div>
           <div class="lump-footer">
+            <label><input type="checkbox" data-path="lumpSumWithdrawals.${index}.deferrable"${item.deferrable !== false ? ' checked' : ''}><span class="k">May defer in a bad year (stress callers only)</span></label>
             <label><input type="checkbox" data-path="lumpSumWithdrawals.${index}.enabled"${item.enabled !== false ? ' checked' : ''}><span class="k">Include &amp; calculate on chart</span></label>
             <button type="button" class="remove-lump-sum" data-index="${index}">Remove</button>
           </div>
@@ -4288,6 +4532,12 @@
       ${single ? `<p class="sub" id="singleExcludedNotice">${excludedCount} Person 2-owned ${excludedCount === 1 ? 'item is' : 'items are'} hidden and excluded from every calculation. Joint 50/50 entries contribute only Person 1’s 50% share. Switching back to Couple restores the saved Person 2 data.</p>` : ''}
       ${moneyField('Preferred Retirement Income', 'household.targetAfterTax', household.targetAfterTax)}
       ${moneyField('Essential Annual Budget', 'household.annualBudget', household.annualBudget)}
+      <ul class="sub">
+        <li>Preferred is normal spending.</li>
+        <li>Essential is the bad-year floor.</li>
+        <li>(Not calculated - suggested prudent guidance of 20% buffer only)</li>
+      </ul>
+      <p class="sub"><strong>Suggested Strategy:</strong> Every 6 or 12 months, review current spending for the next two years plus anticipated lump sums, then top up the Savings Pot from super to hold as a term deposit or cash. This is guidance only; it is not included in projection calculations, table values or charts.</p>
       ${numberField(horizonLabel, 'household.modelEndAge', household.modelEndAge, 'min="65" max="120"')}
       <label><span class="k">Apply ABP minimum drawdown</span>
         <input type="checkbox" data-path="household.applyMinimumDrawdown"${household.applyMinimumDrawdown ? ' checked' : ''}>
@@ -4493,9 +4743,12 @@
   }
 
   function statusCard(className, label, value) {
+    const dismissalKey = JSON.stringify([className, label, value]);
+    if (dismissedStatusCards.has(dismissalKey)) return '';
     return `<div class="flag ${className}">
       <strong>${escapeHtml(label)}</strong>
       <span>${escapeHtml(value)}</span>
+      <button type="button" class="flag-dismiss" data-dismiss-status="${escapeHtml(dismissalKey)}" aria-label="Dismiss ${escapeHtml(label)}" title="Dismiss this message">×</button>
     </div>`;
   }
 
@@ -4504,15 +4757,15 @@
   // check the sources themselves against that date.
   function ratesStalenessCard() {
     const staleness = core.ratesStaleness();
-    if (staleness.state === 'unknown') return '';
-    const checked = staleness.oldestCheckedDate;
+    if (staleness.state === 'unknown') return statusCard('warn', 'Rates currency unknown', 'A source date could not be checked. Review the linked sources.');
     if (staleness.roundsPassed === 0) {
       const next = staleness.nextIndexation;
       return statusCard(
         'ok',
         'Rates currency',
-        `Verified ${checked}. No scheduled indexation has passed since then` +
-          (next ? `; next is ${next.label} on ${isoFromTime(next.time)}.` : '.')
+        'No scheduled review is overdue for the dated source groups.' +
+          (next ? ` Next: ${next.label} on ${isoFromTime(next.time)}.` : '') +
+          ' Deeming rates and Work Bonus have no routine review date; policy changes remain possible. See the linked sources below.'
       );
     }
     const rounds = staleness.roundsPassed === 1
@@ -4524,8 +4777,8 @@
     return statusCard(
       staleness.state,
       'Rates may be out of date',
-      `Oldest input verified ${checked} (${staleness.oldestLabel}); ` +
-        `${rounds} passed since. ${tail}`
+      `${staleness.crossed[0].label}: review due ${isoFromTime(staleness.crossed[0].time)}; ` +
+        `${rounds} passed. ${tail}`
     );
   }
 
@@ -4643,7 +4896,6 @@
     hideChartTooltip();
     drawAxes(ctx, width, height, maximum, pads);
     const incomeSegments = buildIncomeSegments(scenario);
-
     rows.forEach((row, rowIndex) => {
       const barX = pads.left + rowIndex * step + (step - barWidth) / 2;
       const factor = displayFactor(row);
@@ -4682,6 +4934,16 @@
         chartState.segments.push({ x: barX, y: blockTop, width: barWidth,
           height: blockHeight, rowIndex, year: row.year, ages: row.ages,
           key: 'lumpSum', label: 'Lump sum withdrawal', value: lumpValue, displayFactor: factor });
+      }
+      if (row.events.some(event => event.type === 'lump-sum')) {
+        const markerY = pads.top + 3;
+        ctx.fillStyle = '#F0C571';
+        ctx.beginPath();
+        ctx.arc(barX + barWidth / 2, markerY, 3, 0, Math.PI * 2);
+        ctx.fill();
+        chartState.segments.push({ x: barX, y: markerY - 5, width: barWidth,
+          height: 10, rowIndex, year: row.year, ages: row.ages,
+          key: 'lumpSum', label: 'Lump-sum funding event', value: lumpValue, displayFactor: factor });
       }
       const displayAge = row.ages.find(age => age !== null);
       if (displayAge % 5 === 0) {
@@ -4722,8 +4984,8 @@
     ctx.textBaseline = 'bottom';
     ctx.fillText('Preferred', width - pads.right, targetEndY - 3);
 
-    drawReferenceLine(row => row.budget, BUDGET_COLOUR, [2, 3]);
-    const budgetStartY = y(rows[0].budget * displayFactor(rows[0]));
+    drawReferenceLine(row => row.essential, BUDGET_COLOUR, [2, 3]);
+    const budgetStartY = y(rows[0].essential * displayFactor(rows[0]));
     ctx.fillStyle = BUDGET_COLOUR;
     ctx.textAlign = 'left';
     ctx.textBaseline = 'bottom';
@@ -4823,7 +5085,7 @@
 
   function showChartTooltip(segment, row, point) {
     const tooltip = $('#chartTooltip');
-    const lines = core.chartTooltipLines(segment, row, currentScenario);
+    const lines = core.chartTooltipLines(segment, row, currentScenario, displayFactor(row));
     tooltip.innerHTML = lines.map(line => `<span>${escapeHtml(line)}</span>`).join('');
     tooltip.style.left = `${Math.min(point.x + 12, Math.max(8, chart.clientWidth - 260))}px`;
     tooltip.style.top = `${Math.max(8, point.y + 12)}px`;
@@ -4961,7 +5223,8 @@
       'After tax',
       'Banked',
       'Event',
-      '+/-'
+      '+/-',
+      ...(showCalculationLogs ? ['Calculation log'] : [])
     ];
     const body = rows.map(row => {
       // Row values are in today's dollars; multiply back by the year's
@@ -4971,7 +5234,10 @@
       const taxDisplay = row.tax < -0.005
         ? `Estimated tax refund ${money(-row.tax)}`
         : money(row.tax);
-      const eventText = row.events.map(event => event.label).join('; ');
+      const visibleEvents = row.events.filter(event => event.type !== 'capital-loss' ||
+        event.currentLoss > 0.005 || event.applied > 0.005);
+      const eventText = visibleEvents.map(event => event.type === 'lump-sum'
+        ? core.lumpSumEventLabel(event, people, factor) : event.label).join('; ');
       const minDraw = personIndexes.reduce((sum, index) => sum + row.minDraws[index], 0);
       const topUpDraw = personIndexes.reduce((sum, index) => sum + row.topUpDraws[index], 0);
       const rateLabels = personIndexes.map(index => row.minRates[index])
@@ -4980,7 +5246,12 @@
       const minDrawCell = minDraw > 0.5
         ? `${money(minDraw)} (${rateLabels.join(' / ')})`
         : '-';
-      return `<tr class="${row.shortfall > 1 ? 'short' : ''}${row.events.length ? ' event' : ''}">
+      const logParts = [];
+      row.events.filter(event => event.type === 'capital-loss').forEach(event => {
+        logParts.push(`${event.person} capital losses: opening ${money(event.openingLoss)}, realised this year ${money(event.currentLoss)}, applied to gains ${money(event.applied)}, closing carry-forward ${money(event.closingLoss)}.`);
+      });
+      const calculationLog = logParts.join(' ');
+      return `<tr class="${row.shortfall > 1 ? 'short' : ''}${visibleEvents.length ? ' event' : ''}">
         <td>${row.year}</td>
         ${personIndexes.map(index => `<td>${ageText(row.ages[index])}</td>`).join('')}
         <td>${money(row.totalAssets)}</td>
@@ -5004,11 +5275,12 @@
         <td>${row.shortfall > 1
           ? `-${money(row.shortfall)}`
           : 'ok'}</td>
+        ${showCalculationLogs ? `<td class="event-cell calculation-log">${escapeHtml(calculationLog || '—')}</td>` : ''}
       </tr>`;
     }).join('');
     $('#tbl').innerHTML =
       `<thead><tr>${headings.map(heading =>
-        `<th${heading === 'Event' ? ' class="event-cell"' : ''}>${escapeHtml(heading)}</th>`).join('')}</tr></thead><tbody>${body}</tbody>`;
+        `<th${['Event', 'Calculation log'].includes(heading) ? ' class="event-cell"' : ''}>${escapeHtml(heading)}</th>`).join('')}</tr></thead><tbody>${body}</tbody>`;
     $('#tableDollarsNote').textContent = nominal
       ? 'Table values in nominal (future) dollars. ABP min is taken from the post-growth balance, so the rate applies to a larger base than the prior-year balance shown.'
       : 'Table values in today’s (2026) dollars. ABP min is taken from the post-growth nominal balance, so the amount shown here is that draw deflated to 2026 dollars.';
@@ -5178,8 +5450,8 @@
         '4% under 65, 5% at 65-74, 6% at 75-79, 7% at 80-84, 9% at 85-89, 11% at 90-94, 14% at 95+, ' +
         'applied to the post-growth balance each year',
       `Preferred Retirement Income $${Math.round(scenario.household.targetAfterTax).toLocaleString()} ` +
-        `(draw target), Essential Annual Budget $${Math.round(scenario.household.annualBudget ?? scenario.household.targetAfterTax).toLocaleString()} ` +
-        '(spending cap); income above the Essential Annual Budget is banked to savings',
+        `(normal spending), Essential Annual Budget $${Math.round(scenario.household.annualBudget ?? scenario.household.targetAfterTax).toLocaleString()} ` +
+        '(bad-year floor); only income above the active spending target is banked to savings. The ordinary deterministic run does not generate bad years',
       assumptions.ukPensionsEnabled !== false
         ? `GBP to AUD ${assumptions.gbpAud} fixed for all years; UK State Pension indexation per person ` +
           `(frozen = fixed nominal GBP, so real value falls with inflation); UPP deduction ${assumptions.uppPct}% for tax`
@@ -5240,6 +5512,18 @@
   function renderScenario(scenario) {
     pendingUiContext = captureUiContext();
     currentScenario = structuredClone(scenario);
+    const review = currentScenario.spendingReview;
+    const notice = $('#spendingReview');
+    notice.hidden = !review;
+    notice.innerHTML = review ? `Review spending: your previous Preferred was ${escapeHtml(core.formatMoney(review.previousPreferred))} and Essential was ${escapeHtml(core.formatMoney(review.previousEssential))}. Both now start at the previous Essential amount; the saved cash buffer strategy is not modelled. Preferred now means normal spending and Essential is the bad-year floor. Review them in Advanced. <button type="button" id="dismissSpendingReview">Dismiss</button>` : '';
+    if (review) $('#dismissSpendingReview').onclick = () => {
+      delete currentScenario.spendingReview;
+      if (saveScenario(currentScenario)) notice.hidden = true;
+      else {
+        currentScenario.spendingReview = review;
+        showScenarioMessage('Correct the highlighted inputs before dismissing this review.', 'error');
+      }
+    };
     $('#scenarioName').value = currentScenario.scenarioName;
     renderScenarioBasics(currentScenario);
     renderReturnAssumptions(currentScenario);
@@ -5293,7 +5577,7 @@
     return { ...scenario, lumpSumWithdrawals: [...(scenario.lumpSumWithdrawals ?? []), {
       id: globalThis.crypto?.randomUUID?.() ?? `lump-${Date.now()}`,
       amount: 0, reason: '', month: scenario.startYear === now.getFullYear() ? now.getMonth() + 1 : 1,
-      year: scenario.startYear, source: 'automatic', enabled: true
+      year: scenario.startYear, source: 'automatic', enabled: true, deferrable: true
     }] };
   }
 
@@ -5554,6 +5838,22 @@
 
   $('#controls').addEventListener('change', event => {
     if (event.target.matches('.holding-csv')) return;
+    if (event.target.matches('.return-profile')) {
+      const path = event.target.dataset.path;
+      const index = Number(path.split('.')[1]);
+      const profile = event.target.value;
+      currentScenario = setPathImmutable(currentScenario, path, profile);
+      const suggested = core.returnProfileNominalMidpoint(currentScenario, index);
+      if (suggested != null) {
+        currentScenario = setPathImmutable(currentScenario,
+          `people.${index}.accumulationReturnPct`, suggested);
+        currentScenario = setPathImmutable(currentScenario,
+          `people.${index}.retirementReturnPct`, suggested);
+      }
+      scheduleSave(currentScenario);
+      renderScenario(currentScenario);
+      return;
+    }
     if (event.target.dataset.path?.endsWith('.enabled')) {
       const item = event.target.closest('.lump-item');
       item?.classList.toggle('disabled', !event.target.checked);
@@ -5682,6 +5982,20 @@
   });
 
   $('#controls').addEventListener('click', async event => {
+    const midpointButton = event.target.closest('[data-return-midpoint]');
+    if (midpointButton) {
+      const path = midpointButton.dataset.returnMidpoint;
+      const isSuper = path.startsWith('people.');
+      const index = isSuper ? Number(path.split('.')[1]) : 0;
+      const midpoint = core.returnProfileNominalMidpoint(
+        currentScenario, index, isSuper ? 'super' : 'savings');
+      if (midpoint != null) {
+        currentScenario = setPathImmutable(currentScenario, path, midpoint);
+        scheduleSave(currentScenario);
+        renderScenario(currentScenario);
+      }
+      return;
+    }
     const chevron = event.target.closest('.lump-chevron');
     if (chevron) {
       const id = chevron.dataset.lumpId;
@@ -5894,6 +6208,20 @@
     } catch (error) {
       showScenarioMessage(`CSV export failed: ${error.message}`, 'error');
     }
+  });
+
+  $('#showCalculationLogs').addEventListener('change', event => {
+    showCalculationLogs = event.target.checked;
+    if (currentProjection) {
+      renderProjectionTable(currentProjection.rows, currentScenario.people, currentScenario);
+    }
+  });
+
+  $('#flags').addEventListener('click', event => {
+    const dismiss = event.target.closest('[data-dismiss-status]');
+    if (!dismiss) return;
+    dismissedStatusCards.add(dismiss.dataset.dismissStatus);
+    dismiss.closest('.flag')?.remove();
   });
 
   $('#themeToggle').addEventListener('click', () => {

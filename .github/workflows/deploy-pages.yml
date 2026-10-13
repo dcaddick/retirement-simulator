@@ -26,6 +26,8 @@ jobs:
           node-version: 20
       - name: Run deterministic regression suite
         run: node tests/retirement-simulator.test.mjs
+      - name: Run deterministic v1.1.1 invariants
+        run: node tests/v1.1.1.test.mjs
       - name: Build controlled Pages artifact
         shell: bash
         run: |

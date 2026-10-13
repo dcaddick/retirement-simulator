@@ -15,7 +15,7 @@ These tests are regression evidence for this personal prototype, not professiona
 
 The Monte Carlo v0.7 suite checks imported-scenario handling, matching age-gap and survivor Age Pension treatment, person-level tax allocation, the same fixed first-death event in every Monte Carlo path, deterministic parity under zero volatility, reproducibility, risk-mode behaviour, deterministic stress overrides and invariants that keep stress results outside the stochastic probability denominator. The suite also verifies that age 59 is rejected with the approved explanation and age 60 is accepted. It also covers schema-4 to schema-5 migration and zero-volatility salary-growth parity while confirming the remaining import guards stay active. It also covers Other-income ownership, tax, Age Pension, household-funding and survivor parity under zero volatility, plus seeded stochastic invariants. Defined Benefit and UK State Pension parity tests cover UPP tax treatment, indexation, start-age boundaries and survivor continuation.
 
-The repository workflow at `.github/workflows/test.yml` runs both commands with Node 20 for pull requests and pushes to `main`.
+The repository workflow at `.github/workflows/test.yml` runs all three commands with Node 20 for pull requests and pushes to `main`.
 
 ## Archived release comparison
 
@@ -29,7 +29,7 @@ archive/retirement-simulator-v1.0.6.html
 archive/retirement-simulator-v1.0.9.html
 ```
 
-For the lump-sum regression, use fictional demo values, disable **Include Aged Pension estimate**, add a withdrawal and confirm no script-error banner appears. CI verifies each archived file against its release-tag Git blob.
+For the lump-sum regression, use fictional demo values, disable **Include Aged Pension estimate**, add a withdrawal and confirm no script-error banner appears. CI verifies the explicitly listed archived baselines against their recorded Git blobs. The v1.1.0-labelled archive is the outgoing checkout including the later layout fix; its recorded checkout hash is verified locally, while release-tag comparison remains pending.
 
 ## Browser verification
 
@@ -52,7 +52,7 @@ Automated tests do not replace a real-browser pass. For user-interface changes, 
 - JSON import and export;
 - visible-table CSV export in both today's-dollar and nominal display modes;
 - local-storage reset and new-scenario behaviour;
-- transfer of a simulator export into the experimental Monte Carlo report.
+- confirmation that the parked Monte Carlo report rejects schema-15 exports; compatibility checks use its frozen schema-14 baseline.
 - light and dark themes, including persistence after reload;
 - Treasury/manual inflation changes and both real-return readouts;
 - manual share pricing and explicitly selected US Stooq lookup;
@@ -124,3 +124,13 @@ Before committing or opening a pull request, scan changed files for:
 - screenshots containing personal information.
 
 Use fictional examples in all public tests and documentation.
+
+## v1.1.1 release verification
+
+The deterministic regression suite is `node tests/retirement-simulator.test.mjs`; focused release invariants are `node tests/v1.1.1.test.mjs`. The latter covers schema migration, the non-modeled Cash + Savings guidance, lump-sum display amounts and source breakdown, and return guidance.
+
+With Playwright available, run `node tests/v1.1.1.browser.cjs` for migration, notice persistence/dismissal, strategy guidance, display/CSV, view parity, live return context and responsive layout. The file-picker writer is mocked to capture export contents; this verifies serialization, not an actual operating-system save. Screenshots use fictional inputs and are stored under ignored `output/v1.1.1/`.
+
+The older `node tests/simple-settings.browser.cjs` attempts a real browser download. Its download step reports `download.path: canceled` in this host session, reproduced on both the untouched outgoing archive and current source; do not count that suite as passing. A real iPad Safari pass was not performed. GitHub Pages deploys when the release is merged to `main`.
+
+Local deterministic verification on 13 October 2026: 469 regression checks passed and the focused v1.1.1 invariant suite passed. `node --check tests/v1.1.1.browser.cjs` and `git diff --check` passed. The Node 20 GitHub Actions workflow has not yet run for this release branch.

@@ -2,7 +2,7 @@
 
 ### [Download the simulator](https://github.com/dcaddick/retirement-simulator/releases/latest/download/retirement-simulator.html) · [Open it in your browser](https://dcaddick.github.io/retirement-simulator/)
 
-![Retirement Income Simulator v1.1.0 showing the Simple starting view and projection beside it](docs/assets/retirement-simulator-v1.1.0.png)
+![Retirement Income Simulator showing the Simple starting view and projection beside it](docs/assets/retirement-simulator-v1.1.0.png)
 
 *The simulator opens with a simple starting view. Advanced settings are available when you want them. Results are estimates, not financial advice.*
 
@@ -87,6 +87,8 @@ If you want your own accountant, registered tax agent or financial adviser to ex
 
 ## Experimental Monte Carlo companion
 
+**Development is permanently parked for now.** The v1.1.1 release targets the deterministic simulator; it does not resume Monte Carlo feature, import or parity work.
+
 The Monte Carlo report is deliberately labelled **experimental**. It can help compare how an imported scenario behaves under different synthetic return sequences, risk modes, glide paths and deterministic stress cases.
 
 It does **not** calculate a dependable personal probability of retirement success. Its output depends on user-selected assumptions and a simplified stochastic model. Inflation, tax law, policy, employment, health, aged care, property, foreign exchange and longevity are not all stochastic.
@@ -134,3 +136,9 @@ Issues, feature requests, forks and pull requests are welcome. Modelling changes
 ## Licence
 
 Licensed under the [Apache License 2.0](LICENSE). The software is provided on an "AS IS" basis, without warranties or conditions of any kind.
+
+### Version 1.1.1
+
+Preferred means normal spending, and Essential is the bad-year floor. The ordinary deterministic projection follows Preferred; it does not create bad years. When an older scenario is migrated, both spending values start at the previous Essential amount and a notice asks you to review the change.
+
+Advanced settings describe a suggested manual strategy: every six or twelve months, review the next two years of spending and anticipated lump sums, then top up Savings from super if desired. This is guidance only and is not calculated in projections, tables or charts. Lump-sum events now show requested, funded and unfunded amounts and their actual funding sources. Broad super risk profiles update suggested returns while leaving them editable; linked evidence explains the reference ranges.

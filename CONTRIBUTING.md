@@ -35,6 +35,10 @@ Changes to tax, pension, superannuation or retirement rules should include:
 
 Do not present estimates as regulated advice or claim precision the model does not provide.
 
+### Date-sensitive assumptions
+
+Whenever a code change touches a rate, threshold, date-sensitive policy rule or its source metadata, check the current authoritative source before changing the code. Record the source URL, effective date, page-updated date (when available) and the date checked; update the in-app provenance and `docs/independent-review/source-register.csv` together. If the source has not changed, still record that it was reviewed and when. For a change that does not touch date-sensitive assumptions, mark the source-review item as not applicable in the pull request rather than doing an unrelated rates lookup.
+
 ## Pull requests
 
 Keep changes focused and reviewable. Before opening a pull request:
@@ -45,6 +49,8 @@ Keep changes focused and reviewable. Before opening a pull request:
 4. Run a privacy scan over the changed files.
 5. Update documentation and the changelog when behaviour changes.
 6. Before replacing the deterministic production build, preserve the outgoing sanitized `retirement-simulator.html` under `archive/retirement-simulator-vX.Y.Z.html`, verify it against its tag or release asset, and update `archive/README.md`. Never archive personal scenarios or screenshots.
+
+Complete the repository pull-request template, including the date-sensitive source review or its not-applicable reason. A source review does not by itself establish that the simulator's full entitlement calculations have been independently validated.
 
 GitHub Actions runs both `.mjs` suites for pull requests and pushes to `main`. A contribution is not ready to merge while that workflow is failing, even if the change appears unrelated to the model.
 

@@ -1,0 +1,123 @@
+const { chromium } = require('playwright');
+const assert = require('node:assert/strict');
+const fs = require('node:fs/promises');
+const path = require('node:path');
+const { pathToFileURL } = require('node:url');
+
+(async () => {
+  const browser = await chromium.launch({ channel: process.env.BROWSER_CHANNEL || 'chrome', headless: true });
+  const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
+  // Exercise the app's file-picker writer without depending on the host's
+  // download policy. The existing browser suite covers real downloads separately.
+  await context.addInitScript(() => {
+    const createObjectURL = URL.createObjectURL.bind(URL);
+    URL.createObjectURL = blob => { window.__exportBlob = blob; return createObjectURL(blob); };
+    window.showSaveFilePicker = async options => ({ createWritable: async () => ({
+      write: async text => { window.__savedFile = { name: options.suggestedName, text }; }, close: async () => {}
+    }) });
+  });
+  const page = await context.newPage();
+  const errors = [];
+  page.on('pageerror', error => errors.push(error.message));
+  const key = 'family-retirement-simulator:v1.1.1:scenario';
+  const output = path.resolve('output/v1.1.1');
+  await fs.mkdir(output, { recursive: true });
+  const settle = () => page.waitForTimeout(650);
+  try {
+    await page.goto(pathToFileURL(path.resolve('retirement-simulator.html')).href);
+    const initialFlags = page.locator('#flags .flag');
+    assert.ok(await initialFlags.count() > 0);
+    assert.equal(await page.locator('#flags .flag-dismiss').count(), await initialFlags.count());
+    await initialFlags.first().locator('.flag-dismiss').click();
+    assert.equal(await initialFlags.count(), 0);
+    await page.reload();
+    await settle();
+    assert.ok(await page.locator('#flags .flag').count() > 0);
+    const legacy = await page.evaluate(() => {
+      const scenario = RetirementSimulatorCore.makeSampleScenario();
+      scenario.schemaVersion = 14;
+      scenario.scenarioName = 'Fictional migration test';
+      scenario.household.targetAfterTax = 90000;
+      scenario.household.annualBudget = 60000;
+      return scenario;
+    });
+    await page.locator('#scenarioFile').setInputFiles({ name: 'fictional-schema14.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(legacy)) });
+    await settle();
+    assert.match(await page.locator('#spendingReview').innerText(), /\$90,000.*\$60,000/);
+    let saved = await page.evaluate(key => JSON.parse(localStorage.getItem(key)), key);
+    assert.equal(saved.schemaVersion, 16);
+    assert.equal(saved.household.cashBufferYears, undefined);
+    assert.equal(saved.household.targetAfterTax, 60000);
+    await page.reload();
+    await settle();
+    assert.equal(await page.locator('#spendingReview').isVisible(), true);
+    await page.locator('#dismissSpendingReview').click();
+    await page.reload();
+    await settle();
+    assert.equal(await page.locator('#spendingReview').isVisible(), false);
+    await page.locator('#advancedMode').click();
+    const section = page.locator('#scenarioSection');
+    if (!(await section.evaluate(node => node.open))) await section.locator('summary').first().click();
+    assert.match(await section.innerText(), /Not calculated - suggested prudent guidance of 20% buffer only/);
+    assert.match(await section.innerText(), /Suggested Strategy: Every 6 or 12 months, review current spending for the next two years/);
+    assert.equal(await section.getByText('Bad-year threshold % (stress callers only)').count(), 0);
+    assert.equal(await page.locator('[data-path="household.cashBufferYears"]').count(), 0);
+    assert.equal(await page.locator('#projectionError').isVisible(), false);
+    assert.equal(await page.locator('#showCalculationLogs').isChecked(), false);
+    assert.doesNotMatch(await page.locator('#tbl thead').innerText(), /Calculation log/);
+    await page.locator('#showCalculationLogs').check();
+    assert.match(await page.locator('#tbl thead').innerText(), /Calculation log/);
+    assert.doesNotMatch(await page.locator('#tbl').innerText(), /Cash buffer|Savings ownership/);
+    const realEvent = await page.locator('#tbl tbody tr').filter({ hasText: 'New car - requested' }).innerText();
+    assert.match(realEvent, /requested \$20,000/);
+    await page.locator('#displayMode').selectOption('nominal');
+    const nominalEvent = await page.locator('#tbl tbody tr').filter({ hasText: 'New car - requested' }).innerText();
+    assert.notEqual(nominalEvent, realEvent);
+    assert.match(nominalEvent, /selected source/);
+    await page.getByRole('button', { name: 'Export CSV', exact: true }).click();
+    const csv = await page.evaluate(() => window.__exportBlob.text());
+    assert.doesNotMatch(csv, /Cash buffer|Savings ownership/);
+    const expectedEvent = await page.locator('#tbl tbody tr').filter({ hasText: 'New car - requested' }).locator('td.event-cell').last().innerText();
+    assert.ok(csv.includes(expectedEvent.replaceAll('"', '""')));
+    await page.locator('#displayMode').selectOption('real');
+    const profile = page.locator('[data-path="people.0.superReturnProfile"]');
+    const accumulation = page.locator('[data-path="people.0.accumulationReturnPct"]');
+    const returns = page.locator('[data-path="people.0.retirementReturnPct"]');
+    await profile.selectOption('balanced');
+    await settle();
+    const balancedNominal = await page.evaluate(() => RetirementSimulatorCore.returnProfileNominalMidpoint(
+      JSON.parse(localStorage.getItem('family-retirement-simulator:v1.1.1:scenario')), 0));
+    assert.equal(Number(accumulation.inputValue()), balancedNominal);
+    assert.equal(Number(returns.inputValue()), balancedNominal);
+    await profile.selectOption('custom');
+    assert.equal(await page.locator('[data-return-context="people.0.retirementReturnPct"] .return-warning').count(), 0);
+    await profile.selectOption('balanced');
+    const issueLink = page.locator('[data-return-context="people.0.retirementReturnPct"] a.return-info');
+    assert.equal(await issueLink.getAttribute('href'), 'https://github.com/dcaddick/retirement-simulator/issues/46');
+    await returns.fill('20');
+    await returns.press('Tab');
+    await settle();
+    assert.match(await page.locator('[data-return-context="people.0.retirementReturnPct"]').innerText(), /OUT OF BAND/);
+    assert.equal(await returns.inputValue(), '20');
+    await returns.fill('6.5');
+    await returns.press('Tab');
+    await settle();
+    await page.screenshot({ path: path.join(output, 'advanced-desktop.png'), fullPage: true });
+    const dashboard = await page.locator('#kpis').innerText();
+    await page.locator('#simpleMode').click();
+    assert.equal(await page.locator('#kpis').innerText(), dashboard);
+    await page.locator('#exportScenario').click();
+    await settle();
+    const exported = await page.evaluate(() => JSON.parse(window.__savedFile.text));
+    assert.equal(exported.schemaVersion, 16);
+    assert.equal(exported.household.cashBufferYears, undefined);
+    assert.equal(exported.spendingReview, undefined);
+    await page.screenshot({ path: path.join(output, 'simple-desktop.png'), fullPage: true });
+    await page.setViewportSize({ width: 390, height: 844 });
+    await settle();
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+    await page.screenshot({ path: path.join(output, 'simple-mobile.png'), fullPage: true });
+    assert.deepEqual(errors, []);
+    console.log('v1.1.1 browser checks passed: migration, notice persistence/dismissal, strategy guidance, view parity, JSON writer, responsive layout.');
+  } finally { await browser.close(); }
+})().catch(error => { console.error(error); process.exitCode = 1; });
