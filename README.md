@@ -35,7 +35,6 @@ No server, account or build step is required.
 1. Clone or download the repository.
 2. Open `retirement-simulator.html` in a modern browser.
 3. Start with the fictional sample, create a new scenario or import your own JSON file.
-4. Optionally export the scenario and import it into `retirement-monte-carlo-v0.7.html`.
 
 The stable live filename is always `retirement-simulator.html`. Exact sanitized public releases are also retained under [`archive/`](archive/) for regression testing and comparison.
 
@@ -87,7 +86,7 @@ If you want your own accountant, registered tax agent or financial adviser to ex
 
 ## Experimental Monte Carlo companion
 
-**Development is permanently parked for now.** The v1.1.1 release targets the deterministic simulator; it does not resume Monte Carlo feature, import or parity work.
+**Development is permanently parked.** `retirement-monte-carlo-v0.7.html` is kept as a frozen, unmaintained reference. It receives no feature, import, parity or rate updates, is not tested in CI and is not deployed to GitHub Pages. It cannot import scenarios exported by v1.1.0 or later.
 
 The Monte Carlo report is deliberately labelled **experimental**. It can help compare how an imported scenario behaves under different synthetic return sequences, risk modes, glide paths and deterministic stress cases.
 
@@ -95,9 +94,9 @@ It does **not** calculate a dependable personal probability of retirement succes
 
 Use it as a sensitivity and comparison tool, not a forecast or recommendation.
 
-Monte Carlo v0.7 can import the standard deterministic sample, uses the same zero/half/full Age Pension eligibility boundary, and applies an enabled fixed first-death event in the same selected year in every path. It does not model probabilistic mortality. Because its experimental engine does not yet reproduce every deterministic cash flow, it explicitly rejects imports containing active lump-sum withdrawals, populated Other income/Other assets, active Defined Benefit/UK Pension income, or active v1.06 share growth/dividend/franking assumptions instead of silently omitting them. That broader import support is still tracked in [issue #1](https://github.com/dcaddick/retirement-simulator/issues/1); disabled or inert fields may remain because they do not affect the model.
+Monte Carlo v0.7 can import the standard deterministic sample, uses the same zero/half/full Age Pension eligibility boundary, and applies an enabled fixed first-death event in the same selected year in every path. It does not model probabilistic mortality. Because its experimental engine does not yet reproduce every deterministic cash flow, it explicitly rejects imports containing active lump-sum withdrawals, populated Other income/Other assets, active Defined Benefit/UK Pension income, or active v1.06 share growth/dividend/franking assumptions instead of silently omitting them. That broader import support ([issue #1](https://github.com/dcaddick/retirement-simulator/issues/1)) was closed as not planned; disabled or inert fields may remain because they do not affect the model.
 
-Unreleased v0.8 work uses native schema 5 and adds salary-growth parity, Other-income parity and Defined Benefit/UK Pension parity. Imported above-inflation salary growth now feeds salary, SG, tax, Age Pension assessment and household funding in every path. Other income now retains currency conversion, CPI indexation, taxable treatment, ownership and survivor continuation. Pension flows now retain their mode, start age, indexation, currency and UPP tax treatment, include toggle and survivor continuation. Monte Carlo remains experimental, and issue #1 stays open while the Other assets, lump-sum and share-return guards remain.
+The last, unreleased v0.8 work uses native schema 5 and adds salary-growth parity, Other-income parity and Defined Benefit/UK Pension parity. Imported above-inflation salary growth now feeds salary, SG, tax, Age Pension assessment and household funding in every path. Other income now retains currency conversion, CPI indexation, taxable treatment, ownership and survivor continuation. Pension flows now retain their mode, start age, indexation, currency and UPP tax treatment, include toggle and survivor continuation. The Other assets, lump-sum and share-return guards remain permanently in place.
 
 ## Privacy
 
@@ -116,14 +115,14 @@ Never commit a personal scenario to a public repository or attach one to a publi
 
 ## Testing
 
-The repository includes Node-based regression suites for both tools:
+The repository includes Node-based regression suites for the deterministic simulator:
 
 ```powershell
 node tests/retirement-simulator.test.mjs
-node tests/retirement-monte-carlo.test.mjs
+node tests/v1.1.1.test.mjs
 ```
 
-The suites exercise core calculations, schema migration, validation, CSP/market boundaries and model invariants. GitHub Actions runs both suites on every pull request and push to `main`. Browser behaviour and visual output still require a real-browser review. See [Testing](docs/TESTING.md).
+The suites exercise core calculations, schema migration, validation, CSP/market boundaries and model invariants. GitHub Actions runs these suites on every pull request and push to `main`. Browser behaviour and visual output still require a real-browser review. See [Testing](docs/TESTING.md).
 
 ## Project history
 

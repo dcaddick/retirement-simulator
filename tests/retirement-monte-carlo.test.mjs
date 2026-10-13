@@ -6,17 +6,12 @@ const html = await readFile(
   new URL('../retirement-monte-carlo-v0.7.html', import.meta.url),
   'utf8'
 );
-// Monte Carlo is parked: preserve its existing schema-14 behavior contract.
-// Apply only the separately approved shared government-rate refresh to that
-// frozen baseline; schema-15 spending/buffer parity is intentionally unsupported.
-const deterministicHtml = (await readFile(
+// Monte Carlo is permanently parked: pin it to the frozen v1.1.0 deterministic
+// baseline it was last maintained against. Not run in CI.
+const deterministicHtml = await readFile(
   new URL('../archive/retirement-simulator-v1.1.0.html', import.meta.url),
   'utf8'
-)).replace('1810.40 * 26', '1866 * 26').replace('1200.90 * 26', '1237.70 * 26')
-  .replace('deemingLowerRate: 0.0125', 'deemingLowerRate: 0.0175')
-  .replace('deemingUpperRate: 0.0325', 'deemingUpperRate: 0.0375')
-  .replace('cshcCoupleThreshold: 161768', 'cshcCoupleThreshold: 168076')
-  .replace('cshcSingleThreshold: 101105', 'cshcSingleThreshold: 105048');
+);
 const readme = await readFile(new URL('../README.md', import.meta.url), 'utf8');
 const methodology = await readFile(
   new URL('../docs/MODEL-METHODOLOGY.md', import.meta.url), 'utf8');
@@ -586,8 +581,8 @@ assert.deepEqual(plain(simulator.agePensionForHousehold({
   assets: 0, assessableIncome: 0, included: true
 })), {
   eligibleCount: 1,
-  household: 1237.70 * 26,
-  byPerson: [1237.70 * 26, 0],
+  household: 1200.90 * 26,
+  byPerson: [1200.90 * 26, 0],
   status: 'single'
 });
 
