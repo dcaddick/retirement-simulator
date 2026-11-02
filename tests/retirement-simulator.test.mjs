@@ -250,10 +250,14 @@ check('return assumptions are explained below the table',
 check('assumptions and methodology moved out of the controls panel',
   html.indexOf('<summary>Model assumptions and sources</summary>') > html.indexOf('<div class="tblwrap">') &&
   html.indexOf('id="methodologySection"') > html.indexOf('<div class="tblwrap">'));
-check('v1.1.1 document version is consistent',
-  html.includes('<title>Family Retirement Income Simulator v1.1.1</title>') &&
-  html.includes('<span class="version">v1.1.1</span>') &&
-  html.includes("const STORAGE_KEY = 'family-retirement-simulator:v1.1.1:scenario'") &&
+check('v1.1.2 document version is consistent',
+  html.includes('<title>Family Retirement Income Simulator v1.1.2</title>') &&
+  html.includes('<span class="version">v1.1.2</span>') &&
+  html.includes('<b>v1.1.2.</b>') &&
+  html.includes("const STORAGE_KEY = 'family-retirement-simulator:v1.1.2:scenario'") &&
+  html.includes("'family-retirement-simulator:v1.1.1:scenario'") &&
+  html.includes("'family-retirement-simulator:v1.1.0:scenario'") &&
+  readme.includes('[Hosted version](https://dcaddick.github.io/retirement-simulator/) v1.1.2') &&
   html.includes("'family-retirement-simulator:v1.13:scenario'") &&
   html.includes("'family-retirement-simulator:v1.12:scenario'") &&
   html.includes("'family-retirement-simulator:v1.11:scenario'") &&

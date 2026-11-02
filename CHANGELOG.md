@@ -2,8 +2,10 @@
 
 This changelog summarizes public, non-personal milestones. Early development used many private prototype snapshots; those files are intentionally not reproduced in the public repository.
 
-## Unreleased
+## 1.1.2 - 2026-11-02
 
+- Version label, footer and local storage key move to v1.1.2. Scenarios saved by v1.1.1 load automatically. No calculation, rate or schema changes.
+- Archived the outgoing v1.1.1 build, verified against its tag and checked in CI.
 - Monte Carlo companion is permanently parked: it is kept as a frozen reference with no further feature, parity or rate updates. Its suite is pinned to the archived v1.1.0 deterministic baseline and removed from CI, which fixes the CI failure on `main` after v1.1.1 (#49). Issue #1 is closed as not planned.
 - CI now verifies the v1.1.0 archive against its recorded checkout. Compared with the `v1.1.0` release tag, the archive differs only by the #48 Event-column alignment fix.
 - Rewrote the README for households, in plain language with a new "Reading your results" section, and moved run, storage, model-coverage, network, testing, Monte Carlo and history detail to [docs/TECHNICAL.md](docs/TECHNICAL.md).

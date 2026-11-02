@@ -1,6 +1,6 @@
 # Retirement Simulator
 
-### [Hosted version](https://dcaddick.github.io/retirement-simulator/)
+### [Hosted version](https://dcaddick.github.io/retirement-simulator/) v1.1.2
 
 A free retirement-income planner for Australian couples and singles. It runs entirely in your browser, needs no account, and keeps your numbers on your own device.
 
