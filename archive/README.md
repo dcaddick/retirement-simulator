@@ -21,6 +21,8 @@ The outgoing v1.12 public sample screenshot is also retained as [`retirement-sim
 
 The outgoing v1.1.0-labelled checkout, including the subsequent #48 Event-column alignment fix, is retained as `retirement-simulator-v1.1.0.html`. Verified source: `dee57d7261f64630c34842d20cc518bec7a34ba4:retirement-simulator.html`; Git blob `4511fe1d3e2c3a78e0663d2a40b4cd08f34451e6`; SHA-256 `7AE5E8E252059DFA593CA49892F07B406EE358A42064DF67BB43C11C7C70F4CD`. This is a verified checkout snapshot, checked in CI. Compared with the `v1.1.0` release tag (`b75e4f5`), it differs only by the two-line #48 Event-column alignment fix (checked 14 October 2026).
 
+The outgoing v1.1.1 release is retained as `retirement-simulator-v1.1.1.html`. Verified source: `v1.1.1:retirement-simulator.html` (`a02377a`); Git blob `0d77b5576d6373f4b14024052e17c9940e4f69f0`; SHA-256 `27115402E81D029920977A1A580F7992301EB2253C493C775A444E6DCDB78953`, checked in CI. The `v1.1.1` release asset has SHA-256 `F37430DD6930FFF03FAA7C05BAA6D8088086D5955ED0190C76F1FB1C9500C17E` because it was uploaded with Windows line endings; with line endings normalized it is identical to the tag (checked 2 November 2026).
+
 Only public fictional sample data may be stored here. Never archive personal scenarios, balances, names, screenshots, exports or private development artifacts.
 
 Before a new production iteration replaces `retirement-simulator.html`, copy the outgoing sanitized build here as `retirement-simulator-vX.Y.Z.html`, verify it against the outgoing tag or release asset, and update this table.
