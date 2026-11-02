@@ -6,6 +6,7 @@ This changelog summarizes public, non-personal milestones. Early development use
 
 - Monte Carlo companion is permanently parked: it is kept as a frozen reference with no further feature, parity or rate updates. Its suite is pinned to the archived v1.1.0 deterministic baseline and removed from CI, which fixes the CI failure on `main` after v1.1.1 (#49). Issue #1 is closed as not planned.
 - CI now verifies the v1.1.0 archive against its recorded checkout. Compared with the `v1.1.0` release tag, the archive differs only by the #48 Event-column alignment fix.
+- Rewrote the README for households, in plain language with a new "Reading your results" section, and moved run, storage, model-coverage, network, testing, Monte Carlo and history detail to [docs/TECHNICAL.md](docs/TECHNICAL.md).
 - Added a pull request template with a date-sensitive source review checklist, plus the v1.1.1 design, plan and September repair-plan documents.
 
 ## 1.1.1 - 2026-10-13

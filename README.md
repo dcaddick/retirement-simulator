@@ -1,143 +1,93 @@
 # Retirement Simulator
 
-### [Download the simulator](https://github.com/dcaddick/retirement-simulator/releases/latest/download/retirement-simulator.html) · [Open it in your browser](https://dcaddick.github.io/retirement-simulator/)
+### [Hosted version](https://dcaddick.github.io/retirement-simulator/)
 
-![Retirement Income Simulator showing the Simple starting view and projection beside it](docs/assets/retirement-simulator-v1.1.0.png)
+A free retirement-income planner for Australian couples and singles. It runs entirely in your browser, needs no account, and keeps your numbers on your own device.
+
+## What it helps you work out
+
+- Can we afford to retire at the age we have in mind?
+- How long will our super and savings last at the spending we want?
+- When might the Age Pension start, and roughly how much would it pay?
+- How much tax will we pay along the way?
+- What happens to the surviving partner if one of us dies first?
+- How far could spending drop in a bad year and still be covered?
+
+## Getting started
+
+Have these ready: each person's age and planned retirement age, super balances, cash and savings, salary if still working, and roughly what you'd like to spend each year. You can enter spending per year, month or week.
+
+Open the simulator and fill in the **Simple** view: **About you**, **What you have** and **Your retirement lifestyle**. It starts with clearly labelled fictional example amounts, so you can see how it works before typing anything personal. The projection updates as you go.
+
+When you want more detail, choose **Advanced**. It adds ownership, planned large expenses, other pensions, shares, returns, inflation and survivor settings. Switching between the views never loses anything you've entered.
+
+<img src="docs/assets/retirement-simulator-v1.1.0-chart.png" width="720" alt="Retirement Income Simulator showing the Simple starting view and projection beside it">
 
 *The simulator opens with a simple starting view. Advanced settings are available when you want them. Results are estimates, not financial advice.*
 
-The hosted version keeps scenario data in that browser's local storage. Scenarios created from a locally opened file do not automatically appear there, but you can move them with JSON export/import.
+## What it takes into account
 
-A local-first retirement-income modelling tool for Australian households. Estimates are simplified, assumptions can become stale, and results are not predictions.
+- **Work and super:** salaries, retirement ages, employer super guarantee contributions, and super growth until you retire.
+- **Drawing down in retirement:** access to super from 60, the minimum yearly pension withdrawals, and the order you choose to draw on super, savings and other money.
+- **The Age Pension:** the income and assets tests, deeming, the Work Bonus, and the Commonwealth Seniors Health Card, including couples where only one partner has reached pension age.
+- **Tax:** income tax, the Medicare levy and the main senior and low-income offsets, plus capital gains tax when shares are sold.
+- **Investments:** cash, savings, shares with dividends and franking credits, and other assets and income.
+- **Other pensions:** Australian defined-benefit pensions and the UK State Pension.
+- **Big one-off costs:** a new car, renovations or travel, with a clear warning if one can't be fully paid for.
+- **Couples and survivors:** an optional "what if one of us dies first" scenario covering inherited super, survivor spending and the switch to single-person tax and pension rules.
 
-The header carries a "Get the latest version" link to the GitHub releases page. It is an ordinary link: the file never contacts GitHub or checks for updates on its own.
+## Reading your results
 
-## Yours to download and use
+- **Preferred** is the income you'd like to spend in a normal year. The projection always follows it.
+- **Essential** is the minimum you could live on in a bad year. The chart draws it as a line so you can see how much room you have, but the projection never invents bad years for you.
+- **Projected shortfall** names the first year your money can't cover Preferred spending, if there is one.
+- **Today's dollars** shows every year's figures in current spending power, so amounts 20 years out are easy to compare. Switch to **nominal dollars** to see the actual future amounts.
+- An **amber warning** means a planned one-off cost can't be fully paid for. It doesn't change the yearly spending result shown separately.
+- The year-by-year table shows where each year's money comes from and where it goes. You can export it to a spreadsheet.
 
-Download the HTML files, keep them locally, modify them and use them however the licence permits. There are no accounts, analytics, advertising pixels, trackers, telemetry or background callbacks. Scenario data stays in your browser's local storage.
+Advanced settings also suggest a simple habit: every six or twelve months, look at the next two years of spending and planned costs, and top up savings from super if you want a buffer. That suggestion is guidance only and isn't built into the projection.
 
-The only network requests are optional and user-triggered: a US share-price lookup through Stooq and a currency-rate lookup through Frankfurter. The simulator works without either service, and the interface tells you before those requests are used.
+## What it won't do
+
+- **It isn't financial advice.** It's an educational estimate built for one household's planning and shared openly. It isn't a regulated calculator.
+- **Rules and rates change.** Pension, tax and deeming figures are dated and will go out of date. The simulator tells you when its built-in figures may have been superseded.
+- **Super before 60 isn't modelled.** Super access age must be 60 or older.
+- **Results aren't predictions.** Returns, inflation, health and policy won't follow any fixed assumption.
+
+The [Deferred Review Register](docs/DEFERRED-REVIEW.md) lists known limitations openly.
+
+## Your data stays with you
+
+- Calculations happen in your browser. Nothing you enter is uploaded, and no account is needed.
+- There are no ads, trackers or analytics.
+- Scenarios are saved in your browser automatically. That storage is convenient but not encrypted.
+- You can export a scenario to a file and import it again later or on another device. Treat that file like a bank statement.
+- The hosted version keeps scenarios in that browser's local storage. Scenarios from a downloaded copy do not automatically appear there, and the reverse is also true; move them with JSON export/import.
+- If you use the hosted version, GitHub Pages serves the page, so GitHub sees ordinary web-request details such as the visitor IP address. Your scenario is never sent to GitHub.
+- The only optional network lookups are US share prices and exchange rates, and the simulator tells you before using them.
+
+Never post a personal scenario in a public issue. Use made-up numbers to report a problem. See [Security and privacy reporting](SECURITY.md).
+
+**[Download the simulator](https://github.com/dcaddick/retirement-simulator/releases/latest/download/retirement-simulator.html)** to keep your own copy. It's a single file that runs offline in your browser.
+
+## Getting a second opinion
+
+No independent review of this simulator has been performed. Nothing here is verified, certified or endorsed.
+
+If you'd like your accountant, tax agent or financial adviser to check the model before you rely on it, the [Independent Review Materials](docs/independent-review/README.md) give them everything they need: the exact release, how each rule is calculated, the official sources behind it, worked example scenarios and the project's own list of known problems.
+
+<!-- Outside Australia? cross-link placeholder: add once agreed with mjcrepeau/retirement-planner (US and Canada). -->
 
 ## Inspiration
 
 The income-chart concept and survival-context treatment were inspired by the retirement income graphs in [SuperCalcs Retirement Income Simulator](https://supercalcs.com.au/ris9/mst/graphs). This project is an independent implementation with its own transparent assumptions and calculation model; it is not affiliated with or endorsed by SuperCalcs.
 
-## Why this exists
+## For developers and reviewers
 
-This started as a tool for understanding one household's retirement choices. It is not a commercial product, a regulated calculator or a promise of universal suitability. It is published under an open-source licence so people can inspect it, adapt it, raise issues and propose improvements.
+The [technical overview](docs/TECHNICAL.md) covers running it locally, storage, the full model coverage, network boundaries, testing, the parked Monte Carlo companion and project history. [Model methodology](docs/MODEL-METHODOLOGY.md) sets out the calculation sequence, and the [changelog](CHANGELOG.md) records each release.
 
-There are no guarantees about support, response times, future maintenance or acceptance of contributions.
-
-## Run it
-
-No server, account or build step is required.
-
-1. Clone or download the repository.
-2. Open `retirement-simulator.html` in a modern browser.
-3. Start with the fictional sample, create a new scenario or import your own JSON file.
-
-The stable live filename is always `retirement-simulator.html`. Exact sanitized public releases are also retained under [`archive/`](archive/) for regression testing and comparison.
-
-Scenario data stays in the browser's local storage unless you explicitly import or export a file. Both pages include a locally remembered light/dark theme control.
-
-## Retirement Simulator
-
-The settings panel starts in **Simple**, with three short sections: **About you**, **What you have**, and **Your retirement lifestyle**. Enter ages, retirement ages, super, cash and savings, and one household spending goal. Salary appears only while someone is still working. Spending can be entered per year, month or week (12 months or 52 weeks per year).
-
-Choose **Advanced** or **Explore more options** for the full editor, including names, ownership, planned spending, pensions, investments, returns, inflation and survivor settings. Both views use the same scenario and calculations; switching views preserves every value. The chosen view and spending period are remembered locally, separately from exported scenario data.
-
-Fresh starts and **New** use labelled fictional example amounts with no planned expenses and equal preferred-income and essential-budget targets. Editing that single spending goal updates both while they remain equal. Imported or saved scenarios with different targets keep their separate essential budget, with a link to review it in Advanced. **Reset sample** still restores the original, more detailed sample. Single-household joint balances retain the existing 50% inclusion rule, which Simple explains beside the affected account.
-
-The deterministic simulator models either a couple or a single-person household and includes:
-
-- salaries, retirement ages and superannuation contributions;
-- accumulation and retirement-phase super balances;
-- super access from age 60 and ordered drawdown tiers;
-- planned lump-sum withdrawals with requested, funded and unfunded audit output plus a separate affordability warning;
-- cash, savings, shareholdings, other income and other assets;
-- individual Other Asset selection as a financial investment for Age Pension deeming, while every Other Asset remains in the assets test;
-- nominal share-price growth, holding-period dividends and optional franking credits by owner;
-- per-person capital-loss netting and carry-forward, with CGT funded from assets rather than counted as retirement income;
-- Australian income-tax estimates, Medicare, LITO/SAPTO, Age Pension and CSHC estimates, including one partnered share when only one partner has reached Age Pension age;
-- Australian defined-benefit and UK State Pension support;
-- an optional fixed first-death scenario with immediate survivor spending, ownership, inherited-super, continuing-income, tax and single Age Pension transitions;
-- optional per-person salary growth above inflation, defaulting to 0%;
-- account-based pension minimum drawdowns;
-- Preferred Retirement Income, Essential Annual Budget and surplus banking;
-- today's-dollar and nominal-dollar views;
-- year-by-year projection tables, visible-table CSV export and inspectable charts;
-- local autosave plus JSON import and export.
-
-In **Single** mode, Person 1 is the sole modelled person from the first year. Saved Person 2 details and Person 2-owned records are hidden, preserved for a later switch back to **Couple**, and contribute nothing to calculations or output. Joint 50/50 records contribute only Person 1's 50% share. Single mode uses the entered Preferred Retirement Income and Essential Annual Budget in full, applies single-person tax and government-support rules immediately, and does not trigger first-death, inheritance or survivor-percentage logic. This household-type control is currently deterministic-only; the experimental Monte Carlo companion is unchanged.
-
-Return assumptions and inflation are shown together. The interface calculates the nominal-minus-inflation spread live, showing both the long-run 2.5% view and the near-term Treasury rate when they differ.
-
-An amber dashboard warning makes any unfunded lump-sum amount visible without changing the separate annual-budget status.
-
-Both tools require a super access age of 60 or older. They treat super withdrawals as tax-free and do not model the additional tax rules that may apply before age 60.
-
-The app favours transparent approximations over hidden precision. See [Model methodology](docs/MODEL-METHODOLOGY.md) for the calculation sequence and boundaries, and the maintained [Deferred Review Register](docs/DEFERRED-REVIEW.md) for known limitations that require later professional review, product decisions or separately designed remediation.
-
-## Having it checked by your own professional
-
-No independent review of this simulator has been performed. Nothing here is verified, certified or endorsed.
-
-If you want your own accountant, registered tax agent or financial adviser to examine the model before you rely on it, the [Independent Review Materials](docs/independent-review/README.md) give them what they need without asking anyone's permission: the exact release identity and hash, a rule-by-rule map from the documented methodology to the code, the external sources each rule depends on and their effective periods, fictional reference scenarios with an independent-calculation protocol, the test evidence and its limits, and the project's own list of open defects.
-
-## Experimental Monte Carlo companion
-
-**Development is permanently parked.** `retirement-monte-carlo-v0.7.html` is kept as a frozen, unmaintained reference. It receives no feature, import, parity or rate updates, is not tested in CI and is not deployed to GitHub Pages. It cannot import scenarios exported by v1.1.0 or later.
-
-The Monte Carlo report is deliberately labelled **experimental**. It can help compare how an imported scenario behaves under different synthetic return sequences, risk modes, glide paths and deterministic stress cases.
-
-It does **not** calculate a dependable personal probability of retirement success. Its output depends on user-selected assumptions and a simplified stochastic model. Inflation, tax law, policy, employment, health, aged care, property, foreign exchange and longevity are not all stochastic.
-
-Use it as a sensitivity and comparison tool, not a forecast or recommendation.
-
-Monte Carlo v0.7 can import the standard deterministic sample, uses the same zero/half/full Age Pension eligibility boundary, and applies an enabled fixed first-death event in the same selected year in every path. It does not model probabilistic mortality. Because its experimental engine does not yet reproduce every deterministic cash flow, it explicitly rejects imports containing active lump-sum withdrawals, populated Other income/Other assets, active Defined Benefit/UK Pension income, or active v1.06 share growth/dividend/franking assumptions instead of silently omitting them. That broader import support ([issue #1](https://github.com/dcaddick/retirement-simulator/issues/1)) was closed as not planned; disabled or inert fields may remain because they do not affect the model.
-
-The last, unreleased v0.8 work uses native schema 5 and adds salary-growth parity, Other-income parity and Defined Benefit/UK Pension parity. Imported above-inflation salary growth now feeds salary, SG, tax, Age Pension assessment and household funding in every path. Other income now retains currency conversion, CPI indexation, taxable treatment, ownership and survivor continuation. Pension flows now retain their mode, start age, indexation, currency and UPP tax treatment, include toggle and survivor continuation. The Other assets, lump-sum and share-return guards remain permanently in place.
-
-## Privacy
-
-- Core calculations run locally in the browser.
-- The optional GitHub Pages version is served by GitHub. GitHub receives ordinary web-request metadata, including the visitor IP address, but the simulator does not send scenario contents to GitHub.
-- No account is required.
-- Scenario data is not uploaded by the core calculation tools.
-- Browser local storage is convenient but not encrypted.
-- Exported JSON files may contain highly sensitive financial information.
-- Share prices are manual by default. Choosing **US market (Stooq)** and pressing fetch sends the requested US ticker to Stooq and requests USD/AUD from Frankfurter.
-- Those optional requests expose ordinary network metadata, including the browser's IP address, to the relevant third party. Manual pricing makes no market-data request.
-
-The application CSP limits browser connections to `stooq.com` and `api.frankfurter.app`. It cannot control how those independent services process their request logs.
-
-Never commit a personal scenario to a public repository or attach one to a public issue. Reproduce bugs with fictional values. See [Security and privacy reporting](SECURITY.md).
-
-## Testing
-
-The repository includes Node-based regression suites for the deterministic simulator:
-
-```powershell
-node tests/retirement-simulator.test.mjs
-node tests/v1.1.1.test.mjs
-```
-
-The suites exercise core calculations, schema migration, validation, CSP/market boundaries and model invariants. GitHub Actions runs these suites on every pull request and push to `main`. Browser behaviour and visual output still require a real-browser review. See [Testing](docs/TESTING.md).
-
-## Project history
-
-The original work evolved through many private prototypes. The public repository keeps the current tools, a sanitized [changelog](CHANGELOG.md), and exact sanitized production snapshots under [`archive/`](archive/) so technically capable users can compare and test older public iterations. Personal scenarios and private development artifacts are never archived here.
-
-## Contributing
-
-Issues, feature requests, forks and pull requests are welcome. Modelling changes should include dated authoritative sources, explicit assumptions and regression tests. Please read [CONTRIBUTING.md](CONTRIBUTING.md) first.
+Issues, feature requests, forks and pull requests are welcome, though there are no guarantees of support or maintenance. Modelling changes should include dated official sources, explicit assumptions and regression tests. Please read [CONTRIBUTING.md](CONTRIBUTING.md) first.
 
 ## Licence
 
 Licensed under the [Apache License 2.0](LICENSE). The software is provided on an "AS IS" basis, without warranties or conditions of any kind.
-
-### Version 1.1.1
-
-Preferred means normal spending, and Essential is the bad-year floor. The ordinary deterministic projection follows Preferred; it does not create bad years. When an older scenario is migrated, both spending values start at the previous Essential amount and a notice asks you to review the change.
-
-Advanced settings describe a suggested manual strategy: every six or twelve months, review the next two years of spending and anticipated lump sums, then top up Savings from super if desired. This is guidance only and is not calculated in projections, tables or charts. Lump-sum events now show requested, funded and unfunded amounts and their actual funding sources. Broad super risk profiles update suggested returns while leaving them editable; linked evidence explains the reference ranges.
