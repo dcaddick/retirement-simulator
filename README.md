@@ -62,6 +62,8 @@ The [Deferred Review Register](docs/DEFERRED-REVIEW.md) lists known limitations 
 - There are no ads, trackers or analytics.
 - Scenarios are saved in your browser automatically. That storage is convenient but not encrypted.
 - You can export a scenario to a file and import it again later or on another device. Treat that file like a bank statement.
+- The hosted version keeps scenarios in that browser's local storage. Scenarios from a downloaded copy do not automatically appear there, and the reverse is also true; move them with JSON export/import.
+- If you use the hosted version, GitHub Pages serves the page, so GitHub sees ordinary web-request details such as the visitor IP address. Your scenario is never sent to GitHub.
 - The only optional network lookups are US share prices and exchange rates, and the simulator tells you before using them.
 
 Never post a personal scenario in a public issue. Use made-up numbers to report a problem. See [Security and privacy reporting](SECURITY.md).

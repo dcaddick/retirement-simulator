@@ -52,6 +52,7 @@ const SCREENSHOT_110 = fileURLToPath(
   new URL('../docs/assets/retirement-simulator-v1.1.0.png', import.meta.url)
 );
 const README = fileURLToPath(new URL('../README.md', import.meta.url));
+const TECHNICAL = fileURLToPath(new URL('../docs/TECHNICAL.md', import.meta.url));
 const PAGES_WORKFLOW = fileURLToPath(
   new URL('../.github/workflows/deploy-pages.yml', import.meta.url)
 );
@@ -63,6 +64,7 @@ const methodology = readFileSync(METHODOLOGY, 'utf8');
 const testingGuide = readFileSync(TESTING, 'utf8');
 const changelog = readFileSync(CHANGELOG, 'utf8');
 const readme = readFileSync(README, 'utf8');
+const technical = readFileSync(TECHNICAL, 'utf8');
 const archiveReadme = readFileSync(ARCHIVE_README, 'utf8');
 const testWorkflow = readFileSync(TEST_WORKFLOW, 'utf8');
 const pagesWorkflow = existsSync(PAGES_WORKFLOW)
@@ -402,22 +404,23 @@ check('methodology records prototype architecture rationale',
 check('README places download links directly above the v1.1.0 screenshot',
   readme.indexOf('[Download the simulator]') < readme.indexOf('docs/assets/retirement-simulator-v1.1.0.png') &&
   readme.indexOf('[Open it in your browser]') < readme.indexOf('docs/assets/retirement-simulator-v1.1.0.png') &&
-  readme.indexOf('docs/assets/retirement-simulator-v1.1.0.png') < readme.indexOf('A local-first retirement-income modelling tool') &&
+  readme.indexOf('docs/assets/retirement-simulator-v1.1.0.png') < readme.indexOf('A free retirement-income planner') &&
   readme.includes('v1.1.0') &&
   readme.includes('docs/assets/retirement-simulator-v1.1.0.png') &&
   existsSync(SCREENSHOT_110) &&
   !readme.includes('captured from v1.12') &&
-  readme.includes('retirement-monte-carlo-v0.7.html') &&
-  readme.includes('one partner') && readme.includes('franking') &&
-  readme.includes('capital-loss') && readme.includes('docs/DEFERRED-REVIEW.md'));
+  readme.includes('docs/TECHNICAL.md') && readme.includes('docs/DEFERRED-REVIEW.md') &&
+  technical.includes('retirement-monte-carlo-v0.7.html') &&
+  technical.includes('one partner') && technical.includes('franking') &&
+  technical.includes('capital-loss'));
 check('v1.09 documents lump-sum affordability warnings',
-  readme.includes('unfunded lump-sum') &&
+  technical.includes('unfunded lump-sum') &&
   methodology.includes('requested, funded and unfunded') &&
   testingGuide.includes('partially and completely unfunded'));
 check('Monte Carlo is documented as permanently parked',
-  readme.includes('**Development is permanently parked.**') &&
-  readme.includes('not tested in CI') &&
-  readme.includes('retirement-monte-carlo-v0.7.html'));
+  technical.includes('**Development is permanently parked.**') &&
+  technical.includes('not tested in CI') &&
+  technical.includes('retirement-monte-carlo-v0.7.html'));
 check('release docs define the fixed first-death boundary',
   methodology.includes('start of the selected projection year') &&
   methodology.includes('No bereavement payment') &&
@@ -426,8 +429,8 @@ check('deferred register resolves the survivor-state item',
   deferredReview.includes('AIPR-003-MORTALITY') &&
   deferredReview.includes('Resolved in v1.0.8/v0.7'));
 check('Monte Carlo scope issue is linked as closed, not planned',
-  readme.includes('issues/1') &&
-  readme.includes('closed as not planned'));
+  technical.includes('issues/1') &&
+  technical.includes('closed as not planned'));
 check('browser checklist covers survivor state in both tools',
   testingGuide.includes('fixed first-death') &&
   testingGuide.includes('every Monte Carlo path'));
@@ -456,7 +459,7 @@ check('deferred register resolves the age-gap item',
   deferredReview.includes('AIPR-003-AP-AGEGAP') &&
   deferredReview.includes('Resolved in v1.0.7'));
 check('public docs explain the supported age-60 super boundary',
-  readme.includes('super access age of 60 or older') &&
+  technical.includes('super access age of 60 or older') &&
   methodology.includes('Super access age is limited to 60 or older') &&
   testingGuide.includes('age 59 is rejected') &&
   testingGuide.includes('age 60 is accepted'));
@@ -2862,7 +2865,7 @@ check('single assumptions omit inactive people and owned records',
   html.includes('activeOwnedEntries(scenario, scenario.otherIncomes ?? [])') &&
   html.includes('activeOwnedEntries(scenario, scenario.otherAssets ?? [])'));
 check('public docs define deterministic single household boundaries',
-  readme.includes('Person 2-owned records are hidden') &&
+  technical.includes('Person 2-owned records are hidden') &&
   methodology.includes('### Explicit single household') &&
   methodology.includes('Person 2-owned cash, savings, shares, Other income and Other assets') &&
   methodology.includes('currently deterministic-only'));
