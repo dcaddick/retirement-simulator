@@ -1,10 +1,6 @@
 # Retirement Simulator
 
-### [Download the simulator](https://github.com/dcaddick/retirement-simulator/releases/latest/download/retirement-simulator.html) · [Open it in your browser](https://dcaddick.github.io/retirement-simulator/)
-
-![Retirement Income Simulator showing the Simple starting view and projection beside it](docs/assets/retirement-simulator-v1.1.0.png)
-
-*The simulator opens with a simple starting view. Advanced settings are available when you want them. Results are estimates, not financial advice.*
+### [Hosted version](https://dcaddick.github.io/retirement-simulator/)
 
 A free retirement-income planner for Australian couples and singles. It runs entirely in your browser, needs no account, and keeps your numbers on your own device.
 
@@ -24,6 +20,10 @@ Have these ready: each person's age and planned retirement age, super balances, 
 Open the simulator and fill in the **Simple** view: **About you**, **What you have** and **Your retirement lifestyle**. It starts with clearly labelled fictional example amounts, so you can see how it works before typing anything personal. The projection updates as you go.
 
 When you want more detail, choose **Advanced**. It adds ownership, planned large expenses, other pensions, shares, returns, inflation and survivor settings. Switching between the views never loses anything you've entered.
+
+<img src="docs/assets/retirement-simulator-v1.1.0.png" width="480" alt="Retirement Income Simulator showing the Simple starting view and projection beside it">
+
+*The simulator opens with a simple starting view. Advanced settings are available when you want them. Results are estimates, not financial advice.*
 
 ## What it takes into account
 
@@ -67,6 +67,8 @@ The [Deferred Review Register](docs/DEFERRED-REVIEW.md) lists known limitations 
 - The only optional network lookups are US share prices and exchange rates, and the simulator tells you before using them.
 
 Never post a personal scenario in a public issue. Use made-up numbers to report a problem. See [Security and privacy reporting](SECURITY.md).
+
+**[Download the simulator](https://github.com/dcaddick/retirement-simulator/releases/latest/download/retirement-simulator.html)** to keep your own copy. It's a single file that runs offline in your browser.
 
 ## Getting a second opinion
 

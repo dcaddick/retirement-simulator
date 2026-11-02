@@ -401,10 +401,12 @@ check('methodology discloses childless Medicare family scope',
 check('methodology records prototype architecture rationale',
   methodology.includes('personal prototype') &&
   methodology.includes('thousands of users'));
-check('README places download links directly above the v1.1.0 screenshot',
-  readme.indexOf('[Download the simulator]') < readme.indexOf('docs/assets/retirement-simulator-v1.1.0.png') &&
-  readme.indexOf('[Open it in your browser]') < readme.indexOf('docs/assets/retirement-simulator-v1.1.0.png') &&
-  readme.indexOf('docs/assets/retirement-simulator-v1.1.0.png') < readme.indexOf('A free retirement-income planner') &&
+check('README leads with the hosted version and shows the v1.1.0 screenshot in Getting started',
+  readme.indexOf('[Hosted version]') < readme.indexOf('A free retirement-income planner') &&
+  readme.indexOf('## Getting started') < readme.indexOf('docs/assets/retirement-simulator-v1.1.0.png') &&
+  readme.indexOf('docs/assets/retirement-simulator-v1.1.0.png') < readme.indexOf('## What it takes into account') &&
+  readme.indexOf('## Your data stays with you') < readme.indexOf('[Download the simulator]') &&
+  readme.indexOf('[Download the simulator]') < readme.indexOf('## Getting a second opinion') &&
   readme.includes('v1.1.0') &&
   readme.includes('docs/assets/retirement-simulator-v1.1.0.png') &&
   existsSync(SCREENSHOT_110) &&
@@ -2898,10 +2900,11 @@ const downloadLinkIndex = readme.indexOf(
   'https://github.com/dcaddick/retirement-simulator/releases/latest/download/retirement-simulator.html'
 );
 const hostedLinkIndex = readme.indexOf(pagesUrl);
-check('README offers the hosted simulator beneath the download',
+check('README offers the hosted simulator above the download',
   downloadLinkIndex >= 0 &&
-  hostedLinkIndex > downloadLinkIndex &&
-  readme.includes('Open it in your browser'));
+  hostedLinkIndex >= 0 &&
+  hostedLinkIndex < downloadLinkIndex &&
+  readme.includes('Hosted version'));
 check('README explains hosted storage and transfer boundaries',
   readme.includes("that browser's local storage") &&
   readme.includes('do not automatically appear') &&
