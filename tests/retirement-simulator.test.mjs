@@ -51,6 +51,9 @@ const CHANGELOG = fileURLToPath(new URL('../CHANGELOG.md', import.meta.url));
 const SCREENSHOT_110 = fileURLToPath(
   new URL('../docs/assets/retirement-simulator-v1.1.0.png', import.meta.url)
 );
+const SCREENSHOT_110_CHART = fileURLToPath(
+  new URL('../docs/assets/retirement-simulator-v1.1.0-chart.png', import.meta.url)
+);
 const README = fileURLToPath(new URL('../README.md', import.meta.url));
 const TECHNICAL = fileURLToPath(new URL('../docs/TECHNICAL.md', import.meta.url));
 const PAGES_WORKFLOW = fileURLToPath(
@@ -403,13 +406,13 @@ check('methodology records prototype architecture rationale',
   methodology.includes('thousands of users'));
 check('README leads with the hosted version and shows the v1.1.0 screenshot in Getting started',
   readme.indexOf('[Hosted version]') < readme.indexOf('A free retirement-income planner') &&
-  readme.indexOf('## Getting started') < readme.indexOf('docs/assets/retirement-simulator-v1.1.0.png') &&
-  readme.indexOf('docs/assets/retirement-simulator-v1.1.0.png') < readme.indexOf('## What it takes into account') &&
+  readme.indexOf('## Getting started') < readme.indexOf('docs/assets/retirement-simulator-v1.1.0-chart.png') &&
+  readme.indexOf('docs/assets/retirement-simulator-v1.1.0-chart.png') < readme.indexOf('## What it takes into account') &&
   readme.indexOf('## Your data stays with you') < readme.indexOf('[Download the simulator]') &&
   readme.indexOf('[Download the simulator]') < readme.indexOf('## Getting a second opinion') &&
   readme.includes('v1.1.0') &&
-  readme.includes('docs/assets/retirement-simulator-v1.1.0.png') &&
-  existsSync(SCREENSHOT_110) &&
+  readme.includes('docs/assets/retirement-simulator-v1.1.0-chart.png') &&
+  existsSync(SCREENSHOT_110) && existsSync(SCREENSHOT_110_CHART) &&
   !readme.includes('captured from v1.12') &&
   readme.includes('docs/TECHNICAL.md') && readme.includes('docs/DEFERRED-REVIEW.md') &&
   technical.includes('retirement-monte-carlo-v0.7.html') &&

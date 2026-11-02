@@ -21,7 +21,7 @@ Open the simulator and fill in the **Simple** view: **About you**, **What you ha
 
 When you want more detail, choose **Advanced**. It adds ownership, planned large expenses, other pensions, shares, returns, inflation and survivor settings. Switching between the views never loses anything you've entered.
 
-<img src="docs/assets/retirement-simulator-v1.1.0.png" width="480" alt="Retirement Income Simulator showing the Simple starting view and projection beside it">
+<img src="docs/assets/retirement-simulator-v1.1.0-chart.png" width="720" alt="Retirement Income Simulator showing the Simple starting view and projection beside it">
 
 *The simulator opens with a simple starting view. Advanced settings are available when you want them. Results are estimates, not financial advice.*
 
